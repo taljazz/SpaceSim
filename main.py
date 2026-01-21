@@ -276,46 +276,154 @@ def update_loop():
         pygame.draw.line(screen, (255, 0, 0), (cursor_x - 5, cursor_y), (cursor_x + 5, cursor_y))
         pygame.draw.line(screen, (255, 0, 0), (cursor_x, cursor_y - 5), (cursor_x, cursor_y + 5))
     else:
-        # Draw golden spiral for ship visualization
-        max_r = 20
+        # Get ship center for all drawings
+        ship_center = project_to_2d(ship.position, ship.view_rotation)
+
+        # Calculate movement properties
+        velocity_mag = np.linalg.norm(ship.velocity)
+        glow_intensity = min(1.0, velocity_mag / ship.max_velocity)
+        avg_resonance = np.mean(ship.resonance_levels)
+
+        # === MOTION TRAIL (velocity streaks behind ship) ===
+        if velocity_mag > 0.5:
+            # Draw fading trail lines behind ship
+            vel_angle = np.arctan2(ship.velocity[1], ship.velocity[0])
+            for trail_i in range(5):
+                trail_alpha = int(150 * (1 - trail_i / 5) * glow_intensity)
+                trail_length = 10 + trail_i * 8
+                trail_spread = trail_i * 3
+                # Calculate trail position (behind ship)
+                trail_x = ship_center[0] - np.cos(vel_angle) * trail_length
+                trail_y = ship_center[1] - np.sin(vel_angle) * trail_length
+                # Add some spread
+                offset_angle = vel_angle + np.pi/2
+                trail_x1 = trail_x + np.cos(offset_angle) * trail_spread
+                trail_y1 = trail_y + np.sin(offset_angle) * trail_spread
+                trail_x2 = trail_x - np.cos(offset_angle) * trail_spread
+                trail_y2 = trail_y - np.sin(offset_angle) * trail_spread
+                trail_color = (255, 200, int(50 + 100 * (1 - trail_i / 5)))
+                pygame.draw.line(screen, trail_color, ship_center, (int(trail_x1), int(trail_y1)), 1)
+                pygame.draw.line(screen, trail_color, ship_center, (int(trail_x2), int(trail_y2)), 1)
+
+        # === BREATHING SPIRAL (pulses with resonance) ===
+        # Spiral size breathes based on average resonance
+        breath = 1.0 + 0.15 * np.sin(anim_time * 2) * avg_resonance
+        max_r = 20 * breath
         theta_max = 6 * np.pi
-        a = max_r / (PHI ** (2 * theta_max / np.pi))
+        spiral_a = max_r / (PHI ** (2 * theta_max / np.pi))
+
+        # Add subtle rotation animation based on resonance
+        spiral_rotation = anim_time * 0.3 * avg_resonance
+
         theta = np.linspace(0, theta_max, 100)
-        r = a * PHI ** (2 * theta / np.pi)
-        x = r * np.cos(theta + ship.heading)
-        y = r * np.sin(theta + ship.heading)
+        r = spiral_a * PHI ** (2 * theta / np.pi)
+        x = r * np.cos(theta + ship.heading + spiral_rotation)
+        y = r * np.sin(theta + ship.heading + spiral_rotation)
         spiral_points = np.tile(ship.position, (100, 1))
         spiral_points[:, 0] += x
         spiral_points[:, 1] += y
         screen_points = [project_to_2d(p, ship.view_rotation) for p in spiral_points]
-        pygame.draw.lines(screen, (255, 255, 0) if not ship.high_contrast else (0, 0, 255), False, screen_points, 2)
 
-        # Draw engine points on spiral with dynamic glow based on velocity
+        # === SPIRAL COLOR GRADIENT (shifts based on Tuaoi mode and resonance) ===
+        # Draw spiral segments with color gradient
+        tuaoi_colors = {
+            'healing': (0, 255, 100),
+            'navigation': (100, 150, 255),
+            'communication': (255, 255, 100),
+            'power': (255, 100, 100),
+            'regeneration': (200, 100, 255),
+            'transcendence': (255, 255, 255)
+        }
+        base_spiral_color = tuaoi_colors.get(ship.tuaoi_mode, (255, 255, 0))
+
+        for seg_i in range(len(screen_points) - 1):
+            # Color shifts along spiral
+            t = seg_i / len(screen_points)
+            color_shift = 0.5 + 0.5 * np.sin(anim_time * 4 + t * 6)
+            seg_color = tuple(int(c * (0.5 + 0.5 * color_shift)) for c in base_spiral_color)
+            if not ship.high_contrast:
+                pygame.draw.line(screen, seg_color, screen_points[seg_i], screen_points[seg_i + 1], 2)
+            else:
+                pygame.draw.line(screen, (0, 0, 255), screen_points[seg_i], screen_points[seg_i + 1], 2)
+
+        # === ENERGY FLOW PARTICLES (dots flowing along spiral) ===
+        num_particles = 8
+        for p_i in range(num_particles):
+            # Particle position moves along spiral over time
+            particle_t = (anim_time * 0.5 + p_i / num_particles) % 1.0
+            particle_idx = int(particle_t * (len(screen_points) - 1))
+            if particle_idx < len(screen_points):
+                px, py = screen_points[particle_idx]
+                # Particle brightness pulses
+                p_bright = 0.6 + 0.4 * np.sin(anim_time * 6 + p_i)
+                p_color = tuple(int(c * p_bright) for c in base_spiral_color)
+                pygame.draw.circle(screen, p_color, (int(px), int(py)), 3)
+
+        # === TUAOI CRYSTAL CORE (hexagonal center with mode color) ===
+        core_pulse = 0.8 + 0.2 * np.sin(anim_time * 3)
+        core_size = int(8 * core_pulse)
+        core_color = tuple(int(c * core_pulse) for c in base_spiral_color)
+
+        # Draw hexagonal crystal core (6 sides for Tuaoi)
+        hex_points = []
+        for h_i in range(6):
+            h_angle = h_i * (np.pi / 3) + anim_time * 0.5
+            hx = ship_center[0] + core_size * np.cos(h_angle)
+            hy = ship_center[1] + core_size * np.sin(h_angle)
+            hex_points.append((hx, hy))
+        pygame.draw.polygon(screen, core_color, hex_points, 2)
+
+        # Inner glow
+        inner_hex_points = []
+        for h_i in range(6):
+            h_angle = h_i * (np.pi / 3) + anim_time * 0.5
+            hx = ship_center[0] + (core_size * 0.5) * np.cos(h_angle)
+            hy = ship_center[1] + (core_size * 0.5) * np.sin(h_angle)
+            inner_hex_points.append((hx, hy))
+        inner_color = tuple(min(255, int(c * 1.3)) for c in core_color)
+        pygame.draw.polygon(screen, inner_color, inner_hex_points)
+
+        # === ENGINE POINTS with enhanced glow ===
         theta_engines = np.array([theta_max - i * (np.pi / PHI) for i in range(3)])
-        r_engines = a * PHI ** (2 * theta_engines / np.pi)
-        x_engines = r_engines * np.cos(theta_engines + ship.heading)
-        y_engines = r_engines * np.sin(theta_engines + ship.heading)
+        r_engines = spiral_a * PHI ** (2 * theta_engines / np.pi)
+        x_engines = r_engines * np.cos(theta_engines + ship.heading + spiral_rotation)
+        y_engines = r_engines * np.sin(theta_engines + ship.heading + spiral_rotation)
         engine_points = np.tile(ship.position, (3, 1))
         engine_points[:, 0] += x_engines
         engine_points[:, 1] += y_engines
         screen_engine_points = [project_to_2d(p, ship.view_rotation) for p in engine_points]
 
-        # Engine glow intensity based on velocity
-        velocity_mag = np.linalg.norm(ship.velocity)
-        glow_intensity = min(1.0, velocity_mag / ship.max_velocity)
-        engine_pulse = 0.7 + 0.3 * np.sin(anim_time * 8)  # Fast pulse
+        engine_pulse = 0.7 + 0.3 * np.sin(anim_time * 8)
 
-        for ep in screen_engine_points:
-            # Outer glow based on velocity
+        for eng_i, ep in enumerate(screen_engine_points):
+            # Outer glow based on velocity (larger, more intense when moving)
             if glow_intensity > 0.1:
-                glow_size = int(8 + 6 * glow_intensity * engine_pulse)
-                glow_color = (255, int(100 + 100 * (1 - glow_intensity)), 0)
-                pygame.draw.circle(screen, glow_color, ep, glow_size)
-            # Core engine point
-            pygame.draw.circle(screen, (255, 0, 0) if not ship.high_contrast else (0, 255, 0), ep, 5)
+                glow_size = int(10 + 8 * glow_intensity * engine_pulse)
+                # Color shifts orange->white with speed
+                glow_r = 255
+                glow_g = int(100 + 155 * (1 - glow_intensity))
+                glow_b = int(50 * (1 - glow_intensity))
+                pygame.draw.circle(screen, (glow_r, glow_g, glow_b), ep, glow_size)
+                # Secondary inner glow
+                pygame.draw.circle(screen, (255, 200, 100), ep, int(glow_size * 0.6))
+
+            # Engine core with per-engine pulse offset
+            eng_pulse = 0.7 + 0.3 * np.sin(anim_time * 10 + eng_i * 2)
+            eng_color = (255, int(50 * eng_pulse), 0) if not ship.high_contrast else (0, 255, 0)
+            pygame.draw.circle(screen, eng_color, ep, 5)
+
+            # Tiny exhaust particles when moving
+            if velocity_mag > 1.0:
+                for exhaust_i in range(3):
+                    ex_dist = 5 + exhaust_i * 4 + np.sin(anim_time * 15 + eng_i + exhaust_i) * 2
+                    ex_angle = np.arctan2(ship.velocity[1], ship.velocity[0]) + np.pi  # Behind ship
+                    ex_spread = (exhaust_i - 1) * 0.3
+                    ex_x = ep[0] + np.cos(ex_angle + ex_spread) * ex_dist
+                    ex_y = ep[1] + np.sin(ex_angle + ex_spread) * ex_dist
+                    ex_alpha = int(200 * (1 - exhaust_i / 3))
+                    pygame.draw.circle(screen, (255, ex_alpha, 0), (int(ex_x), int(ex_y)), 2)
 
         # Draw resonance rings around ship (5 rings for 5 dimensions)
-        ship_center = project_to_2d(ship.position, ship.view_rotation)
         for i in range(N_DIMENSIONS):
             res_level = ship.resonance_levels[i]
             ring_radius = 30 + i * 12

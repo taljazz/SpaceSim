@@ -257,7 +257,7 @@ def update_loop():
         pygame.draw.line(screen, color, start_2d, end_2d, width)
 
         # Draw energy particles flowing along the line (if on this ley line, show more)
-        if ship.on_ley_line and ship.current_ley_line == ley_line:
+        if ship.on_ley_line and ship.current_ley_line is ley_line:
             # More visible energy dots when player is on this ley line
             for i in range(5):
                 t = (anim_time * 0.3 + i * 0.2) % 1.0

@@ -3,8 +3,9 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 **Last Updated:** 2026-01-21
-**Current Status:** Complete Atlantean Universe - 12+1 Temples, Ley Lines, Pyramids, Portal Anchors, Sacred Geometry, Consciousness System, Astral Projection
-**Total Lines of Code:** ~5,500 lines across all Python files
+**Current Status:** GitHub Release Ready - Complete Atlantean Universe with polished speech system
+**Total Lines of Code:** ~5,600 lines across all Python files
+**Repository:** https://github.com/taljazz/SpaceSim
 
 ## Table of Contents
 1. [Recent Changes](#recent-changes-2026-01-21)
@@ -26,6 +27,75 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 17. [Session History](#session-history)
 
 ## Recent Changes (2026-01-21)
+
+### Session 7: GitHub Release & Speech Polish ✅ COMPLETE
+
+**Goal:** Prepare project for GitHub release and fix speech system issues
+
+**What Was Done:**
+
+1. **GitHub Repository Setup**
+   - Initialized git repository
+   - Created comprehensive `.gitignore` for Python projects
+   - Configured git identity (Thomas, taljazz@me.com)
+   - Created initial commit with all 21 files (20,617 lines)
+   - Published to: https://github.com/taljazz/SpaceSim
+
+2. **README.md Enhancements**
+   - Added "Important Notice" disclaimer section at top
+   - Explains simulator is for Atlantean/consciousness explorers
+   - Not for those committed to linear/materialist science
+   - Documents that concepts cannot be "proven" conventionally
+
+3. **runme.bat Created**
+   - Simple batch file to launch game
+   - Activates conda 'ss' environment automatically
+   - Runs `python main.py`
+   - Usage: Double-click to play
+
+4. **F1 Help Key Changed**
+   - Previously: Created `instructions.txt` and opened it
+   - Now: Opens `README.md` directly (comprehensive documentation)
+   - Deleted `instructions.txt` (no longer generated)
+
+5. **Redundant Speech Removal**
+   - **Landing success**: Reduced from 3 messages to 1
+     - Removed "Anchoring successful" (generate_crystals already announces)
+   - **Upgrade menu**: Combined "Entering upgrade menu" + "You have X crystals" into one
+   - **HUD dialog**: Removed redundant "Entering HUD dialog"
+   - **Starmap**: Removed redundant "Entering starmap"
+   - **Rift selection**: Removed redundant "Entering Harmonic Chamber selection"
+   - **Temple keys**: Combined 12th key message with "all keys collected"
+   - **Crystal completion**: Combined pattern bonus messages into one
+
+6. **Speech Guard Fixes (Prevent Repeating)**
+   Added flags to prevent messages from repeating every frame:
+
+   | Message | New Flag | Behavior |
+   |---------|----------|----------|
+   | "Temple of X nearby..." | `temple_nearby_announced` | Announces once, resets when leaving |
+   | "Halls of Amenti remain sealed..." | `amenti_sealed_announced` | Announces once, resets when leaving |
+   | "You are the universe..." (easter egg) | `easter_egg_announced` | Announces once, resets when frequencies change |
+   | "Warning: Astral form too far..." | `astral_too_far` | Announces once, resets when returning |
+
+**Files Modified:**
+- `ship.py`: Speech guards, redundancy removal (+19 lines net)
+- `SpaceSim.py`: Same speech fixes for monolithic version
+- `README.md`: Added disclaimer, updated instructions
+- `.gitignore`: Created (Python, IDE, game saves)
+- `runme.bat`: Created (launcher script)
+
+**Git Commits:**
+1. `c80ac63` - Initial commit: Golden Spiral Spaceship Simulator
+2. `36886f1` - Add Atlantean disclaimer and open README.md for help
+3. `802062c` - Add runme.bat for easy launching
+4. `5b33205` - Update README with runme.bat instructions
+5. `53a03bf` - Remove redundant speech throughout project
+6. `917aaa0` - Add guards to prevent repeated speech announcements
+
+**Result:** Project ready for public GitHub release with polished, non-repetitive speech system.
+
+---
 
 ### Session 6: Complete Atlantean Universe ✅ COMPLETE
 - **12+1 Temple System** - 12 zodiac temples + Halls of Amenti at universe center
@@ -1617,6 +1687,74 @@ self.amenti_blessing_active = False
 ```
 
 **Testing Status:** ✅ Game runs successfully, all imports verified
+
+---
+
+### Session 7 (2026-01-21): GitHub Release & Speech Polish
+
+**Context**: Preparing project for public release on GitHub
+
+**Goal**: Set up repository, fix speech system issues, create launch scripts
+
+**What Was Done:**
+
+1. **GitHub Repository Setup**
+   - Initialized git repository with `git init`
+   - Created `.gitignore` for Python projects (pycache, venv, saves, IDE files)
+   - Configured git identity (Thomas, taljazz@me.com)
+   - Initial commit: 21 files, 20,617 lines of code
+   - Repository: https://github.com/taljazz/SpaceSim
+
+2. **README.md Disclaimer**
+   - Added "Important Notice" section explaining:
+     - Simulator for Atlantean/consciousness explorers
+     - Not for those committed to linear/materialist science
+     - Concepts cannot be "proven" conventionally
+   - Welcomes "fellow travelers on the path"
+
+3. **runme.bat Launcher**
+   - Simple batch file for easy launching
+   - Activates conda 'ss' environment
+   - Runs `python main.py`
+
+4. **F1 Help Key Update**
+   - Changed from generating `instructions.txt` to opening `README.md` directly
+   - Deleted obsolete instructions.txt
+
+5. **Redundant Speech Removal**
+   Consolidated multiple back-to-back speech calls:
+   - Landing: 3 messages → 1 ("Anchored on..." includes all info)
+   - Upgrade menu: "Entering..." + "You have X..." → combined
+   - HUD/Starmap/Rift: Removed "Entering X" (first item provides context)
+   - Temple keys: Combined 12th key + "all collected" messages
+   - Crystal completion: Combined pattern/bonus messages
+
+6. **Speech Guard System**
+   Added flags to prevent messages repeating every frame:
+
+   | Message | Flag | Reset When |
+   |---------|------|------------|
+   | Temple nearby | `temple_nearby_announced` | Leave temple area |
+   | Amenti sealed | `amenti_sealed_announced` | Leave Amenti area |
+   | Easter egg | `easter_egg_announced` | Frequencies change |
+   | Astral too far | `astral_too_far` | Return closer to body |
+
+**Files Modified:**
+- ship.py: +4 new flags, speech guards, redundancy fixes
+- SpaceSim.py: Same speech fixes
+- README.md: Added disclaimer, updated F1 reference
+- .gitignore: Created
+- runme.bat: Created
+
+**Git Commits:**
+1. `c80ac63` - Initial commit
+2. `36886f1` - Atlantean disclaimer + README help
+3. `802062c` - runme.bat launcher
+4. `5b33205` - README runme.bat instructions
+5. `53a03bf` - Remove redundant speech
+6. `917aaa0` - Add speech guards
+
+**Result:** Project published to GitHub with polished, non-repetitive speech system
 
 ---
 

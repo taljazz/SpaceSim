@@ -1,0 +1,6 @@
+@echo off
+echo Activating conda environment 'ss'...
+call conda activate ss
+echo Starting Golden Spiral Spaceship Simulator...
+python main.py
+pause

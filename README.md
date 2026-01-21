@@ -75,6 +75,8 @@ pip install sounddevice cytolk
 
 # Run the game
 python main.py
+
+# Or simply double-click runme.bat
 ```
 
 ### Setup with pip
@@ -107,7 +109,7 @@ python main.py
 
 ### Your First 5 Minutes
 
-1. **Launch the game**: `python main.py`
+1. **Launch the game**: Double-click `runme.bat` (or run `python main.py` in the conda environment)
 2. **Listen**: You'll hear a continuous tone - this is your drive signal
 3. **Press R**: Read your current status (position, velocity, resonance)
 4. **Press Q**: Query the target frequency for your selected dimension

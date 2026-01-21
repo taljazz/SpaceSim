@@ -27,6 +27,7 @@ tolk.load()
 tolk.speak("Welcome to the Golden Spiral Spaceship Simulator. Resonance propulsion engaged. Harmonize with the universe.")
 
 # Set up display
+fullscreen = False
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Golden Spiral Spaceship Simulator")
 clock = pygame.time.Clock()
@@ -56,6 +57,7 @@ next_click_time = 0.0
 def update_loop():
     """Main game update loop."""
     global next_click_time, stars, planets, nebulae, celestial_bodies, temples, ley_lines, pyramids
+    global fullscreen, screen
 
     dt = clock.tick(FPS) / 1000.0
     ship.simulation_time += dt
@@ -86,6 +88,16 @@ def update_loop():
             audio_system.stop()
             tolk.unload()
             exit()
+
+        # F11 toggles fullscreen
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+            fullscreen = not fullscreen
+            if fullscreen:
+                screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                ship.speak("Fullscreen enabled.")
+            else:
+                screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+                ship.speak("Windowed mode.")
 
     # Get keys and update ship
     keys = pygame.key.get_pressed()

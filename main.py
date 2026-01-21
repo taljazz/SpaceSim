@@ -321,9 +321,12 @@ def update_loop():
             ring_radius = 30 + i * 12
             # Ring color based on dimension and resonance
             hue = (i * 72) % 360  # Different hue for each dimension
-            brightness = int(100 + 155 * res_level)
+            # Base brightness 40-100 based on resonance, with pulsing effect
+            pulse_factor = 0.7 + 0.3 * np.sin(anim_time * 3 + i)
+            brightness = int((40 + 60 * res_level) * pulse_factor)
+            brightness = max(10, min(100, brightness))  # Clamp to valid HSVA range
             ring_color = pygame.Color(0)
-            ring_color.hsva = (hue, 80, brightness * (0.5 + 0.5 * np.sin(anim_time * 3 + i)), 100)
+            ring_color.hsva = (hue, 80, brightness, 100)
             # Ring thickness based on resonance
             thickness = 1 if res_level < 0.5 else (2 if res_level < 0.8 else 3)
             pygame.draw.circle(screen, ring_color, ship_center, int(ring_radius * (0.8 + 0.2 * res_level)), thickness)

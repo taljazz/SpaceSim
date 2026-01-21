@@ -406,8 +406,8 @@ def update_loop():
         pygame.draw.line(screen, (255, 0, 0), (cursor_x - 5, cursor_y), (cursor_x + 5, cursor_y))
         pygame.draw.line(screen, (255, 0, 0), (cursor_x, cursor_y - 5), (cursor_x, cursor_y + 5))
     else:
-        # Get ship center for all drawings
-        ship_center = project_to_2d(ship.position, ship.view_rotation, screen_size)
+        # Ship is ALWAYS at screen center (you ARE the ship, looking out)
+        ship_center = (screen_w // 2, screen_h // 2)
 
         # Calculate movement properties
         velocity_mag = np.linalg.norm(ship.velocity)

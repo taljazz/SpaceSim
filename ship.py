@@ -1149,9 +1149,14 @@ class Ship:
     # Collect crystal on planet
     def collect_crystal(self):
         # Check resonance and collect if sufficient
-        dists = [np.linalg.norm(self.cursor_pos - pos) for pos in self.crystal_positions]
+        if not self.crystal_positions:
+            self.speak("No crystals on this planet.")
+            return
+        # Calculate distances, treating already-collected crystals as infinitely far
+        dists = [np.linalg.norm(self.cursor_pos - pos) if idx not in self.locked_crystals else float('inf')
+                 for idx, pos in enumerate(self.crystal_positions)]
         nearest = np.argmin(dists)
-        if dists[nearest] > 1 or nearest in self.locked_crystals:
+        if dists[nearest] > 1 or dists[nearest] == float('inf'):
             self.speak("No collectable crystal nearby.")
             return
         # Get crystal data (now a dict with 'freqs' and optional 'atlantean_type')

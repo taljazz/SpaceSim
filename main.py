@@ -52,12 +52,16 @@ audio_system.start()
 
 # Game state
 next_click_time = 0.0
+zoom_level = 1.0  # 1.0 = normal, >1 = zoomed in, <1 = zoomed out
+ZOOM_MIN = 0.2
+ZOOM_MAX = 5.0
+ZOOM_STEP = 0.1
 
 
 def update_loop():
     """Main game update loop."""
     global next_click_time, stars, planets, nebulae, celestial_bodies, temples, ley_lines, pyramids
-    global fullscreen, screen
+    global fullscreen, screen, zoom_level
 
     dt = clock.tick(FPS) / 1000.0
     ship.simulation_time += dt
@@ -98,6 +102,27 @@ def update_loop():
             else:
                 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
                 ship.speak("Windowed mode.")
+
+        # Mouse wheel zoom
+        if event.type == pygame.MOUSEWHEEL:
+            if event.y > 0:  # Scroll up = zoom in
+                zoom_level = min(ZOOM_MAX, zoom_level + ZOOM_STEP)
+                ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
+            elif event.y < 0:  # Scroll down = zoom out
+                zoom_level = max(ZOOM_MIN, zoom_level - ZOOM_STEP)
+                ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
+
+        # Keyboard zoom: + to zoom in, - to zoom out, 0 to reset
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
+                zoom_level = min(ZOOM_MAX, zoom_level + ZOOM_STEP)
+                ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
+            elif event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
+                zoom_level = max(ZOOM_MIN, zoom_level - ZOOM_STEP)
+                ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
+            elif event.key == pygame.K_0 or event.key == pygame.K_KP0:
+                zoom_level = 1.0
+                ship.speak("Zoom reset to 100 percent.")
 
     # Get keys and update ship
     keys = pygame.key.get_pressed()
@@ -200,7 +225,7 @@ def update_loop():
 
     # Draw stars with twinkling effect and parallax
     for idx, body in enumerate(stars):
-        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
+        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         # Apply camera shake offset with parallax (distant stars move less)
         dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
         parallax_factor = max(0.3, min(1.0, 50 / (dist_to_ship + 10)))
@@ -225,7 +250,7 @@ def update_loop():
 
     # Draw planets with parallax and orbital motion visible
     for body in planets:
-        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
+        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         # Parallax effect based on distance
         dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
         parallax_factor = max(0.5, min(1.0, 30 / (dist_to_ship + 5)))
@@ -244,7 +269,7 @@ def update_loop():
         if dist_to_ship < 80 and not ship.landed_mode:
             orbit_radius = body.get('orbit_radius', 20)
             parent_star = stars[body.get('parent_star_idx', 0)]
-            star_2d = project_to_2d(parent_star['pos'], ship.view_rotation, screen_size)
+            star_2d = project_to_2d(parent_star['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
             star_draw_x = int(star_2d[0] + camera_offset_x * parallax_factor)
             star_draw_y = int(star_2d[1] + camera_offset_y * parallax_factor)
             # Scale orbit to screen (approximation)
@@ -255,7 +280,7 @@ def update_loop():
 
     # Draw nebulae with swirling effect
     for idx, body in enumerate(nebulae):
-        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
+        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
         parallax_factor = max(0.4, min(1.0, 40 / (dist_to_ship + 10)))
         draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
@@ -282,7 +307,7 @@ def update_loop():
 
     # Draw rifts with pulsing dimensional effect
     for idx, rift in enumerate(ship.rifts):
-        pos_2d = project_to_2d(rift['pos'], ship.view_rotation, screen_size)
+        pos_2d = project_to_2d(rift['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         # Parallax for rifts (they feel closer/more present)
         dist_to_ship = np.linalg.norm(rift['pos'] - ship.position)
         parallax_factor = max(0.6, min(1.0, 25 / (dist_to_ship + 5)))
@@ -302,7 +327,7 @@ def update_loop():
 
     # Draw temples (golden triangles) with pulsing glow
     for idx, temple in enumerate(temples):
-        pos_2d = project_to_2d(temple['pos'], ship.view_rotation, screen_size)
+        pos_2d = project_to_2d(temple['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         # Parallax for temples
         dist_to_ship = np.linalg.norm(temple['pos'] - ship.position)
         parallax_factor = max(0.5, min(1.0, 35 / (dist_to_ship + 8)))
@@ -349,7 +374,7 @@ def update_loop():
 
     # Draw pyramids (golden squares) with parallax
     for pyramid in pyramids:
-        pos_2d = project_to_2d(pyramid['pos'], ship.view_rotation, screen_size)
+        pos_2d = project_to_2d(pyramid['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         dist_to_ship = np.linalg.norm(pyramid['pos'] - ship.position)
         parallax_factor = max(0.5, min(1.0, 35 / (dist_to_ship + 8)))
         draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
@@ -367,8 +392,8 @@ def update_loop():
 
     # Draw ley lines with energy flow effect
     for idx, ley_line in enumerate(ley_lines):
-        start_2d = project_to_2d(ley_line['start'], ship.view_rotation, screen_size)
-        end_2d = project_to_2d(ley_line['end'], ship.view_rotation, screen_size)
+        start_2d = project_to_2d(ley_line['start'], ship.view_rotation, screen_size, zoom_level, ship.position)
+        end_2d = project_to_2d(ley_line['end'], ship.view_rotation, screen_size, zoom_level, ship.position)
 
         # Pulsing brightness based on time
         pulse = 0.6 + 0.4 * np.sin(anim_time * 2 + idx * 0.5)
@@ -530,7 +555,7 @@ def update_loop():
         spiral_points = np.tile(ship.position, (100, 1))
         spiral_points[:, 0] += x
         spiral_points[:, 1] += y
-        screen_points = [project_to_2d(p, ship.view_rotation, screen_size) for p in spiral_points]
+        screen_points = [project_to_2d(p, ship.view_rotation, screen_size, zoom_level, ship.position) for p in spiral_points]
 
         # === SPIRAL COLOR GRADIENT (shifts based on Tuaoi mode and resonance) ===
         # Draw spiral segments with color gradient
@@ -599,7 +624,7 @@ def update_loop():
         engine_points = np.tile(ship.position, (3, 1))
         engine_points[:, 0] += x_engines
         engine_points[:, 1] += y_engines
-        screen_engine_points = [project_to_2d(p, ship.view_rotation, screen_size) for p in engine_points]
+        screen_engine_points = [project_to_2d(p, ship.view_rotation, screen_size, zoom_level, ship.position) for p in engine_points]
 
         engine_pulse = 0.7 + 0.3 * np.sin(anim_time * 8)
 

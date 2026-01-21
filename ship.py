@@ -538,8 +538,7 @@ class Ship:
                     if self.starmap_mode:
                         self.update_starmap_items(stars, planets, nebulae)
                         self.starmap_index = 0
-                        self.speak("Entering starmap.")
-                        self.speak_starmap_item()
+                        self.speak_starmap_item()  # First item provides context
                     else:
                         self.speak("Exiting starmap.")
                 # Toggle high contrast
@@ -593,15 +592,13 @@ class Ship:
                         self.upgrade_mode = True
                         self.hud_index = 0
                         self.update_hud_items(upgrade=True)
-                        self.speak("Entering upgrade menu.")
-                        self.speak(f"You have {self.crystals_collected} crystals.")
+                        self.speak(f"Attunement menu. {self.crystals_collected} crystals available.")
                         self.speak_hud_item()
                     else:
                         self.hud_mode = True
                         self.hud_index = 0
                         self.update_hud_items()
-                        self.speak("Entering HUD dialog.")
-                        self.speak_hud_item()
+                        self.speak_hud_item()  # First item announces the menu context
                 # Text size adjustment flag
                 elif event.key == pygame.K_t:
                     self.text_size_adjusted = True
@@ -641,8 +638,7 @@ class Ship:
                             self.rift_selection_mode = True
                             self.update_rift_items()
                             self.rift_selection_index = 0
-                            self.speak("Entering Harmonic Chamber selection.")
-                            self.speak_rift_item()
+                            self.speak_rift_item()  # First item provides context
                         else:
                             self.speak("No Harmonic Chambers detected.")
                 # Toggle speed mode in manual mode
@@ -1142,18 +1138,18 @@ class Ship:
 
             # Check for sacred geometry pattern completion
             if len(self.locked_crystals) == self.crystal_count:
-                self.speak("All Atlantean crystals collected. Access attunement menu with U.")
                 if self.current_pattern:
                     pattern_info = SACRED_PATTERNS.get(self.current_pattern, {})
                     bonus = pattern_info.get('bonus', 'unknown')
                     mult = pattern_info.get('mult', 1.0)
-                    self.speak(f"Sacred {self.current_pattern.replace('_', ' ').title()} pattern completed! {bonus.replace('_', ' ').title()} bonus activated.")
                     self.pattern_bonus_timer = 30.0  # 30 second pattern bonus
                     # Apply pattern bonus crystals
                     bonus_crystals = int(self.crystal_count * (mult - 1))
                     if bonus_crystals > 0:
                         self.crystals_collected += bonus_crystals
-                        self.speak(f"Pattern bonus: {bonus_crystals} additional crystals received.")
+                    self.speak(f"All crystals collected! Sacred {self.current_pattern.replace('_', ' ').title()} pattern completed. {bonus.replace('_', ' ').title()} bonus activated. {bonus_crystals} bonus crystals. Press U for attunement.")
+                else:
+                    self.speak("All crystals collected. Press U for attunement menu.")
 
             if self.crystals_collected >= ASCENSION_CRYSTAL_THRESHOLD:
                 self.ascend()
@@ -1315,9 +1311,10 @@ class Ship:
 
                     if res_at_freq > 0.7:  # Need 70% resonance to collect key
                         self.temple_keys.add(key_index)
-                        self.speak(f"Temple of {temple['key_name']} visited. {temple['key_name']} key acquired! {len(self.temple_keys)}/{MINOR_TEMPLE_COUNT} keys collected.")
                         if len(self.temple_keys) == MINOR_TEMPLE_COUNT:
-                            self.speak("All twelve temple keys collected! The Halls of Amenti now await your arrival.")
+                            self.speak(f"{temple['key_name']} key acquired! All twelve temple keys collected. The Halls of Amenti now await your arrival.")
+                        else:
+                            self.speak(f"Temple of {temple['key_name']} visited. {temple['key_name']} key acquired! {len(self.temple_keys)}/{MINOR_TEMPLE_COUNT} keys collected.")
                     else:
                         self.speak(f"Temple of {temple['key_name']} nearby. Tune to {temple_freq:.1f} Hz to receive the key.")
 
@@ -2290,8 +2287,7 @@ class Ship:
                     self.landed_mode = True
                     self.landed_planet = self.nearest_body['pos']
                     self.landed_planet_body = self.nearest_body  # Store full planet data
-                    self.speak("Anchoring successful. Explore the ancient grounds.")
-                    self.generate_crystals()
+                    self.generate_crystals()  # This speaks the landing confirmation
                 else:
                     self.resonance_integrity -= 0.1
                     if self.nearest_body and self.nearest_body['type'] != 'planet':

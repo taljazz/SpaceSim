@@ -510,8 +510,7 @@ class Ship:
                     if self.starmap_mode:
                         self.update_starmap_items()
                         self.starmap_index = 0
-                        speak_with_cooldown("Entering starmap.")
-                        self.speak_starmap_item()
+                        self.speak_starmap_item()  # First item provides context
                     else:
                         speak_with_cooldown("Exiting starmap.")
                 # Toggle high contrast
@@ -556,15 +555,13 @@ class Ship:
                         self.upgrade_mode = True
                         self.hud_index = 0
                         self.update_hud_items(upgrade=True)
-                        speak_with_cooldown("Entering upgrade menu.")
-                        speak_with_cooldown(f"You have {self.crystals_collected} crystals.")
+                        speak_with_cooldown(f"Attunement menu. {self.crystals_collected} crystals available.")
                         self.speak_hud_item()
                     else:
                         self.hud_mode = True
                         self.hud_index = 0
                         self.update_hud_items()
-                        speak_with_cooldown("Entering HUD dialog.")
-                        self.speak_hud_item()
+                        self.speak_hud_item()  # First item provides context
                 # Text size adjustment flag
                 elif event.key == pygame.K_t:
                     self.text_size_adjusted = True

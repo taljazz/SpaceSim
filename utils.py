@@ -28,7 +28,7 @@ def speak_with_cooldown(msg, simulation_time, last_spoken):
     return last_spoken
 
 
-def project_to_2d(pos, rotation):
+def project_to_2d(pos, rotation, screen_size=None):
     """
     Project 5D position to 2D screen coordinates.
 
@@ -39,14 +39,20 @@ def project_to_2d(pos, rotation):
     Args:
         pos: numpy array of position in 5 dimensions
         rotation: View rotation angle in radians
+        screen_size: Optional tuple of (width, height). If None, uses constants.
 
     Returns:
         Tuple of (screen_x, screen_y) pixel coordinates
     """
+    if screen_size is None:
+        width, height = SCREEN_WIDTH, SCREEN_HEIGHT
+    else:
+        width, height = screen_size
+
     cos_r = np.cos(rotation)
     sin_r = np.sin(rotation)
     x = pos[0] * cos_r + pos[3] * sin_r
     y = pos[1] * cos_r + pos[4] * sin_r
-    screen_x = (x + 100) / 200 * SCREEN_WIDTH
-    screen_y = (y + 100) / 200 * SCREEN_HEIGHT
+    screen_x = (x + 100) / 200 * width
+    screen_y = (y + 100) / 200 * height
     return (int(screen_x), int(screen_y))

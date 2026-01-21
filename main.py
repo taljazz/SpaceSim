@@ -140,12 +140,16 @@ def update_loop():
     text_color = (255, 255, 255) if not ship.high_contrast else (0, 0, 0)
     screen.fill(bg_color)
 
+    # Get current screen size for proper scaling in fullscreen
+    screen_size = screen.get_size()
+    screen_w, screen_h = screen_size
+
     # Animation time for dynamic effects
     anim_time = pygame.time.get_ticks() / 1000.0
 
     # Draw stars with twinkling effect
     for idx, body in enumerate(stars):
-        pos_2d = project_to_2d(body['pos'], ship.view_rotation)
+        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
         if ship.high_contrast:
             color = (0, 0, 0)
         else:
@@ -164,7 +168,7 @@ def update_loop():
 
     # Draw planets
     for body in planets:
-        pos_2d = project_to_2d(body['pos'], ship.view_rotation)
+        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
         hue = (((body['pos'][3] + body['pos'][4]) / 200 * 360) % 360 + 360) % 360
         color = pygame.Color(0)
         color.hsva = (hue, 100, 100, 100) if not ship.high_contrast else (0, 0, 0, 100)
@@ -175,7 +179,7 @@ def update_loop():
 
     # Draw nebulae
     for body in nebulae:
-        pos_2d = project_to_2d(body['pos'], ship.view_rotation)
+        pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
         if ship.high_contrast:
             color = (128, 128, 128, 128)  # Gray with transparency
         else:
@@ -185,7 +189,7 @@ def update_loop():
 
     # Draw rifts with pulsing dimensional effect
     for idx, rift in enumerate(ship.rifts):
-        pos_2d = project_to_2d(rift['pos'], ship.view_rotation)
+        pos_2d = project_to_2d(rift['pos'], ship.view_rotation, screen_size)
         # Pulsing size and color
         pulse = 0.5 + 0.5 * np.sin(anim_time * 4 + idx)
         size = int(5 + 3 * pulse)
@@ -199,7 +203,7 @@ def update_loop():
 
     # Draw temples (golden triangles) with pulsing glow
     for idx, temple in enumerate(temples):
-        pos_2d = project_to_2d(temple['pos'], ship.view_rotation)
+        pos_2d = project_to_2d(temple['pos'], ship.view_rotation, screen_size)
         pulse = 0.7 + 0.3 * np.sin(anim_time * 2 + idx * 0.3)
 
         if temple['temple_type'] == 'master':
@@ -241,7 +245,7 @@ def update_loop():
 
     # Draw pyramids (golden squares)
     for pyramid in pyramids:
-        pos_2d = project_to_2d(pyramid['pos'], ship.view_rotation)
+        pos_2d = project_to_2d(pyramid['pos'], ship.view_rotation, screen_size)
         color = (218, 165, 32) if not ship.high_contrast else (0, 0, 0)  # Golden rod
         size = 10
         rect = pygame.Rect(pos_2d[0] - size, pos_2d[1] - size, size * 2, size * 2)
@@ -249,8 +253,8 @@ def update_loop():
 
     # Draw ley lines with energy flow effect
     for idx, ley_line in enumerate(ley_lines):
-        start_2d = project_to_2d(ley_line['start'], ship.view_rotation)
-        end_2d = project_to_2d(ley_line['end'], ship.view_rotation)
+        start_2d = project_to_2d(ley_line['start'], ship.view_rotation, screen_size)
+        end_2d = project_to_2d(ley_line['end'], ship.view_rotation, screen_size)
 
         # Pulsing brightness based on time
         pulse = 0.6 + 0.4 * np.sin(anim_time * 2 + idx * 0.5)
@@ -280,16 +284,16 @@ def update_loop():
     # Draw planet grid if landed
     if ship.landed_mode:
         for pos in ship.crystal_positions:
-            screen_x = int(SCREEN_WIDTH / 2 + pos[0] * 20)
-            screen_y = int(SCREEN_HEIGHT / 2 + pos[1] * 20)
+            screen_x = int(screen_w / 2 + pos[0] * 20)
+            screen_y = int(screen_h / 2 + pos[1] * 20)
             pygame.draw.circle(screen, (0, 255, 0), (screen_x, screen_y), 5)
-        cursor_x = int(SCREEN_WIDTH / 2 + ship.cursor_pos[0] * 20)
-        cursor_y = int(SCREEN_HEIGHT / 2 + ship.cursor_pos[1] * 20)
+        cursor_x = int(screen_w / 2 + ship.cursor_pos[0] * 20)
+        cursor_y = int(screen_h / 2 + ship.cursor_pos[1] * 20)
         pygame.draw.line(screen, (255, 0, 0), (cursor_x - 5, cursor_y), (cursor_x + 5, cursor_y))
         pygame.draw.line(screen, (255, 0, 0), (cursor_x, cursor_y - 5), (cursor_x, cursor_y + 5))
     else:
         # Get ship center for all drawings
-        ship_center = project_to_2d(ship.position, ship.view_rotation)
+        ship_center = project_to_2d(ship.position, ship.view_rotation, screen_size)
 
         # Calculate movement properties
         velocity_mag = np.linalg.norm(ship.velocity)
@@ -334,7 +338,7 @@ def update_loop():
         spiral_points = np.tile(ship.position, (100, 1))
         spiral_points[:, 0] += x
         spiral_points[:, 1] += y
-        screen_points = [project_to_2d(p, ship.view_rotation) for p in spiral_points]
+        screen_points = [project_to_2d(p, ship.view_rotation, screen_size) for p in spiral_points]
 
         # === SPIRAL COLOR GRADIENT (shifts based on Tuaoi mode and resonance) ===
         # Draw spiral segments with color gradient
@@ -403,7 +407,7 @@ def update_loop():
         engine_points = np.tile(ship.position, (3, 1))
         engine_points[:, 0] += x_engines
         engine_points[:, 1] += y_engines
-        screen_engine_points = [project_to_2d(p, ship.view_rotation) for p in engine_points]
+        screen_engine_points = [project_to_2d(p, ship.view_rotation, screen_size) for p in engine_points]
 
         engine_pulse = 0.7 + 0.3 * np.sin(anim_time * 8)
 

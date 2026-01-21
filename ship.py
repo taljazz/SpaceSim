@@ -617,12 +617,10 @@ class Ship:
                     self.hud_text_size = max(12, min(48, self.hud_text_size))
                     font = pygame.font.SysFont(None, self.hud_text_size)
                     self.speak(f"Text size decreased to {self.hud_text_size}.")
-                # Open instructions
+                # Open instructions (README.md)
                 elif event.key == pygame.K_F1 and not self.instructions_opened:
-                    with open('instructions.txt', 'w') as f:
-                        f.write(INSTRUCTIONS)
-                    os.startfile('instructions.txt')
-                    self.speak("Instructions file opened.")
+                    os.startfile('README.md')
+                    self.speak("Documentation opened.")
                     self.instructions_opened = True
                 # Rift interaction: Charge/entry or toggle selection
                 elif event.key == pygame.K_e and not self.landed_mode:

@@ -2,6 +2,24 @@
 
 A 5-dimensional resonance-based spaceship simulator with Atlantean theming, designed for accessibility through audio-driven gameplay and screen reader support.
 
+---
+
+## Important Notice
+
+**This simulator is designed for those who wish to explore consciousness, sacred geometry, and the mystical traditions of Atlantis.** The concepts, mechanics, and physics presented here are rooted in esoteric knowledge, ancient wisdom, and multidimensional theory rather than conventional linear science.
+
+If you are firmly committed to materialist, reductionist, or purely empirical worldviews, this experience may not resonate with you. The resonance-based navigation, 5-dimensional space, sacred frequencies (Solfeggio, Schumann, 432 Hz), and consciousness progression systems cannot be "proven" through conventional scientific methods - and that is by design.
+
+**This simulator is for:**
+- Those drawn to the mysteries of Atlantis and ancient civilizations
+- Seekers exploring consciousness expansion and multidimensional awareness
+- Anyone who feels the call to experience reality beyond the 3D linear paradigm
+- Those who understand that some truths are felt and experienced, not measured
+
+Welcome, fellow traveler. May your frequencies align and your consciousness ascend.
+
+---
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -667,8 +685,7 @@ SpaceSim/
 ├── utils.py           # Helper functions
 ├── config.ini         # User settings (generated)
 ├── savegame.pkl       # Save file (generated)
-├── instructions.txt   # In-game help (generated)
-├── README.md          # This file
+├── README.md          # This file (press F1 in-game to open)
 ├── CLAUDE.md          # Development documentation
 └── Reserve/           # Historical versions
 ```

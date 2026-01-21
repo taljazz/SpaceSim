@@ -246,6 +246,16 @@ class Ship:
         self.visited_amenti = False
         self.amenti_blessing_active = False
 
+        # Frequency Preset System (save/recall favorite frequency configurations)
+        self.frequency_presets = {}  # Dict of {slot_number: [freq1, freq2, freq3, freq4, freq5]}
+        self.pending_preset_overwrite = None  # Slot number awaiting overwrite confirmation
+        self.pending_preset_time = 0.0  # Time when overwrite warning was given
+
+        # Celestial body references (set by main.py after universe generation)
+        self.stars = []
+        self.planets = []
+        self.nebulae = []
+
     def speak(self, msg):
         """Helper method to speak with cooldown."""
         if msg not in self.last_spoken or self.simulation_time - self.last_spoken[msg] > SPEECH_COOLDOWN:
@@ -509,12 +519,51 @@ class Ship:
         # Process key down events
         for event in events:
             if event.type == pygame.KEYDOWN:
-                # Dimension selection keys
-                if event.key == pygame.K_1: self.selected_dim = 0; self.speak("Tuning x dimension."); self.approaching_lock_announced = False
-                elif event.key == pygame.K_2: self.selected_dim = 1; self.speak("Tuning y dimension."); self.approaching_lock_announced = False
-                elif event.key == pygame.K_3: self.selected_dim = 2; self.speak("Tuning z dimension."); self.approaching_lock_announced = False
-                elif event.key == pygame.K_4: self.selected_dim = 3; self.speak("Tuning higher dimension one."); self.approaching_lock_announced = False
-                elif event.key == pygame.K_5: self.selected_dim = 4; self.speak("Tuning higher dimension two."); self.approaching_lock_announced = False
+                # Number keys with modifiers: Frequency Preset System
+                number_keys = {
+                    pygame.K_1: 1, pygame.K_2: 2, pygame.K_3: 3,
+                    pygame.K_4: 4, pygame.K_5: 5, pygame.K_6: 6,
+                    pygame.K_7: 7, pygame.K_8: 8, pygame.K_9: 9
+                }
+                if event.key in number_keys:
+                    slot = number_keys[event.key]
+                    if ctrl_pressed:
+                        # Ctrl+1-9: Save current frequencies to preset slot
+                        # Check if slot already has a preset and needs confirmation
+                        if slot in self.frequency_presets:
+                            # Check if this is a confirmation (same slot pressed within 3 seconds)
+                            if self.pending_preset_overwrite == slot and (self.simulation_time - self.pending_preset_time) < 3.0:
+                                # Confirmed - overwrite the preset
+                                self.frequency_presets[slot] = self.r_drive[:]
+                                freqs_str = ", ".join([f"{f:.0f}" for f in self.r_drive])
+                                self.speak(f"Preset {slot} overwritten. Frequencies: {freqs_str} hertz.")
+                                self.pending_preset_overwrite = None
+                            else:
+                                # First press - warn and wait for confirmation
+                                self.pending_preset_overwrite = slot
+                                self.pending_preset_time = self.simulation_time
+                                self.speak(f"Preset {slot} already exists. Press Control plus {slot} again to overwrite.")
+                        else:
+                            # Slot is empty - save directly
+                            self.frequency_presets[slot] = self.r_drive[:]
+                            freqs_str = ", ".join([f"{f:.0f}" for f in self.r_drive])
+                            self.speak(f"Preset {slot} saved. Frequencies: {freqs_str} hertz.")
+                            self.pending_preset_overwrite = None
+                    elif shift_pressed:
+                        # Shift+1-9: Recall preset (instantly set drive frequencies)
+                        if slot in self.frequency_presets:
+                            self.r_drive = self.frequency_presets[slot][:]
+                            freqs_str = ", ".join([f"{f:.0f}" for f in self.r_drive])
+                            self.speak(f"Preset {slot} recalled. Frequencies set to: {freqs_str} hertz.")
+                        else:
+                            self.speak(f"Preset {slot} is empty. Use Control plus {slot} to save current frequencies.")
+                    else:
+                        # No modifier: Dimension selection (1-5 only)
+                        if slot <= 5:
+                            dim_names = ["x", "y", "z", "higher dimension one", "higher dimension two"]
+                            self.selected_dim = slot - 1
+                            self.speak(f"Tuning {dim_names[slot - 1]} dimension.")
+                            self.approaching_lock_announced = False
                 # Toggle tuning mode
                 elif event.key == pygame.K_j and not self.tuning_mode_toggled:
                     self.tuning_mode = not self.tuning_mode
@@ -1682,9 +1731,10 @@ class Ship:
             'max_velocity': self.max_velocity,
             'crystal_bonus': self.crystal_bonus,
             'golden_harmony_active': self.golden_harmony_active,
-            'stars': stars,
-            'planets': planets,
-            'nebulae': nebulae,
+            'frequency_presets': self.frequency_presets,
+            'stars': self.stars,
+            'planets': self.planets,
+            'nebulae': self.nebulae,
             'rifts': self.rifts  # Note: sounds can't be pickled, but we can recreate
         }
         with open('savegame.pkl', 'wb') as f:
@@ -1706,11 +1756,11 @@ class Ship:
             self.max_velocity = state['max_velocity']
             self.crystal_bonus = state['crystal_bonus']
             self.golden_harmony_active = state['golden_harmony_active']
-            global stars, planets, nebulae, celestial_bodies
-            stars = state['stars']
-            planets = state['planets']
-            nebulae = state['nebulae']
-            celestial_bodies = stars + planets + nebulae
+            self.frequency_presets = state.get('frequency_presets', {})  # Backwards compatible
+            # Store loaded celestial bodies in ship (main.py will read these)
+            self.stars = state['stars']
+            self.planets = state['planets']
+            self.nebulae = state['nebulae']
             self.rifts = state['rifts']
             # Recreate rift sounds
             for rift in self.rifts:
@@ -1718,6 +1768,8 @@ class Ship:
                 sound = SoundEffect(hum_waveform, loop=True, volume=0.0)
                 self.audio_system.active_sound_effects.append(sound)
                 rift['sound'] = sound
+            # Signal main.py to reload celestial bodies from ship
+            self.needs_universe_regeneration = True
             self.speak("Game loaded.")
         except:
             self.speak("No save file found.")

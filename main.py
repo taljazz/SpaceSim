@@ -40,6 +40,10 @@ stars, planets, nebulae, celestial_bodies, temples, ley_lines, pyramids = genera
 
 # Initialize ship
 ship = Ship(config, audio_system)
+# Store celestial body references in ship for save/load
+ship.stars = stars
+ship.planets = planets
+ship.nebulae = nebulae
 audio_system.set_ship(ship)  # Set ship reference for audio callback
 
 # Start audio stream
@@ -88,9 +92,24 @@ def update_loop():
     ship.handle_input(keys, events, stars, planets, nebulae)
     ship.update(dt, celestial_bodies, keys, temples, ley_lines, pyramids)
 
-    # Check if universe needs regeneration (after ascension)
+    # Check if universe needs regeneration (after ascension or game load)
     if ship.needs_universe_regeneration:
-        stars, planets, nebulae, celestial_bodies, temples, ley_lines, pyramids = generate_complete_universe()
+        # Check if this is a load (ship has celestial data) vs regeneration (needs new data)
+        if ship.stars and len(ship.stars) > 0:
+            # Load from save - use ship's stored celestial bodies
+            stars = ship.stars
+            planets = ship.planets
+            nebulae = ship.nebulae
+            celestial_bodies = stars + planets + nebulae
+            # Note: temples/ley_lines/pyramids are regenerated (not saved)
+            # This is intentional - they're procedurally generated from constants
+        else:
+            # Ascension - generate new universe
+            stars, planets, nebulae, celestial_bodies, temples, ley_lines, pyramids = generate_complete_universe()
+            # Update ship's references
+            ship.stars = stars
+            ship.planets = planets
+            ship.nebulae = nebulae
         ship.needs_universe_regeneration = False
 
     # Add periodic click sound based on resonance (only when not landed)

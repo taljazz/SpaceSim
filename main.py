@@ -112,17 +112,19 @@ def update_loop():
                 zoom_level = max(ZOOM_MIN, zoom_level - ZOOM_STEP)
                 ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
 
-        # Keyboard zoom: + to zoom in, - to zoom out, 0 to reset
+        # Keyboard zoom: Shift++ to zoom in, Shift+- to zoom out, Shift+0 to reset
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
-                zoom_level = min(ZOOM_MAX, zoom_level + ZOOM_STEP)
-                ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
-            elif event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
-                zoom_level = max(ZOOM_MIN, zoom_level - ZOOM_STEP)
-                ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
-            elif event.key == pygame.K_0 or event.key == pygame.K_KP0:
-                zoom_level = 1.0
-                ship.speak("Zoom reset to 100 percent.")
+            mods = pygame.key.get_mods()
+            if mods & pygame.KMOD_SHIFT:
+                if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
+                    zoom_level = min(ZOOM_MAX, zoom_level + ZOOM_STEP)
+                    ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
+                elif event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
+                    zoom_level = max(ZOOM_MIN, zoom_level - ZOOM_STEP)
+                    ship.speak(f"Zoom {int(zoom_level * 100)} percent.")
+                elif event.key == pygame.K_0 or event.key == pygame.K_KP0:
+                    zoom_level = 1.0
+                    ship.speak("Zoom reset to 100 percent.")
 
     # Get keys and update ship
     keys = pygame.key.get_pressed()

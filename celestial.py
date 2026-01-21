@@ -98,11 +98,29 @@ def generate_all_celestial_bodies():
     # Generate stars using golden spiral
     stars = generate_celestial(N_STARS, 'star')
 
+    # Add subtle movement properties to stars (wobble from planetary gravity)
+    for i, star in enumerate(stars):
+        star['wobble_speed'] = random.uniform(0.05, 0.2)
+        star['wobble_radius'] = random.uniform(0.5, 2.0)
+        star['wobble_phase'] = random.uniform(0, 2 * np.pi)
+        star['base_pos'] = star['pos'].copy()  # Store original position
+
     # Generate planets orbiting each star
     planets = []
-    for star in stars:
-        for _ in range(N_PLANETS_PER_STAR):
-            pos = star['pos'] + np.random.uniform(-ORBIT_RADIUS, ORBIT_RADIUS, N_DIMENSIONS)
+    for star_idx, star in enumerate(stars):
+        for planet_i in range(N_PLANETS_PER_STAR):
+            # Calculate orbital parameters
+            orbit_radius = random.uniform(ORBIT_RADIUS * 0.3, ORBIT_RADIUS)
+            orbit_speed = random.uniform(0.1, 0.5) / (orbit_radius / ORBIT_RADIUS)  # Kepler-ish: closer = faster
+            orbit_angle = random.uniform(0, 2 * np.pi)
+            orbit_tilt = random.uniform(-0.3, 0.3)  # Slight orbital plane tilt
+
+            # Initial position
+            pos = star['pos'].copy()
+            pos[0] += orbit_radius * np.cos(orbit_angle)
+            pos[1] += orbit_radius * np.sin(orbit_angle)
+            pos[2] += orbit_radius * orbit_tilt * np.sin(orbit_angle)
+
             freq = random.uniform(*FREQUENCY_RANGE)
 
             # Assign exoplanet type
@@ -111,7 +129,7 @@ def generate_all_celestial_bodies():
                 p=list(EXOPLANET_TYPE_PROBABILITIES.values())
             )
 
-            # Create planet with exoplanet properties
+            # Create planet with orbital and exoplanet properties
             planet = {
                 'pos': pos,
                 'freq': freq,
@@ -119,17 +137,69 @@ def generate_all_celestial_bodies():
                 'exoplanet_type': exoplanet_type,
                 'size_mult': EXOPLANET_TYPES[exoplanet_type]['size_mult'],
                 'crystal_mult': EXOPLANET_TYPES[exoplanet_type]['crystal_mult'],
-                'difficulty': EXOPLANET_TYPES[exoplanet_type]['difficulty']
+                'difficulty': EXOPLANET_TYPES[exoplanet_type]['difficulty'],
+                # Orbital mechanics
+                'parent_star_idx': star_idx,
+                'orbit_radius': orbit_radius,
+                'orbit_speed': orbit_speed,
+                'orbit_angle': orbit_angle,
+                'orbit_tilt': orbit_tilt,
+                'orbit_phase': random.uniform(0, 2 * np.pi)  # Starting phase
             }
             planets.append(planet)
 
-    # Generate nebulae
+    # Generate nebulae with drift/rotation properties
     nebulae = generate_celestial(N_NEBULAE, 'nebula')
+    for nebula in nebulae:
+        nebula['drift_speed'] = random.uniform(0.02, 0.1)
+        nebula['drift_angle'] = random.uniform(0, 2 * np.pi)
+        nebula['rotation_speed'] = random.uniform(0.01, 0.05)
+        nebula['base_pos'] = nebula['pos'].copy()
 
     # Combined list for collision/proximity checks
     celestial_bodies = stars + planets + nebulae
 
     return stars, planets, nebulae, celestial_bodies
+
+
+def update_celestial_positions(stars, planets, nebulae, time):
+    """
+    Update celestial body positions based on orbital mechanics and drift.
+
+    Args:
+        stars: List of star bodies
+        planets: List of planet bodies
+        nebulae: List of nebula bodies
+        time: Current simulation time in seconds
+    """
+    # Update star positions (subtle wobble)
+    for star in stars:
+        wobble_x = star['wobble_radius'] * np.cos(time * star['wobble_speed'] + star['wobble_phase'])
+        wobble_y = star['wobble_radius'] * np.sin(time * star['wobble_speed'] + star['wobble_phase'])
+        star['pos'][0] = star['base_pos'][0] + wobble_x
+        star['pos'][1] = star['base_pos'][1] + wobble_y
+
+    # Update planet orbital positions
+    for planet in planets:
+        star = stars[planet['parent_star_idx']]
+        angle = planet['orbit_angle'] + time * planet['orbit_speed']
+        radius = planet['orbit_radius']
+        tilt = planet['orbit_tilt']
+
+        # Calculate orbital position relative to parent star
+        planet['pos'][0] = star['pos'][0] + radius * np.cos(angle)
+        planet['pos'][1] = star['pos'][1] + radius * np.sin(angle)
+        planet['pos'][2] = star['pos'][2] + radius * tilt * np.sin(angle + planet['orbit_phase'])
+        # Higher dimensions follow with PHI relationship
+        planet['pos'][3] = star['pos'][3] + radius * 0.5 * np.cos(angle * PHI)
+        planet['pos'][4] = star['pos'][4] + radius * 0.5 * np.sin(angle * PHI)
+
+    # Update nebula drift
+    for nebula in nebulae:
+        drift_x = np.sin(time * nebula['drift_speed']) * 5
+        drift_y = np.cos(time * nebula['drift_speed'] + nebula['drift_angle']) * 5
+        nebula['pos'][0] = nebula['base_pos'][0] + drift_x
+        nebula['pos'][1] = nebula['base_pos'][1] + drift_y
 
 
 def generate_temples():

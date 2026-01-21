@@ -12,7 +12,7 @@ from cytolk import tolk
 
 from constants import *
 from audio_system import AudioSystem, SoundEffect
-from celestial import generate_all_celestial_bodies, generate_complete_universe
+from celestial import generate_all_celestial_bodies, generate_complete_universe, update_celestial_positions
 from ship import Ship
 from utils import project_to_2d
 
@@ -104,6 +104,9 @@ def update_loop():
     ship.handle_input(keys, events, stars, planets, nebulae)
     ship.update(dt, celestial_bodies, keys, temples, ley_lines, pyramids)
 
+    # Update celestial body positions (orbital mechanics)
+    update_celestial_positions(stars, planets, nebulae, ship.simulation_time)
+
     # Check if universe needs regeneration (after ascension or game load)
     if ship.needs_universe_regeneration:
         # Check if this is a load (ship has celestial data) vs regeneration (needs new data)
@@ -147,9 +150,63 @@ def update_loop():
     # Animation time for dynamic effects
     anim_time = pygame.time.get_ticks() / 1000.0
 
-    # Draw stars with twinkling effect
+    # Calculate ship velocity for visual effects
+    velocity_mag = np.linalg.norm(ship.velocity)
+    speed_factor = min(1.0, velocity_mag / ship.max_velocity)
+
+    # Camera shake based on velocity (subtle screen offset)
+    if velocity_mag > 2.0 and not ship.landed_mode:
+        shake_intensity = min(3.0, velocity_mag * 0.1)
+        camera_offset_x = np.sin(anim_time * 30) * shake_intensity * speed_factor
+        camera_offset_y = np.cos(anim_time * 25) * shake_intensity * speed_factor * 0.5
+    else:
+        camera_offset_x, camera_offset_y = 0, 0
+
+    # Draw speed lines when moving fast (star streaming effect)
+    if speed_factor > 0.3 and not ship.landed_mode:
+        vel_angle = np.arctan2(ship.velocity[1], ship.velocity[0])
+        num_speed_lines = int(20 * speed_factor)
+        for sl_i in range(num_speed_lines):
+            # Random position around screen edges (coming from direction of travel)
+            random_seed = (sl_i * 7 + int(anim_time * 10)) % 1000
+            np.random.seed(random_seed)
+
+            # Lines come from the direction we're moving toward
+            edge_angle = vel_angle + np.random.uniform(-0.5, 0.5)
+            start_dist = screen_w * 0.6
+            end_dist = start_dist - (50 + 100 * speed_factor)
+
+            # Calculate line position with screen center offset
+            cx, cy = screen_w // 2 + camera_offset_x, screen_h // 2 + camera_offset_y
+            start_x = cx + np.cos(edge_angle) * start_dist
+            start_y = cy + np.sin(edge_angle) * start_dist
+            end_x = cx + np.cos(edge_angle) * end_dist
+            end_y = cy + np.sin(edge_angle) * end_dist
+
+            # Animate line position
+            line_phase = (anim_time * 3 + sl_i * 0.3) % 1.0
+            lerp_start_x = start_x + (end_x - start_x) * line_phase
+            lerp_start_y = start_y + (end_y - start_y) * line_phase
+            lerp_end_x = start_x + (end_x - start_x) * min(1.0, line_phase + 0.3)
+            lerp_end_y = start_y + (end_y - start_y) * min(1.0, line_phase + 0.3)
+
+            # Fade based on position in animation
+            alpha = int(150 * speed_factor * (1 - line_phase))
+            if alpha > 10:
+                line_color = (200, 200, 255)
+                pygame.draw.line(screen, line_color,
+                               (int(lerp_start_x), int(lerp_start_y)),
+                               (int(lerp_end_x), int(lerp_end_y)), 1)
+
+    # Draw stars with twinkling effect and parallax
     for idx, body in enumerate(stars):
         pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
+        # Apply camera shake offset with parallax (distant stars move less)
+        dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
+        parallax_factor = max(0.3, min(1.0, 50 / (dist_to_ship + 10)))
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+
         if ship.high_contrast:
             color = (0, 0, 0)
         else:
@@ -164,32 +221,74 @@ def update_loop():
             size = int(3 + np.sin(anim_time * 0.5 + idx) * 1.5)
         elif body.get('stellar_type') == 'white_dwarf':
             size = 1  # Small but bright
-        pygame.draw.circle(screen, color, pos_2d, size)
+        pygame.draw.circle(screen, color, (draw_x, draw_y), size)
 
-    # Draw planets
+    # Draw planets with parallax and orbital motion visible
     for body in planets:
         pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
+        # Parallax effect based on distance
+        dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
+        parallax_factor = max(0.5, min(1.0, 30 / (dist_to_ship + 5)))
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+
         hue = (((body['pos'][3] + body['pos'][4]) / 200 * 360) % 360 + 360) % 360
         color = pygame.Color(0)
         color.hsva = (hue, 100, 100, 100) if not ship.high_contrast else (0, 0, 0, 100)
         # Apply size multiplier from exoplanet type
         size_mult = body.get('size_mult', 1.0)
         radius = int(PLANET_RADIUS * size_mult)
-        pygame.draw.circle(screen, color, pos_2d, radius)
+        pygame.draw.circle(screen, color, (draw_x, draw_y), radius)
 
-    # Draw nebulae
-    for body in nebulae:
+        # Draw faint orbital trail for nearby planets
+        if dist_to_ship < 80 and not ship.landed_mode:
+            orbit_radius = body.get('orbit_radius', 20)
+            parent_star = stars[body.get('parent_star_idx', 0)]
+            star_2d = project_to_2d(parent_star['pos'], ship.view_rotation, screen_size)
+            star_draw_x = int(star_2d[0] + camera_offset_x * parallax_factor)
+            star_draw_y = int(star_2d[1] + camera_offset_y * parallax_factor)
+            # Scale orbit to screen (approximation)
+            screen_orbit_radius = int(orbit_radius * 2)
+            if screen_orbit_radius > 5:
+                pygame.draw.circle(screen, (50, 50, 80), (star_draw_x, star_draw_y),
+                                 screen_orbit_radius, 1)
+
+    # Draw nebulae with swirling effect
+    for idx, body in enumerate(nebulae):
         pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size)
+        dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
+        parallax_factor = max(0.4, min(1.0, 40 / (dist_to_ship + 10)))
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+
         if ship.high_contrast:
-            color = (128, 128, 128, 128)  # Gray with transparency
+            color = (128, 128, 128)
         else:
             nebula_type = body.get('nebula_type', 'emission')
-            color = NEBULA_TYPES[nebula_type]['color']
-        pygame.draw.circle(screen, color, pos_2d, 15)
+            base_color = NEBULA_TYPES[nebula_type]['color']
+            # Pulsing/swirling nebula effect
+            pulse = 0.7 + 0.3 * np.sin(anim_time * body.get('rotation_speed', 0.03) * 50 + idx)
+            color = tuple(int(c * pulse) for c in base_color)
+
+        # Draw multiple layers for depth
+        for layer in range(3):
+            layer_size = 15 - layer * 3
+            layer_alpha = 1.0 - layer * 0.25
+            layer_color = tuple(int(c * layer_alpha) for c in color)
+            layer_offset_x = int(np.sin(anim_time + layer) * 2)
+            layer_offset_y = int(np.cos(anim_time + layer) * 2)
+            pygame.draw.circle(screen, layer_color,
+                             (draw_x + layer_offset_x, draw_y + layer_offset_y), layer_size)
 
     # Draw rifts with pulsing dimensional effect
     for idx, rift in enumerate(ship.rifts):
         pos_2d = project_to_2d(rift['pos'], ship.view_rotation, screen_size)
+        # Parallax for rifts (they feel closer/more present)
+        dist_to_ship = np.linalg.norm(rift['pos'] - ship.position)
+        parallax_factor = max(0.6, min(1.0, 25 / (dist_to_ship + 5)))
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+
         # Pulsing size and color
         pulse = 0.5 + 0.5 * np.sin(anim_time * 4 + idx)
         size = int(5 + 3 * pulse)
@@ -197,13 +296,19 @@ def update_loop():
         r = int(200 + 55 * np.sin(anim_time * 3))
         g = int(50 + 50 * np.sin(anim_time * 2 + 1))
         b = int(200 + 55 * np.cos(anim_time * 3))
-        pygame.draw.circle(screen, (r, g, b), pos_2d, size)
+        pygame.draw.circle(screen, (r, g, b), (draw_x, draw_y), size)
         # Inner glow
-        pygame.draw.circle(screen, (255, 255, 255), pos_2d, max(2, size // 2))
+        pygame.draw.circle(screen, (255, 255, 255), (draw_x, draw_y), max(2, size // 2))
 
     # Draw temples (golden triangles) with pulsing glow
     for idx, temple in enumerate(temples):
         pos_2d = project_to_2d(temple['pos'], ship.view_rotation, screen_size)
+        # Parallax for temples
+        dist_to_ship = np.linalg.norm(temple['pos'] - ship.position)
+        parallax_factor = max(0.5, min(1.0, 35 / (dist_to_ship + 8)))
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+
         pulse = 0.7 + 0.3 * np.sin(anim_time * 2 + idx * 0.3)
 
         if temple['temple_type'] == 'master':
@@ -212,9 +317,8 @@ def update_loop():
             size = int(15 + 3 * np.sin(anim_time * 1.5))
             # Draw outer glow rings
             for ring in range(3, 0, -1):
-                glow_alpha = int(100 / ring)
                 glow_color = (255, 215, 0)
-                pygame.draw.circle(screen, glow_color, pos_2d, size + ring * 5, 1)
+                pygame.draw.circle(screen, glow_color, (draw_x, draw_y), size + ring * 5, 1)
         else:
             # Minor temples - smaller triangles with key collected indicator
             if temple['key_index'] in ship.temple_keys:
@@ -227,29 +331,39 @@ def update_loop():
 
         # Draw triangle
         points = [
-            (pos_2d[0], pos_2d[1] - size),  # Top
-            (pos_2d[0] - size, pos_2d[1] + size),  # Bottom left
-            (pos_2d[0] + size, pos_2d[1] + size)  # Bottom right
+            (draw_x, draw_y - size),  # Top
+            (draw_x - size, draw_y + size),  # Bottom left
+            (draw_x + size, draw_y + size)  # Bottom right
         ]
         pygame.draw.polygon(screen, color, points)
 
         # Draw inner glow for uncollected temples
         if temple['temple_type'] != 'master' and temple['key_index'] not in ship.temple_keys:
             inner_points = [
-                (pos_2d[0], pos_2d[1] - size // 2),
-                (pos_2d[0] - size // 2, pos_2d[1] + size // 2),
-                (pos_2d[0] + size // 2, pos_2d[1] + size // 2)
+                (draw_x, draw_y - size // 2),
+                (draw_x - size // 2, draw_y + size // 2),
+                (draw_x + size // 2, draw_y + size // 2)
             ]
             inner_color = tuple(min(255, int(c * 1.3)) for c in color)
             pygame.draw.polygon(screen, inner_color, inner_points)
 
-    # Draw pyramids (golden squares)
+    # Draw pyramids (golden squares) with parallax
     for pyramid in pyramids:
         pos_2d = project_to_2d(pyramid['pos'], ship.view_rotation, screen_size)
-        color = (218, 165, 32) if not ship.high_contrast else (0, 0, 0)  # Golden rod
+        dist_to_ship = np.linalg.norm(pyramid['pos'] - ship.position)
+        parallax_factor = max(0.5, min(1.0, 35 / (dist_to_ship + 8)))
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+
+        # Pulsing pyramid glow
+        pulse = 0.8 + 0.2 * np.sin(anim_time * 1.5)
+        base_color = (218, 165, 32) if not ship.high_contrast else (0, 0, 0)
+        color = tuple(int(c * pulse) for c in base_color)
         size = 10
-        rect = pygame.Rect(pos_2d[0] - size, pos_2d[1] - size, size * 2, size * 2)
+        rect = pygame.Rect(draw_x - size, draw_y - size, size * 2, size * 2)
         pygame.draw.rect(screen, color, rect)
+        # Inner highlight
+        pygame.draw.rect(screen, (255, 220, 100), pygame.Rect(draw_x - 3, draw_y - 3, 6, 6))
 
     # Draw ley lines with energy flow effect
     for idx, ley_line in enumerate(ley_lines):

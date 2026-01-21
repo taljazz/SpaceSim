@@ -57,11 +57,19 @@ ZOOM_MIN = 0.2
 ZOOM_MAX = 5.0
 ZOOM_STEP = 0.1
 
+# Camera orbit state (3D viewing of the ship)
+camera_orbit_angle = 0.0  # Horizontal orbit around ship (radians, 0 = behind ship)
+camera_pitch = 70.0  # Vertical angle in degrees (0 = level/behind, 90 = top-down)
+CAMERA_ORBIT_SPEED = 2.0  # Radians per second for horizontal orbit
+CAMERA_PITCH_SPEED = 60.0  # Degrees per second for vertical orbit
+CAMERA_PITCH_MIN = 10.0  # Minimum pitch (almost level, from behind)
+CAMERA_PITCH_MAX = 90.0  # Maximum pitch (top-down view)
+
 
 def update_loop():
     """Main game update loop."""
     global next_click_time, stars, planets, nebulae, celestial_bodies, temples, ley_lines, pyramids
-    global fullscreen, screen, zoom_level
+    global fullscreen, screen, zoom_level, camera_orbit_angle, camera_pitch
 
     dt = clock.tick(FPS) / 1000.0
     ship.simulation_time += dt
@@ -126,6 +134,21 @@ def update_loop():
 
     # Get keys and update ship
     keys = pygame.key.get_pressed()
+
+    # Camera orbit controls (continuous)
+    # Home/End: Adjust camera pitch (vertical orbit)
+    if keys[pygame.K_HOME]:
+        camera_pitch = min(CAMERA_PITCH_MAX, camera_pitch + CAMERA_PITCH_SPEED * dt)
+    if keys[pygame.K_END]:
+        camera_pitch = max(CAMERA_PITCH_MIN, camera_pitch - CAMERA_PITCH_SPEED * dt)
+    # Comma/Period: Horizontal orbit around ship
+    if keys[pygame.K_COMMA]:
+        camera_orbit_angle -= CAMERA_ORBIT_SPEED * dt
+    if keys[pygame.K_PERIOD]:
+        camera_orbit_angle += CAMERA_ORBIT_SPEED * dt
+    # Keep orbit angle in 0-2π range
+    camera_orbit_angle %= (2 * np.pi)
+
     ship.handle_input(keys, events, stars, planets, nebulae)
     ship.update(dt, celestial_bodies, keys, temples, ley_lines, pyramids)
 
@@ -187,50 +210,79 @@ def update_loop():
     else:
         camera_offset_x, camera_offset_y = 0, 0
 
+    # Calculate velocity-based visual drift (objects move opposite to ship movement)
+    # IMPORTANT: Must apply view_rotation to velocity to match the projection system
+    if velocity_mag > 0.1 and not ship.landed_mode:
+        # Apply view rotation to velocity (same formula as projection uses for positions)
+        cos_r = np.cos(ship.view_rotation)
+        sin_r = np.sin(ship.view_rotation)
+        # Rotated velocity matches how positions are projected to screen
+        vel_x_rotated = ship.velocity[0] * cos_r + ship.velocity[3] * sin_r
+        vel_y_rotated = ship.velocity[1] * cos_r + ship.velocity[4] * sin_r
+        vel_mag_rotated = np.sqrt(vel_x_rotated**2 + vel_y_rotated**2)
+
+        # Visual drift in opposite direction of ROTATED velocity (creates sense of motion)
+        drift_scale = 15.0 * speed_factor  # How much objects visually shift
+        if vel_mag_rotated > 0.01:
+            velocity_drift_x = -vel_x_rotated / (vel_mag_rotated + 0.1) * drift_scale
+            velocity_drift_y = -vel_y_rotated / (vel_mag_rotated + 0.1) * drift_scale
+        else:
+            velocity_drift_x, velocity_drift_y = 0, 0
+    else:
+        velocity_drift_x, velocity_drift_y = 0, 0
+
     # Draw speed lines when moving fast (star streaming effect)
     if speed_factor > 0.3 and not ship.landed_mode:
-        vel_angle = np.arctan2(ship.velocity[1], ship.velocity[0])
+        # Speed lines come FROM the direction we're heading (opposite of velocity = stars behind us)
+        # IMPORTANT: Use rotated velocity to match projection system
+        cos_r = np.cos(ship.view_rotation)
+        sin_r = np.sin(ship.view_rotation)
+        vel_x_rotated = ship.velocity[0] * cos_r + ship.velocity[3] * sin_r
+        vel_y_rotated = ship.velocity[1] * cos_r + ship.velocity[4] * sin_r
+        vel_angle = np.arctan2(vel_y_rotated, vel_x_rotated)
+        # Lines stream from ahead toward center (we're flying into them)
+        stream_angle = vel_angle  # Direction we're moving toward (in screen space)
         num_speed_lines = int(20 * speed_factor)
         for sl_i in range(num_speed_lines):
-            # Random position around screen edges (coming from direction of travel)
             random_seed = (sl_i * 7 + int(anim_time * 10)) % 1000
             np.random.seed(random_seed)
 
-            # Lines come from the direction we're moving toward
-            edge_angle = vel_angle + np.random.uniform(-0.5, 0.5)
-            start_dist = screen_w * 0.6
-            end_dist = start_dist - (50 + 100 * speed_factor)
+            # Lines appear ahead of us and stream toward/past center
+            edge_angle = stream_angle + np.random.uniform(-0.6, 0.6)
+            start_dist = screen_w * 0.7  # Start from edge
+            end_dist = 50  # End near center
 
-            # Calculate line position with screen center offset
-            cx, cy = screen_w // 2 + camera_offset_x, screen_h // 2 + camera_offset_y
+            cx, cy = screen_w // 2, screen_h // 2
+            # Start position (ahead of us)
             start_x = cx + np.cos(edge_angle) * start_dist
             start_y = cy + np.sin(edge_angle) * start_dist
-            end_x = cx + np.cos(edge_angle) * end_dist
-            end_y = cy + np.sin(edge_angle) * end_dist
+            # End position (behind/around us)
+            end_x = cx + np.cos(edge_angle + np.pi) * end_dist
+            end_y = cy + np.sin(edge_angle + np.pi) * end_dist
 
-            # Animate line position
-            line_phase = (anim_time * 3 + sl_i * 0.3) % 1.0
-            lerp_start_x = start_x + (end_x - start_x) * line_phase
-            lerp_start_y = start_y + (end_y - start_y) * line_phase
-            lerp_end_x = start_x + (end_x - start_x) * min(1.0, line_phase + 0.3)
-            lerp_end_y = start_y + (end_y - start_y) * min(1.0, line_phase + 0.3)
+            # Animate line streaming toward us
+            line_phase = (anim_time * 4 * speed_factor + sl_i * 0.15) % 1.0
+            lerp_x = start_x + (end_x - start_x) * line_phase
+            lerp_y = start_y + (end_y - start_y) * line_phase
+            # Trail behind the point
+            trail_x = start_x + (end_x - start_x) * max(0, line_phase - 0.15)
+            trail_y = start_y + (end_y - start_y) * max(0, line_phase - 0.15)
 
-            # Fade based on position in animation
-            alpha = int(150 * speed_factor * (1 - line_phase))
-            if alpha > 10:
-                line_color = (200, 200, 255)
-                pygame.draw.line(screen, line_color,
-                               (int(lerp_start_x), int(lerp_start_y)),
-                               (int(lerp_end_x), int(lerp_end_y)), 1)
+            # Brighter near center
+            brightness = int(100 + 155 * line_phase)
+            line_color = (brightness, brightness, 255)
+            pygame.draw.line(screen, line_color,
+                           (int(trail_x), int(trail_y)),
+                           (int(lerp_x), int(lerp_y)), 1)
 
     # Draw stars with twinkling effect and parallax
     for idx, body in enumerate(stars):
         pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
-        # Apply camera shake offset with parallax (distant stars move less)
+        # Apply camera shake and velocity drift with parallax (distant stars move less)
         dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
         parallax_factor = max(0.3, min(1.0, 50 / (dist_to_ship + 10)))
-        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
-        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor + velocity_drift_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor + velocity_drift_y * parallax_factor)
 
         if ship.high_contrast:
             color = (0, 0, 0)
@@ -254,8 +306,8 @@ def update_loop():
         # Parallax effect based on distance
         dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
         parallax_factor = max(0.5, min(1.0, 30 / (dist_to_ship + 5)))
-        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
-        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor + velocity_drift_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor + velocity_drift_y * parallax_factor)
 
         hue = (((body['pos'][3] + body['pos'][4]) / 200 * 360) % 360 + 360) % 360
         color = pygame.Color(0)
@@ -270,8 +322,8 @@ def update_loop():
             orbit_radius = body.get('orbit_radius', 20)
             parent_star = stars[body.get('parent_star_idx', 0)]
             star_2d = project_to_2d(parent_star['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
-            star_draw_x = int(star_2d[0] + camera_offset_x * parallax_factor)
-            star_draw_y = int(star_2d[1] + camera_offset_y * parallax_factor)
+            star_draw_x = int(star_2d[0] + camera_offset_x * parallax_factor + velocity_drift_x * parallax_factor)
+            star_draw_y = int(star_2d[1] + camera_offset_y * parallax_factor + velocity_drift_y * parallax_factor)
             # Scale orbit to screen (approximation)
             screen_orbit_radius = int(orbit_radius * 2)
             if screen_orbit_radius > 5:
@@ -283,8 +335,8 @@ def update_loop():
         pos_2d = project_to_2d(body['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         dist_to_ship = np.linalg.norm(body['pos'] - ship.position)
         parallax_factor = max(0.4, min(1.0, 40 / (dist_to_ship + 10)))
-        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
-        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor + velocity_drift_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor + velocity_drift_y * parallax_factor)
 
         if ship.high_contrast:
             color = (128, 128, 128)
@@ -311,8 +363,8 @@ def update_loop():
         # Parallax for rifts (they feel closer/more present)
         dist_to_ship = np.linalg.norm(rift['pos'] - ship.position)
         parallax_factor = max(0.6, min(1.0, 25 / (dist_to_ship + 5)))
-        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
-        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor + velocity_drift_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor + velocity_drift_y * parallax_factor)
 
         # Pulsing size and color
         pulse = 0.5 + 0.5 * np.sin(anim_time * 4 + idx)
@@ -331,8 +383,8 @@ def update_loop():
         # Parallax for temples
         dist_to_ship = np.linalg.norm(temple['pos'] - ship.position)
         parallax_factor = max(0.5, min(1.0, 35 / (dist_to_ship + 8)))
-        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
-        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor + velocity_drift_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor + velocity_drift_y * parallax_factor)
 
         pulse = 0.7 + 0.3 * np.sin(anim_time * 2 + idx * 0.3)
 
@@ -377,8 +429,8 @@ def update_loop():
         pos_2d = project_to_2d(pyramid['pos'], ship.view_rotation, screen_size, zoom_level, ship.position)
         dist_to_ship = np.linalg.norm(pyramid['pos'] - ship.position)
         parallax_factor = max(0.5, min(1.0, 35 / (dist_to_ship + 8)))
-        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor)
-        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor)
+        draw_x = int(pos_2d[0] + camera_offset_x * parallax_factor + velocity_drift_x * parallax_factor)
+        draw_y = int(pos_2d[1] + camera_offset_y * parallax_factor + velocity_drift_y * parallax_factor)
 
         # Pulsing pyramid glow
         pulse = 0.8 + 0.2 * np.sin(anim_time * 1.5)
@@ -395,6 +447,17 @@ def update_loop():
         start_2d = project_to_2d(ley_line['start'], ship.view_rotation, screen_size, zoom_level, ship.position)
         end_2d = project_to_2d(ley_line['end'], ship.view_rotation, screen_size, zoom_level, ship.position)
 
+        # Calculate average parallax for the ley line based on midpoint distance
+        midpoint = (ley_line['start'] + ley_line['end']) / 2
+        dist_to_ship = np.linalg.norm(midpoint - ship.position)
+        parallax_factor = max(0.4, min(1.0, 45 / (dist_to_ship + 15)))
+
+        # Apply velocity drift to both endpoints
+        start_draw = (int(start_2d[0] + velocity_drift_x * parallax_factor),
+                      int(start_2d[1] + velocity_drift_y * parallax_factor))
+        end_draw = (int(end_2d[0] + velocity_drift_x * parallax_factor),
+                    int(end_2d[1] + velocity_drift_y * parallax_factor))
+
         # Pulsing brightness based on time
         pulse = 0.6 + 0.4 * np.sin(anim_time * 2 + idx * 0.5)
 
@@ -409,15 +472,15 @@ def update_loop():
             width = 1
 
         color = tuple(int(c * pulse) for c in base_color)
-        pygame.draw.line(screen, color, start_2d, end_2d, width)
+        pygame.draw.line(screen, color, start_draw, end_draw, width)
 
         # Draw energy particles flowing along the line (if on this ley line, show more)
         if ship.on_ley_line and ship.current_ley_line is ley_line:
             # More visible energy dots when player is on this ley line
             for i in range(5):
                 t = (anim_time * 0.3 + i * 0.2) % 1.0
-                particle_x = int(start_2d[0] + (end_2d[0] - start_2d[0]) * t)
-                particle_y = int(start_2d[1] + (end_2d[1] - start_2d[1]) * t)
+                particle_x = int(start_draw[0] + (end_draw[0] - start_draw[0]) * t)
+                particle_y = int(start_draw[1] + (end_draw[1] - start_draw[1]) * t)
                 pygame.draw.circle(screen, (255, 255, 200), (particle_x, particle_y), 3)
 
     # Draw planet grid if landed
@@ -439,26 +502,90 @@ def update_loop():
         glow_intensity = min(1.0, velocity_mag / ship.max_velocity)
         avg_resonance = np.mean(ship.resonance_levels)
 
+        # === CALCULATE SHIP VISUAL ORIENTATION ===
+        # Ship points in direction of travel (velocity in screen space)
+        # Apply view_rotation to velocity to get screen-space direction
+        cos_r = np.cos(ship.view_rotation)
+        sin_r = np.sin(ship.view_rotation)
+        vel_x_screen = ship.velocity[0] * cos_r + ship.velocity[3] * sin_r
+        vel_y_screen = ship.velocity[1] * cos_r + ship.velocity[4] * sin_r
+
+        # Ship orientation: point in velocity direction, or default forward if stationary
+        if velocity_mag > 0.1:
+            ship_heading_angle = np.arctan2(vel_y_screen, vel_x_screen)
+        else:
+            # When stationary, maintain last heading or default to "up" on screen
+            ship_heading_angle = -np.pi / 2  # Point upward when stationary
+
+        # === 3D CAMERA ORBIT PERSPECTIVE ===
+        # camera_orbit_angle: horizontal orbit (0 = behind ship, π = in front)
+        # camera_pitch: vertical angle (90 = top-down, lower = more from behind)
+
+        # The visual angle of the ship on screen combines:
+        # - ship_heading_angle: which way the ship is actually pointing
+        # - camera_orbit_angle: which way we're viewing from
+        ship_visual_angle = ship_heading_angle - camera_orbit_angle
+
+        # Pitch affects vertical foreshortening (1.0 at 90°, 0 at 0°)
+        pitch_rad = np.radians(camera_pitch)
+        vertical_scale = np.sin(pitch_rad)  # 1.0 when top-down, 0 when level
+
+        # Height offset - when viewing from lower angles, ship appears higher on screen
+        height_offset = np.cos(pitch_rad) * 30  # Ship rises as we lower camera
+
         # === VISIBLE SHIP MODEL ===
-        # Ship is a triangular vessel pointing in heading direction
+        # Ship is a 3D vessel - we see different aspects based on camera angle
         ship_size = 30  # Base size of ship
         pulse = 0.85 + 0.15 * np.sin(anim_time * 3)  # Gentle pulse
 
-        # Calculate ship vertices (triangle pointing in heading direction)
-        # Nose (front)
-        nose_x = ship_center[0] + np.cos(ship.heading) * ship_size * 1.5
-        nose_y = ship_center[1] + np.sin(ship.heading) * ship_size * 1.5
+        # Helper function to apply 3D perspective to a point
+        def apply_perspective(x, y, center_x, center_y):
+            # Offset from center
+            dx = x - center_x
+            dy = y - center_y
+            # Apply vertical foreshortening
+            dy_scaled = dy * vertical_scale
+            # Return new position with height offset
+            return (center_x + dx, center_y + dy_scaled - height_offset)
+
+        # Calculate ship vertices in local space, then apply perspective
+        # Nose (front) - points where we're going
+        nose_local_x = np.cos(ship_visual_angle) * ship_size * 1.5
+        nose_local_y = np.sin(ship_visual_angle) * ship_size * 1.5
+        nose_x, nose_y = apply_perspective(
+            ship_center[0] + nose_local_x,
+            ship_center[1] + nose_local_y,
+            ship_center[0], ship_center[1]
+        )
+
         # Left wing
-        left_angle = ship.heading + np.pi * 0.75
-        left_x = ship_center[0] + np.cos(left_angle) * ship_size
-        left_y = ship_center[1] + np.sin(left_angle) * ship_size
+        left_angle = ship_visual_angle + np.pi * 0.75
+        left_local_x = np.cos(left_angle) * ship_size
+        left_local_y = np.sin(left_angle) * ship_size
+        left_x, left_y = apply_perspective(
+            ship_center[0] + left_local_x,
+            ship_center[1] + left_local_y,
+            ship_center[0], ship_center[1]
+        )
+
         # Right wing
-        right_angle = ship.heading - np.pi * 0.75
-        right_x = ship_center[0] + np.cos(right_angle) * ship_size
-        right_y = ship_center[1] + np.sin(right_angle) * ship_size
+        right_angle = ship_visual_angle - np.pi * 0.75
+        right_local_x = np.cos(right_angle) * ship_size
+        right_local_y = np.sin(right_angle) * ship_size
+        right_x, right_y = apply_perspective(
+            ship_center[0] + right_local_x,
+            ship_center[1] + right_local_y,
+            ship_center[0], ship_center[1]
+        )
+
         # Tail (back center)
-        tail_x = ship_center[0] - np.cos(ship.heading) * ship_size * 0.5
-        tail_y = ship_center[1] - np.sin(ship.heading) * ship_size * 0.5
+        tail_local_x = -np.cos(ship_visual_angle) * ship_size * 0.5
+        tail_local_y = -np.sin(ship_visual_angle) * ship_size * 0.5
+        tail_x, tail_y = apply_perspective(
+            ship_center[0] + tail_local_x,
+            ship_center[1] + tail_local_y,
+            ship_center[0], ship_center[1]
+        )
 
         ship_points = [
             (int(nose_x), int(nose_y)),
@@ -467,23 +594,79 @@ def update_loop():
             (int(right_x), int(right_y))
         ]
 
-        # Outer glow (large, soft)
+        # Calculate visible "top" of ship for 3D effect
+        # When viewing from lower angles, we see the side/height of the ship
+        ship_height = 15 * (1 - vertical_scale)  # Ship has height when not top-down
+
+        # === 3D SHIP BODY (show height when viewing from lower angles) ===
+        if ship_height > 2:
+            # Draw the "side" of the ship as a darker polygon connecting top and bottom
+            # Bottom vertices (current ship_points)
+            # Top vertices (same but offset upward by ship_height)
+            top_nose = (int(nose_x), int(nose_y - ship_height))
+            top_left = (int(left_x), int(left_y - ship_height))
+            top_right = (int(right_x), int(right_y - ship_height))
+            top_tail = (int(tail_x), int(tail_y - ship_height))
+
+            # Draw side panels (connecting top and bottom edges)
+            side_color = (60, 80, 100)  # Dark blue-gray for sides
+
+            # Left side panel
+            pygame.draw.polygon(screen, side_color, [
+                (int(nose_x), int(nose_y)), top_nose,
+                top_left, (int(left_x), int(left_y))
+            ])
+            # Right side panel
+            pygame.draw.polygon(screen, side_color, [
+                (int(nose_x), int(nose_y)), top_nose,
+                top_right, (int(right_x), int(right_y))
+            ])
+            # Back panel
+            pygame.draw.polygon(screen, (40, 60, 80), [
+                (int(left_x), int(left_y)), top_left,
+                top_tail, (int(tail_x), int(tail_y))
+            ])
+            pygame.draw.polygon(screen, (40, 60, 80), [
+                (int(right_x), int(right_y)), top_right,
+                top_tail, (int(tail_x), int(tail_y))
+            ])
+
+            # Update ship_points to be the TOP of the ship
+            ship_points = [top_nose, top_left, top_tail, top_right]
+
+        # Outer glow (large, soft) - now uses perspective
         for glow_layer in range(4, 0, -1):
             glow_size = ship_size + glow_layer * 8
             glow_alpha = 0.15 / glow_layer
-            glow_nose_x = ship_center[0] + np.cos(ship.heading) * glow_size * 1.5
-            glow_nose_y = ship_center[1] + np.sin(ship.heading) * glow_size * 1.5
-            glow_left_x = ship_center[0] + np.cos(left_angle) * glow_size
-            glow_left_y = ship_center[1] + np.sin(left_angle) * glow_size
-            glow_right_x = ship_center[0] + np.cos(right_angle) * glow_size
-            glow_right_y = ship_center[1] + np.sin(right_angle) * glow_size
-            glow_tail_x = ship_center[0] - np.cos(ship.heading) * glow_size * 0.5
-            glow_tail_y = ship_center[1] - np.sin(ship.heading) * glow_size * 0.5
+
+            glow_nose_x, glow_nose_y = apply_perspective(
+                ship_center[0] + np.cos(ship_visual_angle) * glow_size * 1.5,
+                ship_center[1] + np.sin(ship_visual_angle) * glow_size * 1.5,
+                ship_center[0], ship_center[1]
+            )
+            glow_left_x, glow_left_y = apply_perspective(
+                ship_center[0] + np.cos(left_angle) * glow_size,
+                ship_center[1] + np.sin(left_angle) * glow_size,
+                ship_center[0], ship_center[1]
+            )
+            glow_right_x, glow_right_y = apply_perspective(
+                ship_center[0] + np.cos(right_angle) * glow_size,
+                ship_center[1] + np.sin(right_angle) * glow_size,
+                ship_center[0], ship_center[1]
+            )
+            glow_tail_x, glow_tail_y = apply_perspective(
+                ship_center[0] - np.cos(ship_visual_angle) * glow_size * 0.5,
+                ship_center[1] - np.sin(ship_visual_angle) * glow_size * 0.5,
+                ship_center[0], ship_center[1]
+            )
+
+            # Apply height offset to glow when viewing 3D
+            glow_height_offset = ship_height if ship_height > 2 else 0
             glow_points = [
-                (int(glow_nose_x), int(glow_nose_y)),
-                (int(glow_left_x), int(glow_left_y)),
-                (int(glow_tail_x), int(glow_tail_y)),
-                (int(glow_right_x), int(glow_right_y))
+                (int(glow_nose_x), int(glow_nose_y - glow_height_offset)),
+                (int(glow_left_x), int(glow_left_y - glow_height_offset)),
+                (int(glow_tail_x), int(glow_tail_y - glow_height_offset)),
+                (int(glow_right_x), int(glow_right_y - glow_height_offset))
             ]
             glow_color = (int(100 * pulse), int(200 * pulse), int(255 * pulse))
             pygame.draw.polygon(screen, glow_color, glow_points, 2)
@@ -505,45 +688,65 @@ def update_loop():
         outline_color = (255, 255, 255)
         pygame.draw.polygon(screen, outline_color, ship_points, 3)
 
-        # Cockpit/center marker
-        pygame.draw.circle(screen, (255, 255, 200), ship_center, 6)
-        pygame.draw.circle(screen, outline_color, ship_center, 6, 2)
+        # Cockpit/center marker (elevated when viewing from angle)
+        cockpit_center = (ship_center[0], int(ship_center[1] - height_offset - ship_height))
+        pygame.draw.circle(screen, (255, 255, 200), cockpit_center, 6)
+        pygame.draw.circle(screen, outline_color, cockpit_center, 6, 2)
 
-        # Engine glow at back when moving
+        # Engine glow at back when moving (account for 3D height)
         if velocity_mag > 0.5:
             engine_intensity = min(1.0, velocity_mag / 5.0)
             engine_color = (255, int(150 * (1 - engine_intensity)), 0)
+            # Height adjustment for 3D view
+            eng_height = ship_height if ship_height > 2 else 0
             # Left engine
             left_eng_x = (left_x + tail_x) / 2
-            left_eng_y = (left_y + tail_y) / 2
+            left_eng_y = (left_y + tail_y) / 2 - eng_height
             pygame.draw.circle(screen, engine_color, (int(left_eng_x), int(left_eng_y)), int(5 + 5 * engine_intensity))
             # Right engine
             right_eng_x = (right_x + tail_x) / 2
-            right_eng_y = (right_y + tail_y) / 2
+            right_eng_y = (right_y + tail_y) / 2 - eng_height
             pygame.draw.circle(screen, engine_color, (int(right_eng_x), int(right_eng_y)), int(5 + 5 * engine_intensity))
-            # Engine trails
+            # Engine trails (extend behind and down in 3D)
             trail_length = 20 * engine_intensity
-            trail_end_x = tail_x - np.cos(ship.heading) * trail_length
-            trail_end_y = tail_y - np.sin(ship.heading) * trail_length
+            trail_end_x = tail_x - np.cos(ship_visual_angle) * trail_length
+            trail_end_y = tail_y - np.sin(ship_visual_angle) * trail_length + eng_height * 0.5  # Trails go back and down
             pygame.draw.line(screen, (255, 200, 100), (int(left_eng_x), int(left_eng_y)), (int(trail_end_x), int(trail_end_y)), 2)
             pygame.draw.line(screen, (255, 200, 100), (int(right_eng_x), int(right_eng_y)), (int(trail_end_x), int(trail_end_y)), 2)
 
-        # Direction indicator line (extends from nose)
+        # Direction indicator line (extends from nose, on top of ship)
         indicator_length = 25
-        indicator_x = nose_x + np.cos(ship.heading) * indicator_length
-        indicator_y = nose_y + np.sin(ship.heading) * indicator_length
-        pygame.draw.line(screen, (255, 255, 0), (int(nose_x), int(nose_y)), (int(indicator_x), int(indicator_y)), 2)
+        # Get the actual nose position (which may have been updated for 3D)
+        actual_nose = ship_points[0] if isinstance(ship_points[0], tuple) else (int(nose_x), int(nose_y - ship_height))
+        indicator_x = actual_nose[0] + np.cos(ship_visual_angle) * indicator_length
+        indicator_y = actual_nose[1] + np.sin(ship_visual_angle) * indicator_length * vertical_scale
+        pygame.draw.line(screen, (255, 255, 0), actual_nose, (int(indicator_x), int(indicator_y)), 2)
 
-        # Pulsing outer ring for extra visibility
+        # Pulsing outer ring for extra visibility (ellipse when viewing from angle)
         ring_pulse = 0.7 + 0.3 * np.sin(anim_time * 4)
         ring_radius = int(70 + 10 * ring_pulse)
         ring_color = (int(100 * ring_pulse), int(255 * ring_pulse), int(255 * ring_pulse))
-        pygame.draw.circle(screen, ring_color, ship_center, ring_radius, 2)
+        # Draw as ellipse when not top-down, centered on ship
+        ring_center_y = int(ship_center[1] - height_offset - ship_height / 2)
+        ring_height = int(ring_radius * vertical_scale)
+        if ring_height > 10:
+            pygame.draw.ellipse(screen, ring_color,
+                              (ship_center[0] - ring_radius, ring_center_y - ring_height,
+                               ring_radius * 2, ring_height * 2), 2)
+        else:
+            # Very flat ellipse - just draw a line
+            pygame.draw.line(screen, ring_color,
+                           (ship_center[0] - ring_radius, ring_center_y),
+                           (ship_center[0] + ring_radius, ring_center_y), 2)
 
         # === MOTION TRAIL (velocity streaks behind ship) ===
         if velocity_mag > 0.5:
-            # Draw fading trail lines behind ship
-            vel_angle = np.arctan2(ship.velocity[1], ship.velocity[0])
+            # Draw fading trail lines behind ship (using rotated velocity for screen-space direction)
+            cos_r = np.cos(ship.view_rotation)
+            sin_r = np.sin(ship.view_rotation)
+            vel_x_rot = ship.velocity[0] * cos_r + ship.velocity[3] * sin_r
+            vel_y_rot = ship.velocity[1] * cos_r + ship.velocity[4] * sin_r
+            vel_angle = np.arctan2(vel_y_rot, vel_x_rot)
             for trail_i in range(5):
                 trail_alpha = int(150 * (1 - trail_i / 5) * glow_intensity)
                 trail_length = 10 + trail_i * 8
@@ -573,8 +776,8 @@ def update_loop():
 
         theta = np.linspace(0, theta_max, 100)
         r = spiral_a * PHI ** (2 * theta / np.pi)
-        x = r * np.cos(theta + ship.heading + spiral_rotation)
-        y = r * np.sin(theta + ship.heading + spiral_rotation)
+        x = r * np.cos(theta + ship_visual_angle + spiral_rotation)
+        y = r * np.sin(theta + ship_visual_angle + spiral_rotation)
         spiral_points = np.tile(ship.position, (100, 1))
         spiral_points[:, 0] += x
         spiral_points[:, 1] += y
@@ -642,8 +845,8 @@ def update_loop():
         # === ENGINE POINTS with enhanced glow ===
         theta_engines = np.array([theta_max - i * (np.pi / PHI) for i in range(3)])
         r_engines = spiral_a * PHI ** (2 * theta_engines / np.pi)
-        x_engines = r_engines * np.cos(theta_engines + ship.heading + spiral_rotation)
-        y_engines = r_engines * np.sin(theta_engines + ship.heading + spiral_rotation)
+        x_engines = r_engines * np.cos(theta_engines + ship_visual_angle + spiral_rotation)
+        y_engines = r_engines * np.sin(theta_engines + ship_visual_angle + spiral_rotation)
         engine_points = np.tile(ship.position, (3, 1))
         engine_points[:, 0] += x_engines
         engine_points[:, 1] += y_engines
@@ -668,11 +871,15 @@ def update_loop():
             eng_color = (255, int(50 * eng_pulse), 0) if not ship.high_contrast else (0, 255, 0)
             pygame.draw.circle(screen, eng_color, ep, 5)
 
-            # Tiny exhaust particles when moving
+            # Tiny exhaust particles when moving (using rotated velocity for screen-space)
             if velocity_mag > 1.0:
+                cos_r = np.cos(ship.view_rotation)
+                sin_r = np.sin(ship.view_rotation)
+                vel_x_rot = ship.velocity[0] * cos_r + ship.velocity[3] * sin_r
+                vel_y_rot = ship.velocity[1] * cos_r + ship.velocity[4] * sin_r
                 for exhaust_i in range(3):
                     ex_dist = 5 + exhaust_i * 4 + np.sin(anim_time * 15 + eng_i + exhaust_i) * 2
-                    ex_angle = np.arctan2(ship.velocity[1], ship.velocity[0]) + np.pi  # Behind ship
+                    ex_angle = np.arctan2(vel_y_rot, vel_x_rot) + np.pi  # Behind ship
                     ex_spread = (exhaust_i - 1) * 0.3
                     ex_x = ep[0] + np.cos(ex_angle + ex_spread) * ex_dist
                     ex_y = ep[1] + np.sin(ex_angle + ex_spread) * ex_dist

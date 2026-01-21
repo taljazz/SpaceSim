@@ -827,7 +827,9 @@ class Ship:
                 dists = [np.linalg.norm(self.cursor_pos - pos) if idx not in self.locked_crystals else float('inf') for idx, pos in enumerate(self.crystal_positions)]
                 nearest = np.argmin(dists)
                 if dists[nearest] != float('inf'):
-                    delta = abs(self.r_drive[self.selected_dim] - self.crystal_freqs[nearest][self.selected_dim])
+                    crystal_data = self.crystal_freqs[nearest]
+                    crystal_freq_list = crystal_data['freqs'] if isinstance(crystal_data, dict) else crystal_data
+                    delta = abs(self.r_drive[self.selected_dim] - crystal_freq_list[self.selected_dim])
                     rate = TUNING_RATE_PLANET * (delta / 50.0 + 0.1)
                     rate = max(1.0, min(TUNING_RATE_PLANET, rate))
                     if delta < APPROACHING_LOCK_THRESHOLD:

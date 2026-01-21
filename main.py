@@ -414,6 +414,84 @@ def update_loop():
         glow_intensity = min(1.0, velocity_mag / ship.max_velocity)
         avg_resonance = np.mean(ship.resonance_levels)
 
+        # === SHIP POSITION INDICATOR (always visible) ===
+        # Outer pulsing ring to mark ship location
+        indicator_pulse = 0.7 + 0.3 * np.sin(anim_time * 4)
+        outer_ring_radius = int(60 + 10 * indicator_pulse)
+        outer_ring_color = (100, 200, 255)  # Cyan
+        pygame.draw.circle(screen, outer_ring_color, ship_center, outer_ring_radius, 2)
+
+        # Inner targeting reticle
+        reticle_size = 15
+        reticle_color = (255, 255, 255)  # White
+        # Horizontal line
+        pygame.draw.line(screen, reticle_color,
+                        (ship_center[0] - reticle_size - 5, ship_center[1]),
+                        (ship_center[0] - 5, ship_center[1]), 2)
+        pygame.draw.line(screen, reticle_color,
+                        (ship_center[0] + 5, ship_center[1]),
+                        (ship_center[0] + reticle_size + 5, ship_center[1]), 2)
+        # Vertical line
+        pygame.draw.line(screen, reticle_color,
+                        (ship_center[0], ship_center[1] - reticle_size - 5),
+                        (ship_center[0], ship_center[1] - 5), 2)
+        pygame.draw.line(screen, reticle_color,
+                        (ship_center[0], ship_center[1] + 5),
+                        (ship_center[0], ship_center[1] + reticle_size + 5), 2)
+
+        # Heading direction arrow (shows which way ship is pointing)
+        arrow_length = 40
+        arrow_head_size = 10
+        heading_x = ship_center[0] + np.cos(ship.heading) * arrow_length
+        heading_y = ship_center[1] + np.sin(ship.heading) * arrow_length
+        # Arrow shaft
+        pygame.draw.line(screen, (255, 200, 0), ship_center, (int(heading_x), int(heading_y)), 3)
+        # Arrow head
+        arrow_angle1 = ship.heading + np.pi * 0.8
+        arrow_angle2 = ship.heading - np.pi * 0.8
+        head_x1 = heading_x + np.cos(arrow_angle1) * arrow_head_size
+        head_y1 = heading_y + np.sin(arrow_angle1) * arrow_head_size
+        head_x2 = heading_x + np.cos(arrow_angle2) * arrow_head_size
+        head_y2 = heading_y + np.sin(arrow_angle2) * arrow_head_size
+        pygame.draw.polygon(screen, (255, 200, 0), [
+            (int(heading_x), int(heading_y)),
+            (int(head_x1), int(head_y1)),
+            (int(head_x2), int(head_y2))
+        ])
+
+        # Corner brackets around ship (always visible frame)
+        bracket_size = 25
+        bracket_offset = 35
+        bracket_color = (150, 150, 255)
+        # Top-left bracket
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] - bracket_offset, ship_center[1] - bracket_offset),
+                        (ship_center[0] - bracket_offset + bracket_size, ship_center[1] - bracket_offset), 2)
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] - bracket_offset, ship_center[1] - bracket_offset),
+                        (ship_center[0] - bracket_offset, ship_center[1] - bracket_offset + bracket_size), 2)
+        # Top-right bracket
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] + bracket_offset, ship_center[1] - bracket_offset),
+                        (ship_center[0] + bracket_offset - bracket_size, ship_center[1] - bracket_offset), 2)
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] + bracket_offset, ship_center[1] - bracket_offset),
+                        (ship_center[0] + bracket_offset, ship_center[1] - bracket_offset + bracket_size), 2)
+        # Bottom-left bracket
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] - bracket_offset, ship_center[1] + bracket_offset),
+                        (ship_center[0] - bracket_offset + bracket_size, ship_center[1] + bracket_offset), 2)
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] - bracket_offset, ship_center[1] + bracket_offset),
+                        (ship_center[0] - bracket_offset, ship_center[1] + bracket_offset - bracket_size), 2)
+        # Bottom-right bracket
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] + bracket_offset, ship_center[1] + bracket_offset),
+                        (ship_center[0] + bracket_offset - bracket_size, ship_center[1] + bracket_offset), 2)
+        pygame.draw.line(screen, bracket_color,
+                        (ship_center[0] + bracket_offset, ship_center[1] + bracket_offset),
+                        (ship_center[0] + bracket_offset, ship_center[1] + bracket_offset - bracket_size), 2)
+
         # === MOTION TRAIL (velocity streaks behind ship) ===
         if velocity_mag > 0.5:
             # Draw fading trail lines behind ship

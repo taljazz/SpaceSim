@@ -164,6 +164,7 @@ class Ship:
         self.last_spoken = {}
         self.simulation_time = 0.0
         self.last_beep_time = -1.0
+        self.easter_egg_announced = False  # Prevent easter egg spam
 
         # Flag for universe regeneration (used after ascension)
         self.needs_universe_regeneration = False
@@ -204,6 +205,8 @@ class Ship:
         self.temple_keys = set()  # Collected temple keys by index
         self.last_temple_check = 0.0
         self.near_temple = None  # Current nearby temple
+        self.temple_nearby_announced = False  # Prevent "nearby" spam
+        self.amenti_sealed_announced = False  # Prevent "sealed" spam
 
         # Ley Line Navigation
         self.on_ley_line = False
@@ -1311,12 +1314,14 @@ class Ship:
 
                     if res_at_freq > 0.7:  # Need 70% resonance to collect key
                         self.temple_keys.add(key_index)
+                        self.temple_nearby_announced = False  # Reset for future visits
                         if len(self.temple_keys) == MINOR_TEMPLE_COUNT:
                             self.speak(f"{temple['key_name']} key acquired! All twelve temple keys collected. The Halls of Amenti now await your arrival.")
                         else:
                             self.speak(f"Temple of {temple['key_name']} visited. {temple['key_name']} key acquired! {len(self.temple_keys)}/{MINOR_TEMPLE_COUNT} keys collected.")
-                    else:
+                    elif not self.temple_nearby_announced:
                         self.speak(f"Temple of {temple['key_name']} nearby. Tune to {temple_freq:.1f} Hz to receive the key.")
+                        self.temple_nearby_announced = True
 
                 elif key_index == -1:  # Halls of Amenti
                     if len(self.temple_keys) >= MASTER_TEMPLE_UNLOCK_KEYS and self.consciousness_name in ['enlightened', 'ascended']:
@@ -1328,10 +1333,15 @@ class Ship:
                             self.resonance_width *= AMENTI_REWARDS['permanent_resonance_boost']
                             self.consciousness_value = 1.0  # Unlock ascended
                             self.consciousness_name = 'ascended'
-                    else:
+                    elif not self.amenti_sealed_announced:
                         missing = MINOR_TEMPLE_COUNT - len(self.temple_keys)
                         self.speak(f"The Halls of Amenti remain sealed. {missing} more temple keys needed, or consciousness level insufficient.")
+                        self.amenti_sealed_announced = True
                 break
+        else:
+            # Not near any temple - reset announcement flags
+            self.temple_nearby_announced = False
+            self.amenti_sealed_announced = False
 
         self.last_temple_check = self.simulation_time
 
@@ -1465,11 +1475,16 @@ class Ship:
 
         # Check distance from body
         dist_from_body = np.linalg.norm(self.position - self.astral_body_pos)
+        was_too_far = getattr(self, 'astral_too_far', False)
         if dist_from_body > ASTRAL_PROJECTION_RANGE:
-            self.speak("Warning: Astral form too far from body. Connection weakening.")
+            if not was_too_far:
+                self.speak("Warning: Astral form too far from body. Connection weakening.")
+                self.astral_too_far = True
             # Pull back toward body
             direction = self.astral_body_pos - self.position
             self.position += direction * 0.1
+        else:
+            self.astral_too_far = False
 
         # Astral form moves faster
         self.velocity *= ASTRAL_SPEED_MULT
@@ -1966,7 +1981,11 @@ class Ship:
 
         # New: Easter egg check
         if all(abs(rd - EASTER_EGG_FREQ) < EASTER_EGG_TOLERANCE for rd in self.r_drive):
-            self.speak("You are the universe experiencing itself.")
+            if not self.easter_egg_announced:
+                self.speak("You are the universe experiencing itself.")
+                self.easter_egg_announced = True
+        else:
+            self.easter_egg_announced = False
 
         # Random rift generation if high resonance
         if random.random() < 0.001 and avg_res > 0.9:

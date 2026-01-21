@@ -16,7 +16,7 @@ DT = 1.0 / FPS  # Time delta per frame
 # Physics constants
 MAX_VELOCITY_BASE = 10.0  # Base maximum velocity, upgradable
 RESONANCE_WIDTH_BASE = 10.0  # Base resonance width in Hz, upgradable
-FREQUENCY_RANGE = (200.0, 800.0)  # Frequency range for drives and targets
+FREQUENCY_RANGE = (110.0, 963.0)  # Frequency range for drives and targets (110 Hz temple resonance to 963 Hz Divine solfeggio)
 PHI = (1 + np.sqrt(5)) / 2  # Golden ratio constant
 
 # Audio settings
@@ -336,13 +336,13 @@ SOLFEGGIO_TOLERANCE = 5.0  # Hz tolerance for detecting solfeggio frequencies
 
 # Crystal Color Spectrum (frequency to chakra color mapping)
 CRYSTAL_SPECTRUM = {
-    'ruby': {'freq_range': (200, 285), 'color': (220, 20, 60), 'chakra': 'root', 'bonus': 'stability', 'mult': 1.2},
+    'ruby': {'freq_range': (110, 285), 'color': (220, 20, 60), 'chakra': 'root', 'bonus': 'stability', 'mult': 1.2},
     'carnelian': {'freq_range': (285, 350), 'color': (255, 127, 80), 'chakra': 'sacral', 'bonus': 'crystal_find', 'mult': 1.3},
     'citrine': {'freq_range': (350, 417), 'color': (255, 215, 0), 'chakra': 'solar_plexus', 'bonus': 'velocity', 'mult': 1.15},
     'emerald': {'freq_range': (417, 528), 'color': (0, 201, 87), 'chakra': 'heart', 'bonus': 'integrity', 'mult': 1.25},
     'lapis': {'freq_range': (528, 639), 'color': (38, 97, 156), 'chakra': 'throat', 'bonus': 'scan_range', 'mult': 1.4},
     'amethyst': {'freq_range': (639, 741), 'color': (153, 102, 204), 'chakra': 'third_eye', 'bonus': 'rift_detect', 'mult': 1.35},
-    'quartz': {'freq_range': (741, 800), 'color': (255, 255, 255), 'chakra': 'crown', 'bonus': 'universal', 'mult': 1.1},
+    'quartz': {'freq_range': (741, 963), 'color': (255, 255, 255), 'chakra': 'crown', 'bonus': 'universal', 'mult': 1.1},
 }
 
 # Temple of Regeneration (110 Hz resonance - ancient temple frequency)

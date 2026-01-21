@@ -262,6 +262,13 @@ class Ship:
             tolk.speak(msg)
             self.last_spoken[msg] = self.simulation_time
 
+    def get_effective_scan_range(self):
+        """Get effective interaction distance, boosted by Communication mode."""
+        base_range = INTERACTION_DISTANCE
+        if self.tuaoi_mode == 'communication':
+            base_range *= TUAOI_MODES['communication']['rate']  # 2.0x range
+        return base_range
+
     def get_crystal_type(self, frequency):
         """Determine crystal type based on frequency (Atlantean color spectrum)."""
         for crystal_name, info in CRYSTAL_SPECTRUM.items():
@@ -1348,9 +1355,10 @@ class Ship:
             return
 
         self.near_temple = None
+        scan_range = self.get_effective_scan_range()
         for temple in temples:
             dist = np.linalg.norm(self.position - temple['pos'])
-            if dist < INTERACTION_DISTANCE:
+            if dist < scan_range:
                 self.near_temple = temple
                 key_index = temple['key_index']
 
@@ -1434,9 +1442,10 @@ class Ship:
         was_near_pyramid = self.near_pyramid is not None
         self.near_pyramid = None
 
+        scan_range = self.get_effective_scan_range()
         for pyramid in pyramids:
             dist = np.linalg.norm(self.position - pyramid['pos'])
-            if dist < INTERACTION_DISTANCE:
+            if dist < scan_range:
                 self.near_pyramid = pyramid
                 break
 
@@ -1868,7 +1877,11 @@ class Ship:
                     if norm < SLOWDOWN_DIST / 2:
                         self.r_drive[i] = target_drive  # Snap when close to avoid oscillation
                     else:
-                        self.r_drive[i] += (target_drive - self.r_drive[i]) * 0.1  # Smooth interpolation
+                        # Navigation mode boosts autopilot interpolation rate
+                        autopilot_rate = 0.1
+                        if self.tuaoi_mode == 'navigation':
+                            autopilot_rate *= TUAOI_MODES['navigation']['rate']  # 1.5x faster
+                        self.r_drive[i] += (target_drive - self.r_drive[i]) * autopilot_rate
                 # Update lock sound based on alignment
                 projected_pos = project_to_2d(dir_vec, self.view_rotation)
                 angle = np.arctan2(projected_pos[1] - SCREEN_HEIGHT/2, projected_pos[0] - SCREEN_WIDTH/2)
@@ -1901,7 +1914,11 @@ class Ship:
         # Calculate resonance and velocity per dimension
         for i in range(N_DIMENSIONS):
             delta_f = self.r_drive[i] - self.f_target[i]
-            self.resonance_levels[i] = 1 / (1 + (delta_f / self.resonance_width)**2)
+            # Transcendence mode boosts resonance width for higher dimensions (dims 4 & 5)
+            effective_width = self.resonance_width
+            if self.tuaoi_mode == 'transcendence' and i >= 3:
+                effective_width *= TUAOI_MODES['transcendence']['rate']  # 1.4x easier tuning
+            self.resonance_levels[i] = 1 / (1 + (delta_f / effective_width)**2)
             if self.resonance_levels[i] > PERFECT_RESONANCE_THRESHOLD and self.prev_resonance_levels[i] <= PERFECT_RESONANCE_THRESHOLD:
                 self.audio_system.active_sound_effects.append(SoundEffect(self.audio_system.ping_waveform, pan=0.0, volume=self.audio_system.effect_volume))
             if self.resonance_levels[i] > POWER_BUILD_THRESHOLD:
@@ -2167,12 +2184,13 @@ class Ship:
                     self.last_guidance_time = self.simulation_time
 
         # Detect nearby celestial bodies
+        scan_range = self.get_effective_scan_range()
         self.nearest_body = None
         min_dist = float('inf')
         near_any = False
         for body in celestial_bodies:
             dist = np.linalg.norm(self.position - body['pos'])
-            if dist < INTERACTION_DISTANCE:
+            if dist < scan_range:
                 near_any = True
                 if dist < min_dist:
                     min_dist = dist

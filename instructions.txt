@@ -1,0 +1,68 @@
+
+Golden Spiral Spaceship Simulator Instructions
+
+Controls:
+- W/S: Move forward/backward (adjusts r_drive in y-dim for resonance propulsion)
+- A/D: Move left/right (adjusts r_drive in x-dim)
+- PageUp: Descend (adjusts r_drive in z-dim for -z movement)
+- PageDown: Ascent (adjusts r_drive in z-dim for +z movement)
+- Left/Right Arrow: Rotate view left/right
+- Up/Down Arrow: Increase/Decrease drive frequency in selected dim
+- 1-5: Select dimension to tune (1: x, 2: y, 3: z, 4: higher1, 5: higher2); In HUD mode: Navigate items
+- J: Toggle between resonance tuning mode (tune all dims) and manual mode (tune only higher dims)
+- W/A/S/D: On planet: Move cursor north/west/south/east by 1 unit per press
+- R: Read full status (position, velocity, etc.)
+- U: Toggle HUD dialog mode (navigable menu); On planet after all crystals: Upgrade menu
+- Q: Quick query target freq in selected dim
+- V: Toggle verbosity mode (Low/Medium/High)
+- M: Toggle starmap mode (navigable menu of nearby bodies/rifts)
+- T + =/-: Increase/Decrease HUD text size
+- C: Toggle high contrast mode
+- L: Initiate landing (near planet, high resonance)
+- T: Takeoff from planet
+- F: On planet, scan nearest crystal freq
+- X: On planet, collect locked crystal
+- E: If locked on rift and near with sufficient resonance: Charge/enter rift with guidance. Otherwise: Toggle rift selection mode (if rifts detected)
+- Z: In manual mode, toggle speed modes (Approach, Cruise, Quantum)
+- =/-: Adjust master volume
+- Shift + =/-: Adjust beep volume (planets/rifts/locks)
+- Ctrl + =/-: Adjust effect volume (clicks/rotations/chords/hums)
+- Alt + =/-: Adjust drive signal volume
+- F1: Open this instructions file
+- H: Toggle sing-to-tune mode (hum into mic to set drive freq in selected dim)
+- Ctrl+S: Save game
+- Ctrl+L: Load game
+- Ctrl+A: Toggle autosave (every 5 minutes)
+- ESC: Quit
+- In starmap: Type first letter to jump to items (P for Planet, R for Rift, S for Star, N for Nebula, etc.)
+
+Resonance System:
+- Tune r_drive close to f_target per dim for velocity (magnitude by resonance level, direction by sign).
+- Power buildup: Sustain >0.8 resonance for boosts.
+- Dissonance: Low resonance triggers turbulence jitter.
+- Upgrades: Collect crystals on planets for tiered upgrades (width, velocity, etc.).
+
+Viewing System:
+- Rotate to mix higher dims into 2D projection—scan for rifts/objects with panned audio.
+
+Rifts:
+- Detected nearby with panned hum; rotate to center (pan=0) for entry.
+- Lock via selection mode or starmap; guidance provided for approach/alignment.
+- Near with high resonance, press E to charge sequence (auto-nudges alignment; sustain resonance to enter).
+- Rewards warp boosts or bonuses.
+
+Landing/Exploration:
+- Near planet with high resonance, press L to land.
+- On planet: Press W/A/S/D to move cursor on grid, scan/tune to crystals, collect with X.
+- Sing mode (H): Hum into mic to auto-tune to nearest crystal.
+- Upgrade menu via U on planet after collecting all.
+- Press T to takeoff.
+
+Starmap:
+- Press M to toggle.
+- Navigate items with up/down, enter to lock on (autopilot tunes to navigate, lock sound for alignment).
+- Items: Nearby planets, rifts with dist/angle.
+
+Accessibility:
+- All actions spoken via Tolk.
+- Verbosity modes, spatial audio, navigable HUD/starmap.

@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Game saves and config (user-specific)
+savegame.pkl
+config.ini
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Reserve folder (historical versions - optional to include)
+# Reserve/
+
+# Audio files that might be generated
+*.wav
+!gift.wav
+
+# Logs
+*.log
+
+# Claude Code metadata
+.claude/

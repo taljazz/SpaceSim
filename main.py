@@ -128,15 +128,27 @@ def update_loop():
     text_color = (255, 255, 255) if not ship.high_contrast else (0, 0, 0)
     screen.fill(bg_color)
 
-    # Draw stars
-    for body in stars:
+    # Animation time for dynamic effects
+    anim_time = pygame.time.get_ticks() / 1000.0
+
+    # Draw stars with twinkling effect
+    for idx, body in enumerate(stars):
         pos_2d = project_to_2d(body['pos'], ship.view_rotation)
         if ship.high_contrast:
             color = (0, 0, 0)
         else:
             stellar_type = body.get('stellar_type', 'main_sequence')
-            color = STELLAR_TYPES[stellar_type]['color']
-        pygame.draw.circle(screen, color, pos_2d, 2)
+            base_color = STELLAR_TYPES[stellar_type]['color']
+            # Twinkle effect - each star has unique phase based on index
+            twinkle = 0.7 + 0.3 * np.sin(anim_time * 3 + idx * 0.7)
+            color = tuple(int(c * twinkle) for c in base_color)
+        # Pulsing size for red giants
+        size = 2
+        if body.get('stellar_type') == 'red_giant':
+            size = int(3 + np.sin(anim_time * 0.5 + idx) * 1.5)
+        elif body.get('stellar_type') == 'white_dwarf':
+            size = 1  # Small but bright
+        pygame.draw.circle(screen, color, pos_2d, size)
 
     # Draw planets
     for body in planets:
@@ -159,25 +171,44 @@ def update_loop():
             color = NEBULA_TYPES[nebula_type]['color']
         pygame.draw.circle(screen, color, pos_2d, 15)
 
-    # Draw rifts
-    for rift in ship.rifts:
+    # Draw rifts with pulsing dimensional effect
+    for idx, rift in enumerate(ship.rifts):
         pos_2d = project_to_2d(rift['pos'], ship.view_rotation)
-        pygame.draw.circle(screen, (255, 0, 255), pos_2d, 5)
+        # Pulsing size and color
+        pulse = 0.5 + 0.5 * np.sin(anim_time * 4 + idx)
+        size = int(5 + 3 * pulse)
+        # Shifting purple/cyan colors for dimensional effect
+        r = int(200 + 55 * np.sin(anim_time * 3))
+        g = int(50 + 50 * np.sin(anim_time * 2 + 1))
+        b = int(200 + 55 * np.cos(anim_time * 3))
+        pygame.draw.circle(screen, (r, g, b), pos_2d, size)
+        # Inner glow
+        pygame.draw.circle(screen, (255, 255, 255), pos_2d, max(2, size // 2))
 
-    # Draw temples (golden triangles)
-    for temple in temples:
+    # Draw temples (golden triangles) with pulsing glow
+    for idx, temple in enumerate(temples):
         pos_2d = project_to_2d(temple['pos'], ship.view_rotation)
+        pulse = 0.7 + 0.3 * np.sin(anim_time * 2 + idx * 0.3)
+
         if temple['temple_type'] == 'master':
-            # Halls of Amenti - large golden triangle
-            color = (255, 215, 0) if not ship.high_contrast else (0, 0, 0)
-            size = 15
+            # Halls of Amenti - large golden triangle with radiant glow
+            base_color = (255, 215, 0) if not ship.high_contrast else (0, 0, 0)
+            size = int(15 + 3 * np.sin(anim_time * 1.5))
+            # Draw outer glow rings
+            for ring in range(3, 0, -1):
+                glow_alpha = int(100 / ring)
+                glow_color = (255, 215, 0)
+                pygame.draw.circle(screen, glow_color, pos_2d, size + ring * 5, 1)
         else:
             # Minor temples - smaller triangles with key collected indicator
             if temple['key_index'] in ship.temple_keys:
-                color = (0, 255, 128)  # Green if key collected
+                base_color = (0, 255, 128)  # Green if key collected
             else:
-                color = (255, 200, 100) if not ship.high_contrast else (0, 0, 0)
+                base_color = (255, 200, 100) if not ship.high_contrast else (0, 0, 0)
             size = 8
+
+        color = tuple(int(c * pulse) for c in base_color)
+
         # Draw triangle
         points = [
             (pos_2d[0], pos_2d[1] - size),  # Top
@@ -185,6 +216,16 @@ def update_loop():
             (pos_2d[0] + size, pos_2d[1] + size)  # Bottom right
         ]
         pygame.draw.polygon(screen, color, points)
+
+        # Draw inner glow for uncollected temples
+        if temple['temple_type'] != 'master' and temple['key_index'] not in ship.temple_keys:
+            inner_points = [
+                (pos_2d[0], pos_2d[1] - size // 2),
+                (pos_2d[0] - size // 2, pos_2d[1] + size // 2),
+                (pos_2d[0] + size // 2, pos_2d[1] + size // 2)
+            ]
+            inner_color = tuple(min(255, int(c * 1.3)) for c in color)
+            pygame.draw.polygon(screen, inner_color, inner_points)
 
     # Draw pyramids (golden squares)
     for pyramid in pyramids:
@@ -194,17 +235,35 @@ def update_loop():
         rect = pygame.Rect(pos_2d[0] - size, pos_2d[1] - size, size * 2, size * 2)
         pygame.draw.rect(screen, color, rect)
 
-    # Draw ley lines (faint golden lines)
-    for ley_line in ley_lines:
+    # Draw ley lines with energy flow effect
+    for idx, ley_line in enumerate(ley_lines):
         start_2d = project_to_2d(ley_line['start'], ship.view_rotation)
         end_2d = project_to_2d(ley_line['end'], ship.view_rotation)
+
+        # Pulsing brightness based on time
+        pulse = 0.6 + 0.4 * np.sin(anim_time * 2 + idx * 0.5)
+
         if ley_line.get('amenti_path'):
-            color = (255, 215, 0, 100)  # Bright gold for Amenti paths
+            base_color = (255, 215, 0)  # Bright gold for Amenti paths
+            width = 2
         elif ley_line.get('major'):
-            color = (200, 180, 0, 80)  # Darker gold for major lines
+            base_color = (200, 180, 0)  # Darker gold for major lines
+            width = 2
         else:
-            color = (150, 130, 0, 50)  # Dim gold for minor lines
-        pygame.draw.line(screen, color[:3], start_2d, end_2d, 1)
+            base_color = (150, 130, 0)  # Dim gold for minor lines
+            width = 1
+
+        color = tuple(int(c * pulse) for c in base_color)
+        pygame.draw.line(screen, color, start_2d, end_2d, width)
+
+        # Draw energy particles flowing along the line (if on this ley line, show more)
+        if ship.on_ley_line and ship.current_ley_line == ley_line:
+            # More visible energy dots when player is on this ley line
+            for i in range(5):
+                t = (anim_time * 0.3 + i * 0.2) % 1.0
+                particle_x = int(start_2d[0] + (end_2d[0] - start_2d[0]) * t)
+                particle_y = int(start_2d[1] + (end_2d[1] - start_2d[1]) * t)
+                pygame.draw.circle(screen, (255, 255, 200), (particle_x, particle_y), 3)
 
     # Draw planet grid if landed
     if ship.landed_mode:
@@ -231,7 +290,7 @@ def update_loop():
         screen_points = [project_to_2d(p, ship.view_rotation) for p in spiral_points]
         pygame.draw.lines(screen, (255, 255, 0) if not ship.high_contrast else (0, 0, 255), False, screen_points, 2)
 
-        # Draw engine points on spiral
+        # Draw engine points on spiral with dynamic glow based on velocity
         theta_engines = np.array([theta_max - i * (np.pi / PHI) for i in range(3)])
         r_engines = a * PHI ** (2 * theta_engines / np.pi)
         x_engines = r_engines * np.cos(theta_engines + ship.heading)
@@ -240,8 +299,68 @@ def update_loop():
         engine_points[:, 0] += x_engines
         engine_points[:, 1] += y_engines
         screen_engine_points = [project_to_2d(p, ship.view_rotation) for p in engine_points]
+
+        # Engine glow intensity based on velocity
+        velocity_mag = np.linalg.norm(ship.velocity)
+        glow_intensity = min(1.0, velocity_mag / ship.max_velocity)
+        engine_pulse = 0.7 + 0.3 * np.sin(anim_time * 8)  # Fast pulse
+
         for ep in screen_engine_points:
+            # Outer glow based on velocity
+            if glow_intensity > 0.1:
+                glow_size = int(8 + 6 * glow_intensity * engine_pulse)
+                glow_color = (255, int(100 + 100 * (1 - glow_intensity)), 0)
+                pygame.draw.circle(screen, glow_color, ep, glow_size)
+            # Core engine point
             pygame.draw.circle(screen, (255, 0, 0) if not ship.high_contrast else (0, 255, 0), ep, 5)
+
+        # Draw resonance rings around ship (5 rings for 5 dimensions)
+        ship_center = project_to_2d(ship.position, ship.view_rotation)
+        for i in range(N_DIMENSIONS):
+            res_level = ship.resonance_levels[i]
+            ring_radius = 30 + i * 12
+            # Ring color based on dimension and resonance
+            hue = (i * 72) % 360  # Different hue for each dimension
+            brightness = int(100 + 155 * res_level)
+            ring_color = pygame.Color(0)
+            ring_color.hsva = (hue, 80, brightness * (0.5 + 0.5 * np.sin(anim_time * 3 + i)), 100)
+            # Ring thickness based on resonance
+            thickness = 1 if res_level < 0.5 else (2 if res_level < 0.8 else 3)
+            pygame.draw.circle(screen, ring_color, ship_center, int(ring_radius * (0.8 + 0.2 * res_level)), thickness)
+
+        # Draw Merkaba overlay when active (rotating star tetrahedron)
+        if ship.merkaba_active:
+            merkaba_size = 50
+            # Two triangles rotating in opposite directions
+            angle1 = anim_time * 0.5  # Slow rotation
+            angle2 = -anim_time * 0.5  # Counter-rotation
+
+            # Upward triangle
+            tri1_points = []
+            for j in range(3):
+                a = angle1 + j * (2 * np.pi / 3)
+                px = ship_center[0] + merkaba_size * np.cos(a)
+                py = ship_center[1] + merkaba_size * np.sin(a)
+                tri1_points.append((px, py))
+
+            # Downward triangle (inverted)
+            tri2_points = []
+            for j in range(3):
+                a = angle2 + j * (2 * np.pi / 3) + np.pi / 3  # Offset by 60 degrees
+                px = ship_center[0] + merkaba_size * np.cos(a)
+                py = ship_center[1] + merkaba_size * np.sin(a)
+                tri2_points.append((px, py))
+
+            # Draw with golden/white glow
+            merkaba_pulse = 0.7 + 0.3 * np.sin(anim_time * 2)
+            merkaba_color = (int(255 * merkaba_pulse), int(215 * merkaba_pulse), int(100 * merkaba_pulse))
+            pygame.draw.polygon(screen, merkaba_color, tri1_points, 2)
+            pygame.draw.polygon(screen, merkaba_color, tri2_points, 2)
+
+            # Inner star pattern
+            for p1 in tri1_points:
+                for p2 in tri2_points:
+                    pygame.draw.line(screen, (255, 255, 200, 100), p1, p2, 1)
 
     # Render menu or HUD text
     if ship.hud_mode or ship.upgrade_mode or ship.starmap_mode or ship.rift_selection_mode:

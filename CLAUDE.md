@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Last Updated:** 2026-01-21
-**Current Status:** 3D Visual Experience - Dynamic effects, camera orbit, orbital mechanics
-**Total Lines of Code:** ~6,100 lines across all Python files
+**Last Updated:** 2026-04-07
+**Current Status:** C# / MonoGame conversion with event-driven architecture
+**Total Lines of Code:** ~7,000 lines across 38 C# files (converted from ~6,100 Python)
 **Repository:** https://github.com/taljazz/SpaceSim
 
 ## Table of Contents
@@ -26,9 +26,86 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 16. [Important Context for Future Sessions](#important-context-for-future-sessions)
 17. [Session History](#session-history)
 
-## Recent Changes (2026-01-21)
+## Recent Changes (2026-04-07)
 
-### Session 10: Visual Dynamics & 3D Camera Orbit System ✅ COMPLETE
+### Session 11: Python to C# Conversion ✅ COMPLETE
+
+**Goal:** Convert the entire project from Python (interpreted) to C# (compiled) for better performance, using MonoGame + NAudio.
+
+**What Was Done:**
+
+1. **Full C# Conversion**
+   - All 6 Python files converted to 38 C# files
+   - Framework: MonoGame 3.8 (DesktopGL) for rendering, NAudio for real-time audio synthesis
+   - Screen reader: Tolk via P/Invoke (DLLs from Aircraft-Explorer project)
+   - Save/Load: System.Text.Json replaces pickle
+   - Math: MathF + float[5] arrays replace numpy
+
+2. **Partial Class Architecture**
+   - Ship.cs (2906 lines) split into 8 partial files by domain:
+     - Ship.cs (fields/constructor/helpers), Ship.Input.cs, Ship.Update.cs, Ship.Crystals.cs
+     - Ship.Atlantean.cs, Ship.UI.cs, Ship.SaveLoad.cs, Ship.Audio.cs
+   - AudioSystem.cs split into 3: Core, Waveforms, Synthesis
+   - SpaceSimGame.cs split into 2: Core, Update
+
+3. **Event-Driven Architecture**
+   - GameEvents.cs: Central event bus with 15+ typed events
+   - Ship raises events (OnSpeak, OnPlaySound, OnHarmonicDetected, etc.)
+   - AudioSystem subscribes to OnPlaySound, OnClearAllSounds, OnStopAmbientSounds
+   - SpaceSimGame subscribes to OnSpeak, OnUniverseRegenNeeded, OnModeChanged, OnAscension
+   - Tracked/lifecycle sounds (ambient loops, lock sounds) remain direct for reference management
+   - AudioSystem.Read() still reads Ship state directly for real-time synthesis (events would add latency)
+
+4. **Dual Rendering System**
+   - F10 toggles between 3D and 2D rendering modes
+   - 3D: Procedural meshes (spheres, cones, pyramids) via BasicEffect
+   - 2D: SpriteBatch circles/lines/polygons (fallback for systems without GPU)
+   - IGameRenderer interface: Renderer3D and Renderer2D implementations
+   - Camera3D: Third-person behind ship, Left/Right arrows rotate yaw
+
+5. **Debug Logging**
+   - DebugLogger.cs: File-only, thread-safe, timestamped logging
+   - Categories: Init, Audio, Ship, Input, Render, Celestial, Save, Event
+   - Throttled per-frame logging (audio stats 1/sec, render stats every 5s)
+   - Output: spacesim_debug.log
+
+6. **Audio Fix**
+   - Fixed double EffectVolume multiplication in AudioSystem.Read() that made chimes and beeps nearly inaudible
+
+7. **Removed Features**
+   - Camera orbit (Home/End/Comma/Period) removed
+   - 3D ship perspective rendering replaced by true 3D models
+
+**All keybindings preserved from Python version.**
+
+**Project Structure (C#):**
+```
+SpaceSim.CSharp/
+  SpaceSim.sln
+  SpaceSim/
+    Program.cs, SpaceSimGame.cs, SpaceSimGame.Update.cs
+    Ship.cs, Ship.Input.cs, Ship.Update.cs, Ship.Crystals.cs
+    Ship.Atlantean.cs, Ship.UI.cs, Ship.SaveLoad.cs, Ship.Audio.cs
+    AudioSystem.cs, AudioSystem.Waveforms.cs, AudioSystem.Synthesis.cs
+    GameConstants.cs, GameEvents.cs, GameUtils.cs, GameSoundEffect.cs
+    CelestialGenerator.cs, DebugLogger.cs, Vec5.cs, MathHelpers.cs, TolkInterop.cs
+    Models/ (CelestialBody, Rift, Temple, LeyLine, Pyramid, CrystalData, PortalAnchor, SaveGameState, TypeInfo)
+    Rendering/ (IGameRenderer, Renderer2D, Renderer3D, Camera3D, PrimitiveRenderer, PrimitiveRenderer2D, HudRenderer)
+    Content/ (DefaultFont.spritefont)
+    Tolk.dll, TolkDotNet.dll, nvdaControllerClient64.dll
+```
+
+**Running the C# version:**
+```bash
+cd SpaceSim.CSharp
+dotnet run --project SpaceSim
+```
+
+**Python files moved to:** `Reserve/SpaceSim8/`
+
+---
+
+### Previous: Session 10 (2026-01-21): Visual Dynamics & 3D Camera Orbit System ✅ COMPLETE
 
 **Goal:** Add dynamic visual effects, fix camera direction, and implement 3D camera orbit around ship
 

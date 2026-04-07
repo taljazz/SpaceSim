@@ -52,6 +52,31 @@ Thumbs.db
 # Logs
 *.log
 
+# C# / .NET
+bin/
+obj/
+*.dll
+!SpaceSim.CSharp/SpaceSim/Tolk.dll
+!SpaceSim.CSharp/SpaceSim/TolkDotNet.dll
+!SpaceSim.CSharp/SpaceSim/nvdaControllerClient64.dll
+*.exe
+*.pdb
+*.cache
+*.user
+*.suo
+.vs/
+
+# MonoGame content build artifacts
+Content/bin/
+Content/obj/
+
+# NuGet
+*.nupkg
+packages/
+
+# C# save files
+savegame.json
+
 # Claude Code metadata
 .claude/
 

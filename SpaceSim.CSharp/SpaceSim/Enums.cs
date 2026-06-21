@@ -130,3 +130,41 @@ public enum BrainwaveEffect
     FastTuning,
     AllBonus
 }
+
+/// <summary>The special effect applied when a rare Atlantean crystal is collected.</summary>
+public enum CrystalEffect
+{
+    VelocityBurst,
+    ShieldBoost,
+    Communication,
+    Transformation,
+    MemoryUnlock,
+    Purification,
+    AngelicConnection
+}
+
+/// <summary>The healing/awakening influence associated with each Solfeggio frequency.</summary>
+public enum SolfeggioEffect
+{
+    PainRelief,
+    TissueHealing,
+    ReleaseFear,
+    FacilitateChange,
+    UniversalTuning,
+    Transformation,
+    Relationships,
+    Expression,
+    SpiritualOrder,
+    Oneness
+}
+
+/// <summary>Sacred cymatics (sound-into-form) patterns, keyed by frequency band. Reserved for the planned cymatics visualizer.</summary>
+public enum CymaticsPattern
+{
+    Hexagon,
+    Star,
+    Flower,
+    Mandala,
+    Spiral,
+    Merkaba
+}

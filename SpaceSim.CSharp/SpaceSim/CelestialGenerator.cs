@@ -17,7 +17,7 @@ public static class CelestialGenerator
     /// plus random variation.
     /// </summary>
     /// <param name="n">Number of bodies to generate.</param>
-    /// <param name="bodyType">Type of celestial body: "star", "planet", or "nebula".</param>
+    /// <param name="bodyType">The kind of celestial body to generate (Star, Planet, or Nebula).</param>
     /// <returns>List of generated celestial bodies.</returns>
     public static List<CelestialBody> GenerateCelestial(int n, CelestialBodyType bodyType = CelestialBodyType.Star)
     {

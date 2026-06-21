@@ -254,33 +254,32 @@ public partial class Ship
     public void ApplyAtlanteanCrystalEffect(string crystalType)
     {
         if (!GameConstants.AtlanteanCrystalTypes.TryGetValue(crystalType, out var info)) return;
-        string effect = info.Effect;
 
-        switch (effect)
+        switch (info.Effect)
         {
-            case "velocity_burst":
+            case CrystalEffect.VelocityBurst:
                 MaxVelocity *= 1.5f;
                 Speak("Fire crystal energy surges through your light vehicle!");
                 break;
-            case "shield_boost":
+            case CrystalEffect.ShieldBoost:
                 ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + 0.2f);
                 Speak("Aquamarine protective field strengthens your hull.");
                 break;
-            case "communication":
+            case CrystalEffect.Communication:
                 Speak("Larimar stone awakens ancient wisdom within you.");
                 break;
-            case "transformation":
+            case CrystalEffect.Transformation:
                 ConsciousnessValue = MathF.Min(1f, ConsciousnessValue + 0.1f);
                 Speak("Moldavite accelerates your spiritual evolution!");
                 break;
-            case "memory_unlock":
+            case CrystalEffect.MemoryUnlock:
                 Speak("Lemurian seed crystal shares memories of forgotten ages.");
                 break;
-            case "purification":
+            case CrystalEffect.Purification:
                 DissonanceTimer = 0f;
                 Speak("Black tourmaline cleanses all dissonance from your field.");
                 break;
-            case "angelic_connection":
+            case CrystalEffect.AngelicConnection:
                 Speak("Celestite opens channels to higher dimensional beings.");
                 break;
         }

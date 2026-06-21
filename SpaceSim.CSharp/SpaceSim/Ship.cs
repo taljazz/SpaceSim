@@ -174,7 +174,7 @@ public partial class Ship
     public bool MerkabaActive;
     private bool _merkabaAnnounced;
 
-    public Dictionary<int, (string Effect, float Expiry)> ActiveSolfeggio = new();
+    public Dictionary<int, (SolfeggioEffect Effect, float Expiry)> ActiveSolfeggio = new();
     private float _lastSolfeggioCheck;
 
     public bool InTempleResonance;

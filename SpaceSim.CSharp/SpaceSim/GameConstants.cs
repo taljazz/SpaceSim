@@ -197,16 +197,16 @@ public static class GameConstants
     // Solfeggio Frequencies
     public static readonly Dictionary<int, SolfeggioInfo> SolfeggioFrequencies = new()
     {
-        [174] = new("Foundation", "pain_relief", "natural anesthetic", "shield", 1.1f),
-        [285] = new("Quantum", "tissue_healing", "cellular regeneration", "minor_heal", 0.5f),
-        [396] = new("Liberation", "release_fear", "liberating guilt and fear", "stability", 1.2f),
-        [417] = new("Transmutation", "facilitate_change", "undoing situations", "rift_assist", 1.15f),
-        [432] = new("Natural Harmony", "universal_tuning", "cosmic frequency", "base_heal", 1f),
-        [528] = new("Miracle", "transformation", "DNA repair, love frequency", "major_heal", 2f),
-        [639] = new("Connection", "relationships", "harmonizing connections", "comm_boost", 1.3f),
-        [741] = new("Awakening", "expression", "awakening intuition", "rift_detect", 1.4f),
-        [852] = new("Intuition", "spiritual_order", "returning to spiritual order", "third_eye", 1.25f),
-        [963] = new("Divine", "oneness", "connection to Source", "transcend", 1.5f),
+        [174] = new("Foundation", SolfeggioEffect.PainRelief, "natural anesthetic", "shield", 1.1f),
+        [285] = new("Quantum", SolfeggioEffect.TissueHealing, "cellular regeneration", "minor_heal", 0.5f),
+        [396] = new("Liberation", SolfeggioEffect.ReleaseFear, "liberating guilt and fear", "stability", 1.2f),
+        [417] = new("Transmutation", SolfeggioEffect.FacilitateChange, "undoing situations", "rift_assist", 1.15f),
+        [432] = new("Natural Harmony", SolfeggioEffect.UniversalTuning, "cosmic frequency", "base_heal", 1f),
+        [528] = new("Miracle", SolfeggioEffect.Transformation, "DNA repair, love frequency", "major_heal", 2f),
+        [639] = new("Connection", SolfeggioEffect.Relationships, "harmonizing connections", "comm_boost", 1.3f),
+        [741] = new("Awakening", SolfeggioEffect.Expression, "awakening intuition", "rift_detect", 1.4f),
+        [852] = new("Intuition", SolfeggioEffect.SpiritualOrder, "returning to spiritual order", "third_eye", 1.25f),
+        [963] = new("Divine", SolfeggioEffect.Oneness, "connection to Source", "transcend", 1.5f),
     };
     public const float SolfeggioTolerance = 5f;
 
@@ -338,13 +338,13 @@ public static class GameConstants
     // Atlantean Crystal Types
     public static readonly Dictionary<string, AtlanteanCrystalTypeInfo> AtlanteanCrystalTypes = new()
     {
-        ["fire_crystal"] = new(new Color(255, 69, 0), 200f, 300f, "velocity_burst", 2f, "Volcanic energy crystal from Atlantean forges"),
-        ["aquamarine"] = new(new Color(127, 255, 212), 300f, 400f, "shield_boost", 1.5f, "Ocean-born crystal of protection"),
-        ["larimar"] = new(new Color(135, 206, 235), 400f, 500f, "communication", 1.8f, "Dolphin stone of ancient Atlantean wisdom"),
-        ["moldavite"] = new(new Color(154, 205, 50), 500f, 600f, "transformation", 2.5f, "Extraterrestrial glass of rapid evolution"),
-        ["lemurian_seed"] = new(new Color(255, 182, 193), 600f, 700f, "memory_unlock", 2f, "Ancient knowledge carrier from Lemuria"),
-        ["black_tourmaline"] = new(new Color(47, 79, 79), 100f, 200f, "purification", 1.3f, "Protective stone against negative frequencies"),
-        ["celestite"] = new(new Color(176, 224, 230), 700f, 800f, "angelic_connection", 1.7f, "Bridge to higher realms and celestial beings"),
+        ["fire_crystal"] = new(new Color(255, 69, 0), 200f, 300f, CrystalEffect.VelocityBurst, 2f, "Volcanic energy crystal from Atlantean forges"),
+        ["aquamarine"] = new(new Color(127, 255, 212), 300f, 400f, CrystalEffect.ShieldBoost, 1.5f, "Ocean-born crystal of protection"),
+        ["larimar"] = new(new Color(135, 206, 235), 400f, 500f, CrystalEffect.Communication, 1.8f, "Dolphin stone of ancient Atlantean wisdom"),
+        ["moldavite"] = new(new Color(154, 205, 50), 500f, 600f, CrystalEffect.Transformation, 2.5f, "Extraterrestrial glass of rapid evolution"),
+        ["lemurian_seed"] = new(new Color(255, 182, 193), 600f, 700f, CrystalEffect.MemoryUnlock, 2f, "Ancient knowledge carrier from Lemuria"),
+        ["black_tourmaline"] = new(new Color(47, 79, 79), 100f, 200f, CrystalEffect.Purification, 1.3f, "Protective stone against negative frequencies"),
+        ["celestite"] = new(new Color(176, 224, 230), 700f, 800f, CrystalEffect.AngelicConnection, 1.7f, "Bridge to higher realms and celestial beings"),
     };
     public const float AtlanteanCrystalChance = 0.15f;
 
@@ -377,14 +377,14 @@ public static class GameConstants
 
     // Cymatics Visualization
     public const bool CymaticsEnabled = true;
-    public static readonly Dictionary<string, CymaticsPatternInfo> CymaticsPatterns = new()
+    public static readonly Dictionary<CymaticsPattern, CymaticsPatternInfo> CymaticsPatterns = new()
     {
-        ["hexagon"] = new(200f, 300f, 6f),
-        ["star"] = new(300f, 400f, 5f),
-        ["flower"] = new(400f, 500f, 12f),
-        ["mandala"] = new(500f, 600f, 8f),
-        ["spiral"] = new(600f, 700f, PHI),
-        ["merkaba"] = new(700f, 800f, 24f),
+        [CymaticsPattern.Hexagon] = new(200f, 300f, 6f),
+        [CymaticsPattern.Star] = new(300f, 400f, 5f),
+        [CymaticsPattern.Flower] = new(400f, 500f, 12f),
+        [CymaticsPattern.Mandala] = new(500f, 600f, 8f),
+        [CymaticsPattern.Spiral] = new(600f, 700f, PHI),
+        [CymaticsPattern.Merkaba] = new(700f, 800f, 24f),
     };
 
     // Static constructor to generate Fibonacci sequence and derived arrays

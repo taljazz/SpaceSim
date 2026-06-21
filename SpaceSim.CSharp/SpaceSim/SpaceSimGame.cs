@@ -81,7 +81,7 @@ public partial class SpaceSimGame : Game
     // announcement finishes first instead of cutting off our "use up/down, Enter to select" instructions.
     private bool _menuIntroPending = true;
     private float _menuIntroTimer;
-    private const float MenuIntroDelay = 1.0f;
+    private const float MenuIntroDelay = 0.5f;
 
     #endregion
 
@@ -406,9 +406,11 @@ public partial class SpaceSimGame : Game
     {
         if (!_menuIntroPending) return;
 
-        // Any menu key means the player is already engaged — let their navigation do the talking.
+        // Any menu key (including Escape, which opens the quit prompt) means the player is already
+        // engaged — cancel the pending intro and let their input do the talking.
         if (IsKeyPressed(keys, Keys.Up) || IsKeyPressed(keys, Keys.Down)
-            || IsKeyPressed(keys, Keys.Enter) || IsKeyPressed(keys, Keys.Space))
+            || IsKeyPressed(keys, Keys.Enter) || IsKeyPressed(keys, Keys.Space)
+            || IsKeyPressed(keys, Keys.Escape))
         {
             _menuIntroPending = false;
             return;

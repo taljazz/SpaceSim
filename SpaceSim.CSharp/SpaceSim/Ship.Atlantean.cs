@@ -458,6 +458,11 @@ public partial class Ship
 
     #region Harmonic Detection
 
+    // Reused buffers so the twice-per-second harmonic check allocates no fresh collections.
+    private readonly Dictionary<string, HarmonicInfo> _detectedHarmonics = new();
+    private readonly List<(HarmonicType HType, int[] Dims)> _newHarmonics = new();
+    private readonly List<string> _harmonicsToRemove = new();
+
     /// <summary>
     /// Examines every pair of drive frequencies and reports the musical interval (octave, fifth,
     /// golden ratio, etc.) each pair currently forms, keyed by interval + dimension pair.
@@ -465,7 +470,7 @@ public partial class Ship
     /// <returns>A map of detected harmonics for this frame, consumed by <see cref="ApplyHarmonicBonuses"/>.</returns>
     public Dictionary<string, HarmonicInfo> DetectHarmonicRelationships()
     {
-        var detected = new Dictionary<string, HarmonicInfo>();
+        _detectedHarmonics.Clear();
 
         for (int i = 0; i < N; i++)
         {
@@ -475,11 +480,11 @@ public partial class Ship
 
                 float ratio = MathF.Max(RDrive[i], RDrive[j]) / MathF.Min(RDrive[i], RDrive[j]);
                 string key = $"{hType}_d{i + 1}_d{j + 1}";
-                detected[key] = new HarmonicInfo { HType = hType, Dims = new[] { i, j }, Ratio = ratio };
+                _detectedHarmonics[key] = new HarmonicInfo { HType = hType, Dims = new[] { i, j }, Ratio = ratio };
             }
         }
 
-        return detected;
+        return _detectedHarmonics;
     }
 
     /// <summary>
@@ -492,17 +497,17 @@ public partial class Ship
     {
         if (harmonics.Count == 0) return;
 
-        var newHarmonics = new List<(HarmonicType HType, int[] Dims)>();
+        _newHarmonics.Clear();
 
         foreach (var (key, info) in harmonics)
         {
             if (!ActiveHarmonics.ContainsKey(key))
-                newHarmonics.Add((info.HType, info.Dims));
+                _newHarmonics.Add((info.HType, info.Dims));
             ActiveHarmonics[key] = (info.HType, info.Dims, SimulationTime + GameConstants.HarmonicBonusDuration);
         }
 
         // Announce & play chimes
-        foreach (var (hType, dims) in newHarmonics)
+        foreach (var (hType, dims) in _newHarmonics)
         {
             string dimNames = string.Join(" and ", dims.Select(d => $"dimension {d + 1}"));
             // Space the PascalCase interval name so the screen reader says "Perfect Fifth", not "PerfectFifth".
@@ -527,10 +532,10 @@ public partial class Ship
         }
 
         // Apply bonuses & expire old
-        var toRemove = new List<string>();
+        _harmonicsToRemove.Clear();
         foreach (var (key, (hType, dims, expiry)) in ActiveHarmonics)
         {
-            if (SimulationTime > expiry) { toRemove.Add(key); continue; }
+            if (SimulationTime > expiry) { _harmonicsToRemove.Add(key); continue; }
 
             switch (hType)
             {
@@ -554,7 +559,7 @@ public partial class Ship
                     break;
             }
         }
-        foreach (string k in toRemove) ActiveHarmonics.Remove(k);
+        foreach (string k in _harmonicsToRemove) ActiveHarmonics.Remove(k);
     }
 
     #endregion

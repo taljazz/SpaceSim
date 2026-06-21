@@ -27,6 +27,10 @@ public class Renderer2D : BaseGameRenderer
     /// </summary>
     public float ZoomLevel = 1f;
 
+    // Reused 3-vertex buffer for triangle outlines (temples, ship) so we don't allocate a Vector2[]
+    // every object every frame. DrawPolygon consumes it synchronously, so a single shared buffer is safe.
+    private readonly Vector2[] _triBuffer = new Vector2[3];
+
     /// <inheritdoc/>
     protected override void OnInitialize(ContentManager content)
     {
@@ -153,15 +157,12 @@ public class Renderer2D : BaseGameRenderer
                     size = 8f * zoom;
                 }
 
-                // Draw triangle (temple shape)
+                // Draw triangle (temple shape) — reuse the shared buffer instead of allocating.
                 var cx = new Vector2(x, y);
-                var points = new Vector2[]
-                {
-                    cx + new Vector2(0, -size),
-                    cx + new Vector2(-size * 0.866f, size * 0.5f),
-                    cx + new Vector2(size * 0.866f, size * 0.5f),
-                };
-                PrimitiveRenderer2D.DrawPolygon(spriteBatch, points, color, 2);
+                _triBuffer[0] = cx + new Vector2(0, -size);
+                _triBuffer[1] = cx + new Vector2(-size * 0.866f, size * 0.5f);
+                _triBuffer[2] = cx + new Vector2(size * 0.866f, size * 0.5f);
+                PrimitiveRenderer2D.DrawPolygon(spriteBatch, _triBuffer, color, 2);
             }
         }
 
@@ -263,8 +264,10 @@ public class Renderer2D : BaseGameRenderer
         var right = new Vector2(cx + MathF.Cos(heading - 2.5f) * size * 0.7f,
                                 cy + MathF.Sin(heading - 2.5f) * size * 0.7f);
 
-        var shipPoints = new Vector2[] { nose, left, right };
-        PrimitiveRenderer2D.DrawPolygon(spriteBatch, shipPoints, shipColor, 2);
+        _triBuffer[0] = nose;
+        _triBuffer[1] = left;
+        _triBuffer[2] = right;
+        PrimitiveRenderer2D.DrawPolygon(spriteBatch, _triBuffer, shipColor, 2);
 
         // Ship body fill (approximate with lines between vertices)
         PrimitiveRenderer2D.DrawLine(spriteBatch, nose, left, shipColor);

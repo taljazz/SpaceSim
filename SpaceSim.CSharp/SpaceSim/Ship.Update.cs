@@ -499,7 +499,7 @@ public partial class Ship
             RiftChargeTimer -= dt;
             if (LockedRift != null && LockedTarget != null)
             {
-                if (Vec5.Mean(ResonanceLevels) < GameConstants.RiftEntryResThreshold)
+                if (avgRes < GameConstants.RiftEntryResThreshold)
                 {
                     RiftChargeTimer = 0;
                     Speak("Charge aborted-resonance too low. Retune.");
@@ -516,7 +516,7 @@ public partial class Ship
             if (LockedIsRift && LockedTarget != null && SimulationTime - _lastGuidanceTime > 10f)
             {
                 float dist = Vec5.Distance(Position, LockedTarget);
-                float avgResP = Vec5.Mean(ResonanceLevels) * 100f;
+                float avgResP = avgRes * 100f;
                 var proj = ProjectRelative(LockedTarget);
                 float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
                 float pan = MathF.Sin(angle * MathF.PI / 180f);
@@ -544,11 +544,16 @@ public partial class Ship
             }
         }
 
-        // Detect nearby celestial bodies (spatial grid query)
+        // Detect nearby celestial bodies with a SINGLE spatial-grid query, reused for both the
+        // nearest-object cue and the per-type ambients below — the nearest star, planet, and nebula
+        // are tracked in this same pass (scanRange covers every ambient radius), so no second query
+        // is needed.
         float scanRange = GetEffectiveScanRange();
         NearestBody = null;
         float minDist = float.MaxValue;
         bool nearAny = false;
+        CelestialBody? nearStar = null, nearPlanet = null, nearNebula = null;
+        float dStar = float.MaxValue, dPlanet = float.MaxValue, dNebula = float.MaxValue;
         if (SpatialGrid != null)
             SpatialGrid.GetNearby(Position, scanRange, _nearbyBuffer);
         else
@@ -560,6 +565,15 @@ public partial class Ship
             {
                 nearAny = true;
                 if (dist < minDist) { minDist = dist; NearestBody = body; }
+
+                // Track the nearest body of each type for the positional ambients (each applies its
+                // own tighter radius in UpdateProximityAmbients).
+                switch (body.BodyType)
+                {
+                    case CelestialBodyType.Star when dist < dStar: dStar = dist; nearStar = body; break;
+                    case CelestialBodyType.Planet when dist < dPlanet: dPlanet = dist; nearPlanet = body; break;
+                    case CelestialBodyType.Nebula when dist < dNebula: dNebula = dist; nearNebula = body; break;
+                }
             }
         }
         if (nearAny && !NearObject)
@@ -585,8 +599,9 @@ public partial class Ship
 
         // Per-type positional ambients: the nearest star, planet, and nebula each get their own
         // independent 3D voice (started/stopped per type), so a star is audible even when one of its
-        // planets is closer — and slots stop cleanly instead of getting stuck looping.
-        UpdateProximityAmbients(celestialBodies);
+        // planets is closer — and slots stop cleanly instead of getting stuck looping. Uses the
+        // per-type nearest bodies found in the scan above (no extra spatial query).
+        UpdateProximityAmbients(nearStar, dStar, nearPlanet, dPlanet, nearNebula, dNebula);
 
         // Nebula dissonance
         if (NebulaDissonanceEnabled && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Nebula)
@@ -661,7 +676,7 @@ public partial class Ship
                 if (NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
                     landingThreshold *= NearestBody.Difficulty;
 
-                if (Vec5.Mean(ResonanceLevels) > landingThreshold && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
+                if (avgRes > landingThreshold && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
                 {
                     LandedMode = true;
                     LandedPlanet = Vec5.Clone(NearestBody.Position);

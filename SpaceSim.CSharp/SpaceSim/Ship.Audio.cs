@@ -14,12 +14,16 @@ public partial class Ship
     #region Proximity ambient audio helpers
 
     /// <summary>
-    /// Update the looping ambient soundscape. Each frame we find the nearest star, planet, and
-    /// nebula in range and give EACH its own positioned 3D voice — so a star is heard even when one
-    /// of its planets happens to be closer, and a slot is stopped the moment its type leaves range
-    /// (no more stale, stuck drones). With HRTF the simultaneous sources are individually locatable.
+    /// Update the looping ambient soundscape from the nearest star, planet, and nebula — found in a
+    /// single spatial scan in Ship.Update and passed in here. Each gets its own positioned 3D voice
+    /// (so a star is heard even when one of its planets is closer), and each slot stops the moment
+    /// its type leaves range (no more stale, stuck drones). With HRTF the simultaneous sources are
+    /// individually locatable.
     /// </summary>
-    private void UpdateProximityAmbients(List<CelestialBody> celestialBodies)
+    private void UpdateProximityAmbients(
+        CelestialBody? star, float dStar,
+        CelestialBody? planet, float dPlanet,
+        CelestialBody? nebula, float dNebula)
     {
         if (!AmbientSoundsEnabled)
         {
@@ -27,30 +31,7 @@ public partial class Ship
             return;
         }
 
-        // Gather candidates within the largest ambient radius (planets reach furthest, at 15 units).
-        if (SpatialGrid != null)
-            SpatialGrid.GetNearby(Position, GameConstants.InteractionDistance, _nearbyBuffer);
-        else
-        {
-            _nearbyBuffer.Clear();
-            _nearbyBuffer.AddRange(celestialBodies);
-        }
-
-        // Find the nearest body of each type.
-        CelestialBody? star = null, planet = null, nebula = null;
-        float dStar = float.MaxValue, dPlanet = float.MaxValue, dNebula = float.MaxValue;
-        foreach (var body in _nearbyBuffer)
-        {
-            float dist = body.DistanceTo(Position);
-            switch (body.BodyType)
-            {
-                case CelestialBodyType.Star when dist < dStar: dStar = dist; star = body; break;
-                case CelestialBodyType.Planet when dist < dPlanet: dPlanet = dist; planet = body; break;
-                case CelestialBodyType.Nebula when dist < dNebula: dNebula = dist; nebula = body; break;
-            }
-        }
-
-        // Drive each slot independently, or stop it when nothing of that type is in range.
+        // Each slot applies its own tighter radius, or stops when nothing of that type is in range.
         if (star != null && dStar < GameConstants.StarHarmonyRadius) HandleStarAmbient(star, dStar);
         else StopWorldLoop(ref _starSound);
 

@@ -12,6 +12,8 @@ namespace SpaceSim.Rendering;
 /// </summary>
 public class Renderer2D : BaseGameRenderer
 {
+    #region Fields & initialization
+
     // Static color constants to avoid per-frame reconstruction
     private static readonly Color SpeedLineColor = new(180, 180, 255, 40);
     private static readonly Color TempleGoldColor = new(255, 215, 0);
@@ -25,15 +27,28 @@ public class Renderer2D : BaseGameRenderer
     /// </summary>
     public float ZoomLevel = 1f;
 
+    /// <inheritdoc/>
     protected override void OnInitialize(ContentManager content)
     {
         // No 2D-specific initialization needed
     }
 
+    #endregion
+
+    #region World drawing
+
+    /// <summary>
+    /// Draws the full 2D scene by projecting every 5D world position onto the screen
+    /// through the ship's view rotation and zoom, then drawing ley lines, nebulae,
+    /// stars, planets, structures, rifts, and the centered ship. Objects far off
+    /// screen are skipped via <see cref="IsNearScreen"/>.
+    /// </summary>
     public override void DrawWorld(SpriteBatch spriteBatch, Ship ship, GameTime gameTime, int screenW, int screenH)
     {
         try
         {
+        // Projection inputs: the view rotates around the ship, zoom scales the spread,
+        // and the ship's position is the world-space point kept at screen center.
         float rotation = ship.ViewRotation;
         float zoom = ZoomLevel;
         float[] center = ship.Position;
@@ -217,18 +232,20 @@ public class Renderer2D : BaseGameRenderer
         }
     }
 
+    /// <inheritdoc/>
     public override void DrawHud(SpriteBatch spriteBatch, SpriteFont font, Ship ship, int screenW, int screenH)
     {
         // HUD drawing is handled by HudRenderer in SpaceSimGame.Draw
     }
 
-    // =========================================================================
-    //  SHIP DRAWING
-    // =========================================================================
+    #endregion
+
+    #region Ship drawing
 
     private void DrawShip2D(SpriteBatch spriteBatch, Ship ship, GameTime gameTime,
                             int screenW, int screenH)
     {
+        // The ship is always pinned to screen center; the world scrolls around it.
         float cx = screenW / 2f;
         float cy = screenH / 2f;
         float heading = ship.Heading;
@@ -273,9 +290,9 @@ public class Renderer2D : BaseGameRenderer
         }
     }
 
-    // =========================================================================
-    //  SPEED LINES
-    // =========================================================================
+    #endregion
+
+    #region Speed lines
 
     private void DrawSpeedLines2D(SpriteBatch spriteBatch, Ship ship, GameTime gameTime,
                                   int screenW, int screenH)
@@ -312,10 +329,14 @@ public class Renderer2D : BaseGameRenderer
         }
     }
 
-    // =========================================================================
-    //  HELPERS (2D-specific)
-    // =========================================================================
+    #endregion
 
+    #region Helpers (2D-specific)
+
+    /// <summary>
+    /// True if a projected point lies within <paramref name="margin"/> pixels of the
+    /// viewport — a cheap cull so off-screen world objects are skipped.
+    /// </summary>
     private static bool IsNearScreen(int x, int y, int screenW, int screenH, int margin)
     {
         return x > -margin && x < screenW + margin &&
@@ -332,4 +353,6 @@ public class Renderer2D : BaseGameRenderer
             _ => 3f, // MainSequence
         };
     }
+
+    #endregion
 }

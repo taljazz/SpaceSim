@@ -10,6 +10,8 @@ namespace SpaceSim.Rendering;
 /// </summary>
 public static class PrimitiveRenderer2D
 {
+    #region Shared state & initialization
+
     private static Texture2D? _pixel;
     private static bool _initialized;
 
@@ -17,6 +19,11 @@ public static class PrimitiveRenderer2D
     private static readonly Vector2[] _unitCircle32 = PrecomputeUnitCircle(32);
     private static readonly Vector2[] _unitCircle20 = PrecomputeUnitCircle(20);
 
+    /// <summary>
+    /// Builds a reusable unit-circle lookup table (cos/sin per segment) so circle
+    /// drawing can skip trig at runtime. The extra closing point mirrors index 0
+    /// so callers can connect the final segment without a wraparound check.
+    /// </summary>
     private static Vector2[] PrecomputeUnitCircle(int segments)
     {
         var points = new Vector2[segments + 1];
@@ -45,6 +52,10 @@ public static class PrimitiveRenderer2D
     /// </summary>
     public static Texture2D? Pixel => _pixel;
 
+    #endregion
+
+    #region Primitive drawing
+
     /// <summary>
     /// Draws a line between two points using the pixel texture stretched and rotated.
     /// </summary>
@@ -56,6 +67,7 @@ public static class PrimitiveRenderer2D
         float length = delta.Length();
         if (length < 0.001f) return;
 
+        // Stretch the 1x1 pixel to the segment length and rotate it to the line's angle.
         float angle = MathF.Atan2(delta.Y, delta.X);
 
         sb.Draw(
@@ -159,8 +171,11 @@ public static class PrimitiveRenderer2D
 
         for (int i = 0; i < points.Length; i++)
         {
+            // Wrap the last index back to 0 so the outline is closed.
             int next = (i + 1) % points.Length;
             DrawLine(sb, points[i], points[next], color, thickness);
         }
     }
+
+    #endregion
 }

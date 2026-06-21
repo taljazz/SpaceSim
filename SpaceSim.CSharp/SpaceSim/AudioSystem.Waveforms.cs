@@ -6,9 +6,7 @@ namespace SpaceSim;
 
 public partial class AudioSystem
 {
-    // ========================================================================
-    //  Waveform generation
-    // ========================================================================
+    #region Waveform generation
 
     /// <summary>
     /// Pre-compute all waveform buffers used for UI sounds, chimes, and ambient loops.
@@ -57,6 +55,11 @@ public partial class AudioSystem
         IceChime = GenerateIceChime();
     }
 
+    #endregion
+
+    #region Generator helpers
+
+    /// <summary>Build a constant-amplitude pure sine tone of the given frequency, duration, and level.</summary>
     // --- Simple tone helper ---
     private static float[] GenerateTone(float freq, float duration, float amplitude)
     {
@@ -70,6 +73,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Two summed sine partials shaped by an exponential decay envelope — a generic bell/chime.</summary>
     // --- Chime with exponential decay (two frequencies) ---
     private static float[] GenerateChime(float freq1, float freq2,
                                          float duration = 0.4f, float decay = 0.15f, float amp = 0.15f)
@@ -85,6 +89,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Decaying chime whose three partials are stacked at golden-ratio multiples of 432 Hz.</summary>
     // --- Golden ratio chime: 432 Hz + 432*PHI + 432*PHI^2 ---
     private static float[] GenerateGoldenRatioChime()
     {
@@ -106,6 +111,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Dissonant tritone chime (C + F#) plus a quiet low octave for added tension.</summary>
     // --- Tritone chime with low rumble ---
     private static float[] GenerateTritoneChime()
     {
@@ -126,6 +132,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Lush seven-second chord on 432 Hz with extra partials, shaped by a two-hump swell envelope.</summary>
     // --- Golden Chord: 7s, base 432 + 540 + 685 + PHI overtones, double swell ---
     private static float[] GenerateGoldenChord()
     {
@@ -148,6 +155,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Steady one-second hum on 220 Hz with two golden-ratio overtones.</summary>
     // --- Rift Hum: 1s, 220 Hz + PHI harmonics ---
     private static float[] GenerateRiftHum()
     {
@@ -166,6 +174,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Two-second 40 Hz bass throb under a smooth sin^2 swell — the heartbeat of a red giant.</summary>
     // --- Red Giant Pulse: 2s, 40 Hz deep bass with sin^2 envelope ---
     private static float[] GenerateRedGiantPulse()
     {
@@ -183,6 +192,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Warm one-second drone on 250 Hz with a softer fifth-ish 375 Hz partial.</summary>
     // --- Emission Drone: 1s, 250 Hz + 375 Hz harmonic ---
     private static float[] GenerateEmissionDrone()
     {
@@ -198,6 +208,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Bright 700 Hz tone gated by a 4 Hz tremolo for a cool shimmering effect.</summary>
     // --- Reflection Shimmer: 1s, 700 Hz with 4 Hz tremolo ---
     private static float[] GenerateReflectionShimmer()
     {
@@ -213,6 +224,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Multi-layered 500 Hz tone with major-third and fifth partials for a planetary-nebula shell.</summary>
     // --- Planetary Layers: 1s, 500 Hz + 1.25x + 1.5x harmonics ---
     private static float[] GeneratePlanetaryLayers()
     {
@@ -230,6 +242,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Frequency sweep from 200 to 900 Hz blended with deterministic noise — a chaotic blast wave.</summary>
     // --- Supernova Chaos: 1s, swept 200-900 Hz with noise ---
     private static float[] GenerateSupernovaChaos()
     {
@@ -247,6 +260,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Vibrato-modulated 300-500 Hz tone with noise, evoking a roaring gas-giant furnace.</summary>
     // --- Hot Jupiter Roar: 1s, modulated 300-500 Hz with noise ---
     private static float[] GenerateHotJupiterRoar()
     {
@@ -264,6 +278,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Solid, resonant 350 Hz tone with its octave for a massive rocky world.</summary>
     // --- Super Earth Tone: 1s, 350 Hz + octave ---
     private static float[] GenerateSuperEarthTone()
     {
@@ -280,6 +295,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Flowing 275 Hz tone with a slow 1.5 Hz amplitude undulation, like gentle water.</summary>
     // --- Ocean World Flow: 1s, 275 Hz with gentle undulation ---
     private static float[] GenerateOceanWorldFlow()
     {
@@ -296,6 +312,7 @@ public partial class AudioSystem
         return buf;
     }
 
+    /// <summary>Crystalline 800 Hz tone with two upper harmonics and a bell-like exponential decay.</summary>
     // --- Ice Chime: 1s, 800 Hz with harmonics, bell-like decay ---
     private static float[] GenerateIceChime()
     {
@@ -313,4 +330,6 @@ public partial class AudioSystem
         }
         return buf;
     }
+
+    #endregion
 }

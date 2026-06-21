@@ -8,9 +8,18 @@ namespace SpaceSim;
 /// Procedural generation of celestial bodies, temples, ley lines, and pyramids
 /// using golden spiral mathematics and Fibonacci sequences.
 /// Converted from Python celestial.py.
+///
+/// <para>
+/// Everything here is laid out by proportion rather than randomness: bodies spiral outward
+/// at the golden angle, radii step through the Fibonacci sequence, and the two higher
+/// dimensions are folded back from the spatial ones via <see cref="GameConstants.PHI"/>. The
+/// result is a universe that feels structured and resonant rather than scattered.
+/// </para>
 /// </summary>
 public static class CelestialGenerator
 {
+    #region Celestial body generation
+
     /// <summary>
     /// Generate celestial bodies procedurally using golden spiral positioning.
     /// Higher dimensions are derived from spatial dimensions with PHI relationships
@@ -25,6 +34,7 @@ public static class CelestialGenerator
 
         for (int i = 0; i < n; i++)
         {
+            // Golden-angle spiral: each body steps PHI turns around, Fibonacci radius outward.
             float theta = i * 2f * MathF.PI * GameConstants.PHI;
             float r = GameConstants.FibSeq[i % GameConstants.FibSeq.Length] * GameConstants.ScaleFactor;
 
@@ -158,6 +168,10 @@ public static class CelestialGenerator
         return (stars, planets, nebulae, celestialBodies);
     }
 
+    #endregion
+
+    #region Orbital mechanics (per-frame animation)
+
     /// <summary>
     /// Update celestial body positions based on orbital mechanics and drift.
     /// Called each frame to animate star wobble, planetary orbits, and nebula drift.
@@ -166,6 +180,7 @@ public static class CelestialGenerator
     /// <param name="planets">List of planet bodies.</param>
     /// <param name="nebulae">List of nebula bodies.</param>
     /// <param name="time">Current simulation time in seconds.</param>
+    // Latched so each warning is logged once rather than every frame.
     private static bool _warnedNullBasePos;
     private static bool _warnedBadParentIdx;
 
@@ -223,6 +238,10 @@ public static class CelestialGenerator
             nebula.Position[1] = nebula.BasePosition[1] + driftY;
         }
     }
+
+    #endregion
+
+    #region Atlantean structures (temples, ley lines, pyramids)
 
     /// <summary>
     /// Generate the 12 minor zodiac temples plus the Halls of Amenti master temple.
@@ -395,6 +414,10 @@ public static class CelestialGenerator
         return pyramids;
     }
 
+    #endregion
+
+    #region Complete universe assembly
+
     /// <summary>
     /// Generate the complete Atlantean universe including all celestial bodies,
     /// temples, ley lines, and pyramids.
@@ -417,4 +440,6 @@ public static class CelestialGenerator
 
         return (stars, planets, nebulae, celestialBodies, temples, leyLines, pyramids);
     }
+
+    #endregion
 }

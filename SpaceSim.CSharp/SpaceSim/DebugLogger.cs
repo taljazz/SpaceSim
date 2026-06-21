@@ -10,12 +10,15 @@ namespace SpaceSim;
 /// </summary>
 public static class DebugLogger
 {
+    /// <summary>Master switch — set false (or auto-disabled on file error) to silence all logging.</summary>
     public static bool IsEnabled = true;
 
     private static readonly object _lock = new();
     private static StreamWriter? _writer;
     private static readonly Stopwatch _stopwatch = Stopwatch.StartNew();
     private static float _lastFlushTime;
+
+    #region Lifecycle
 
     /// <summary>
     /// Opens the log file. Call once at startup.
@@ -33,6 +36,10 @@ public static class DebugLogger
             IsEnabled = false;
         }
     }
+
+    #endregion
+
+    #region Writing
 
     /// <summary>
     /// Log a message with category and timestamp.
@@ -67,6 +74,10 @@ public static class DebugLogger
         Log(category, $"  StackTrace: {ex.StackTrace}");
     }
 
+    #endregion
+
+    #region Flushing & shutdown
+
     /// <summary>
     /// Force flush all buffered log data to disk.
     /// </summary>
@@ -98,4 +109,6 @@ public static class DebugLogger
             catch { }
         }
     }
+
+    #endregion
 }

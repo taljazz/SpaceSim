@@ -4,15 +4,15 @@ using SpaceSim.Models;
 
 namespace SpaceSim;
 
-// =========================================================================
-//  EVENT ARGUMENT TYPES
-// =========================================================================
+#region Event argument types
 
+/// <summary>Payload for a screen-reader announcement.</summary>
 public class SpeakEventArgs : EventArgs
 {
     public string Message { get; init; } = "";
 }
 
+/// <summary>Payload to play a one-shot or looping sound effect, with pan/volume/pitch.</summary>
 public class SoundEffectEventArgs : EventArgs
 {
     public float[] Waveform { get; init; } = Array.Empty<float>();
@@ -22,12 +22,14 @@ public class SoundEffectEventArgs : EventArgs
     public float Pitch { get; init; } = 1f;
 }
 
+/// <summary>Payload announcing a gameplay mode change (the mode and its new value).</summary>
 public class ModeChangeEventArgs : EventArgs
 {
     public string ModeName { get; init; } = "";
     public string Value { get; init; } = "";
 }
 
+/// <summary>Payload announcing a named state change, with old and new values.</summary>
 public class StateChangeEventArgs : EventArgs
 {
     public string StateName { get; init; } = "";
@@ -35,6 +37,7 @@ public class StateChangeEventArgs : EventArgs
     public object? NewValue { get; init; }
 }
 
+/// <summary>Payload for entering/leaving a celestial body's proximity, with distance and pan.</summary>
 public class ProximityEventArgs : EventArgs
 {
     public CelestialBody? Body { get; init; }
@@ -43,12 +46,14 @@ public class ProximityEventArgs : EventArgs
     public bool Entering { get; init; }
 }
 
+/// <summary>Payload for a rift lifecycle event (spawned / entered / faded).</summary>
 public class RiftEventArgs : EventArgs
 {
     public Rift Rift { get; init; } = null!;
     public string Action { get; init; } = ""; // "entered", "spawned", "faded"
 }
 
+/// <summary>Payload for collecting a crystal, including its chakra type and the running total.</summary>
 public class CrystalEventArgs : EventArgs
 {
     public string CrystalType { get; init; } = "";
@@ -56,18 +61,21 @@ public class CrystalEventArgs : EventArgs
     public int TotalCollected { get; init; }
 }
 
+/// <summary>Payload for a detected harmonic interval and the two dimensions it spans.</summary>
 public class HarmonicEventArgs : EventArgs
 {
     public string HarmonicName { get; init; } = "";
     public int[] Dims { get; init; } = Array.Empty<int>();
 }
 
+/// <summary>Payload for anchoring on (or ascending from) a planet.</summary>
 public class LandingEventArgs : EventArgs
 {
     public bool IsLanding { get; init; } // true = landed, false = takeoff
     public CelestialBody? Planet { get; init; }
 }
 
+/// <summary>Payload for crossing into a new consciousness level.</summary>
 public class ConsciousnessEventArgs : EventArgs
 {
     public string OldLevel { get; init; } = "";
@@ -75,6 +83,7 @@ public class ConsciousnessEventArgs : EventArgs
     public float Value { get; init; }
 }
 
+/// <summary>Payload for acquiring a temple key, including progress toward all 12.</summary>
 public class TempleKeyEventArgs : EventArgs
 {
     public string KeyName { get; init; } = "";
@@ -82,9 +91,9 @@ public class TempleKeyEventArgs : EventArgs
     public int TotalKeys { get; init; }
 }
 
-// =========================================================================
-//  CENTRAL EVENT BUS
-// =========================================================================
+#endregion
+
+#region Central event bus
 
 /// <summary>
 /// Static event bus for decoupled communication between game systems.
@@ -117,9 +126,7 @@ public static class GameEvents
     public static event EventHandler? OnMerkabaActivated;
     public static event EventHandler? OnMerkabaDeactivated;
 
-    // =====================================================================
-    //  RAISE HELPERS (fire-and-forget, null-safe)
-    // =====================================================================
+    #region Raise helpers (fire-and-forget, null-safe)
 
     public static void RaiseSpeak(object? sender, string message)
         => OnSpeak?.Invoke(sender, new SpeakEventArgs { Message = message });
@@ -175,4 +182,8 @@ public static class GameEvents
 
     public static void RaiseMerkabaDeactivated(object? sender)
         => OnMerkabaDeactivated?.Invoke(sender, EventArgs.Empty);
+
+    #endregion
 }
+
+#endregion

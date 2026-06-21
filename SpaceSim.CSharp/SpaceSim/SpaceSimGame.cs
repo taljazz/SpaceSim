@@ -11,9 +11,19 @@ namespace SpaceSim;
 /// <summary>
 /// Main game class for the SpaceSim 5D resonance-based spaceship simulator.
 /// Manages initialization, input, update loop, and rendering delegation.
+///
+/// <para>
+/// This is the MonoGame host: it owns the graphics device, the core systems (<see cref="Ship"/>,
+/// <see cref="AudioSystem"/>, speech), the camera, and both renderers. The per-frame logic lives
+/// in the partial half (<c>SpaceSimGame.Update.cs</c>); this file handles the lifecycle —
+/// construction, <see cref="Initialize"/>, <see cref="LoadContent"/>, the <see cref="GameEvents"/>
+/// wiring, and teardown.
+/// </para>
 /// </summary>
 public partial class SpaceSimGame : Game
 {
+    #region Fields
+
     // --- Graphics ---
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch = null!;
@@ -54,6 +64,11 @@ public partial class SpaceSimGame : Game
     // --- Audio click timer ---
     private float _nextClickTime;
 
+    #endregion
+
+    #region Construction and lifecycle
+
+    /// <summary>Configures the graphics device manager and debug logging. Heavy setup is deferred to <see cref="Initialize"/>.</summary>
     public SpaceSimGame()
     {
         DebugLogger.Initialize();
@@ -189,9 +204,9 @@ public partial class SpaceSimGame : Game
         DebugLogger.Log("Init", $"LoadContent() completed. Viewport: {w}x{h}");
     }
 
-    // ========================================================================
-    //  GameEvent handlers
-    // ========================================================================
+    #endregion
+
+    #region GameEvent handlers
 
     private void HandleSpeak(object? sender, SpeakEventArgs e)
     {
@@ -214,9 +229,9 @@ public partial class SpaceSimGame : Game
         DebugLogger.Log("Event", "Ascension event received");
     }
 
-    // ========================================================================
-    //  Dispose
-    // ========================================================================
+    #endregion
+
+    #region Dispose
 
     protected override void Dispose(bool disposing)
     {
@@ -242,4 +257,6 @@ public partial class SpaceSimGame : Game
 
         base.Dispose(disposing);
     }
+
+    #endregion
 }

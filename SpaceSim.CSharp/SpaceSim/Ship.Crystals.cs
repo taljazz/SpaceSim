@@ -11,10 +11,13 @@ namespace SpaceSim;
 
 public partial class Ship
 {
-    // =========================================================================
-    //  CRYSTAL GENERATION (on landed planet)
-    // =========================================================================
+    #region Crystal generation (on landed planet)
 
+    /// <summary>
+    /// Seed a freshly-anchored planet with collectable crystals. Picks a biome, rolls a crystal
+    /// count (boosted by upgrades and the planet's exoplanet multiplier), arranges them in a sacred
+    /// geometry layout when the count matches a known pattern, and starts the looping biome ambience.
+    /// </summary>
     public void GenerateCrystals()
     {
         CrystalPositions.Clear();
@@ -23,14 +26,16 @@ public partial class Ship
         Biome = Random.Shared.NextDouble() < 0.5 ? PlanetBiome.Harmonic : PlanetBiome.Dissonant;
         PatternProgress.Clear();
 
+        // Rarer planet types skew their crystal yield via CrystalMult (e.g. rogue planets give more).
         float crystalMult = 1f;
         if (LandedPlanetBody != null)
             crystalMult = LandedPlanetBody.CrystalMult;
 
+        // Roll a base count (Crystal Growth upgrades raise both bounds), then scale by the planet's multiplier.
         int baseCount = Random.Shared.Next(1 + CrystalBonus, 9 + CrystalBonus);
         CrystalCount = Math.Max(1, (int)(baseCount * crystalMult));
 
-        // Detect sacred geometry pattern
+        // Detect sacred geometry pattern: if the count exactly matches a pattern's point total, use it.
         CurrentPattern = null;
         foreach (var (patName, patInfo) in GameConstants.SacredPatterns)
         {
@@ -61,7 +66,8 @@ public partial class Ship
 
             CrystalPositions.Add(new[] { px, py });
 
-            // Assign Atlantean crystal type with chance
+            // Small chance each crystal is a special Atlantean type (its own frequency band + effect);
+            // otherwise it gets ordinary frequencies spread across the full range.
             if (Random.Shared.NextSingle() < GameConstants.AtlanteanCrystalChance)
             {
                 var types = GameConstants.AtlanteanCrystalTypes.Keys.ToArray();
@@ -86,7 +92,7 @@ public partial class Ship
         Speak($"Crystals detected at frequencies: {freqStr} Hz in primary dim.");
         _approachingLockAnnounced = false;
 
-        // Play biome sound
+        // Start the looping biome ambience: a golden chord for harmonic worlds, chaos for dissonant ones.
         StopBiomeSound();
         float[] waveform = Biome == PlanetBiome.Harmonic
             ? _audio.GoldenChordWaveform
@@ -95,6 +101,7 @@ public partial class Ship
         _audio.AddSoundEffect(_biomeSound);
     }
 
+    /// <summary>Silence the looping biome ambience started by <see cref="GenerateCrystals"/> (e.g. on takeoff).</summary>
     private void StopBiomeSound()
     {
         // We can't remove from the audio system's internal list directly,
@@ -107,10 +114,15 @@ public partial class Ship
         }
     }
 
-    // =========================================================================
-    //  SCAN / COLLECT CRYSTAL
-    // =========================================================================
+    #endregion
 
+    #region Scan / collect crystal
+
+    /// <summary>
+    /// Announce the nearest un-collected crystal: its distance, compass direction, and target
+    /// frequency for the selected dimension. Auto-snaps the drive onto the crystal's frequencies when
+    /// the player is already close enough, and pans a beep toward it as an audio cue.
+    /// </summary>
     public void ScanNearestCrystal()
     {
         if (CrystalPositions.Count == 0) return;
@@ -129,7 +141,8 @@ public partial class Ship
         var crystal = CrystalFreqs[nearest];
         float[] cFreqs = crystal.Freqs;
 
-        // Auto-snap if close enough
+        // Auto-snap: if the drive is already resonating closely across all dims, lock it exactly
+        // onto the crystal's frequencies so the player doesn't have to fine-tune the last sliver.
         float[] tempRes = new float[N];
         for (int i = 0; i < N; i++)
         {
@@ -162,6 +175,12 @@ public partial class Ship
         GameEvents.RaisePlaySound(this, _audio.BeepWaveform, pan: pan, volume: _audio.BeepVolume);
     }
 
+    /// <summary>
+    /// Attempt to collect the crystal under the cursor. Succeeds only when the drive is in tune
+    /// (mean resonance above the collection threshold) and the crystal is within one grid unit.
+    /// Tallies its value, applies any special effect, and — once the last crystal is gathered —
+    /// awards the sacred-pattern completion bonus and checks for ascension.
+    /// </summary>
     public void CollectCrystal()
     {
         if (CrystalPositions.Count == 0)
@@ -224,7 +243,8 @@ public partial class Ship
             if (Random.Shared.NextSingle() < 0.2f)
                 Speak("Ancient echo: The spiral binds all realms in golden eternity.");
 
-            // Sacred geometry pattern completion
+            // Sacred geometry pattern completion: gathering every crystal of a recognised layout
+            // grants a timed bonus plus extra crystals scaled by the pattern's multiplier.
             if (LockedCrystals.Count == CrystalCount)
             {
                 if (CurrentPattern != null && GameConstants.SacredPatterns.TryGetValue(CurrentPattern.Value, out var pInfo))
@@ -251,6 +271,14 @@ public partial class Ship
         }
     }
 
+    #endregion
+
+    #region Atlantean crystal effects
+
+    /// <summary>
+    /// Apply the one-off effect of a collected special Atlantean crystal (velocity burst, shield
+    /// boost, consciousness gain, dissonance purge, etc.), announcing the corresponding lore line.
+    /// </summary>
     public void ApplyAtlanteanCrystalEffect(string crystalType)
     {
         if (!GameConstants.AtlanteanCrystalTypes.TryGetValue(crystalType, out var info)) return;
@@ -284,4 +312,6 @@ public partial class Ship
                 break;
         }
     }
+
+    #endregion
 }

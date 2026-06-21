@@ -11,6 +11,8 @@ namespace SpaceSim.Rendering;
 /// </summary>
 public static class PrimitiveRenderer
 {
+    #region Shared state & initialization
+
     private static BasicEffect? _effect;
     private static bool _initialized;
 
@@ -35,6 +37,10 @@ public static class PrimitiveRenderer
         _initialized = true;
     }
 
+    #endregion
+
+    #region Primitive drawing
+
     /// <summary>
     /// Draws a wireframe sphere at the given center position.
     /// Uses latitude/longitude line strips to approximate the sphere.
@@ -54,6 +60,8 @@ public static class PrimitiveRenderer
         _effect.Projection = projection;
         _effect.World = Matrix.Identity;
 
+        // Approximate the sphere with three great-circle rings (XZ, XY, YZ) packed
+        // back-to-back into the shared buffer, then drawn as three line strips.
         // Fill pre-allocated vertex buffer for 3 rings
         // Ring in XZ plane (equator)
         for (int i = 0; i <= segments; i++)
@@ -231,6 +239,7 @@ public static class PrimitiveRenderer
             _coneVerts[idx + 2] = new VertexPositionColor(p2, baseColor);
         }
 
+        // Side triangle fan + base triangle fan share one buffer, drawn in a single call.
         int totalTriangles = segments + (segments - 2);
 
         foreach (var pass in _effect.CurrentTechnique.Passes)
@@ -239,4 +248,6 @@ public static class PrimitiveRenderer
             device.DrawUserPrimitives(PrimitiveType.TriangleList, _coneVerts, 0, totalTriangles);
         }
     }
+
+    #endregion
 }

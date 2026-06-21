@@ -15,18 +15,24 @@ namespace SpaceSim;
 /// </summary>
 public partial class Ship
 {
+    #region Constants & external references
+
     // --- Constants shorthand ---
+    // Short local aliases for the handful of game constants used all over this class,
+    // so the physics reads cleanly (N instead of GameConstants.NDimensions, etc.).
     private const int N = GameConstants.NDimensions;
     private const float PHI = GameConstants.PHI;
     private const float DT = GameConstants.Dt;
 
     // --- External references ---
+    // The two services the ship leans on: the audio engine (for sounds/waveforms) and
+    // the screen reader (reached indirectly via the event bus in Speak()).
     private readonly AudioSystem _audio;
     private readonly TolkSpeechService _tolk;
 
-    // =========================================================================
-    //  PUBLIC STATE  (accessible by renderer / Game1)
-    // =========================================================================
+    #endregion
+
+    #region Public state (accessible by renderer / Game1)
 
     // Core position & movement
     public float[] Position = Vec5.Zero();
@@ -165,18 +171,23 @@ public partial class Ship
     public Dictionary<string, (HarmonicType Type, int[] Dims, float Expiry)> ActiveHarmonics = new();
     private float _lastHarmonicCheck;
 
-    // ===== ATLANTEAN STATE =====
+    #region Atlantean state
+
+    // Tuaoi crystal: the six-sided stone the player retunes (press G) for different tactical bonuses.
     public TuaoiMode TuaoiMode = TuaoiMode.Navigation;
     public int TuaoiModeIndex = 1;
     private TuaoiModeInfo _cachedTuaoiInfo = null!;
     private float _lastTuaoiSwitch;
 
+    // Merkaba: the protective light-vehicle field that switches on when every dimension is in tune.
     public bool MerkabaActive;
     private bool _merkabaAnnounced;
 
+    // Solfeggio: sacred frequencies the drive can land on, each granting a timed effect.
     public Dictionary<int, (SolfeggioEffect Effect, float Expiry)> ActiveSolfeggio = new();
     private float _lastSolfeggioCheck;
 
+    // Temple resonance: the 110 Hz ancient-healing band.
     public bool InTempleResonance;
     private bool _templeAnnounced;
 
@@ -254,14 +265,19 @@ public partial class Ship
     // Zoom (managed externally but stored here for convenience)
     public float ZoomLevel = 1f;
 
-    // =========================================================================
-    //  PROPERTIES
-    // =========================================================================
+    #endregion
 
+    #endregion
+
+    #region Properties
+
+    /// <summary>True while any screen-reader menu (HUD, upgrades, starmap, rifts) is open.</summary>
     public bool IsInMenuMode => ActiveMenu != null;
 
+    /// <summary>True while the player is holding the charge to enter a locked rift.</summary>
     public bool IsChargingRift => RiftChargeTimer > 0;
 
+    /// <summary>Charge completion as 0..1, for the renderer to show a progress indicator.</summary>
     public float RiftChargeProgress =>
         RiftChargeTimer > 0 ? 1f - RiftChargeTimer / GameConstants.RiftChargeTime : 0f;
 
@@ -271,10 +287,11 @@ public partial class Ship
     /// <summary>Row labels of the active menu (empty when no menu is open).</summary>
     public IReadOnlyList<string> MenuItems => ActiveMenu?.ItemLabels ?? Array.Empty<string>();
 
-    // =========================================================================
-    //  UPGRADE DEFINITIONS
-    // =========================================================================
+    #endregion
 
+    #region Upgrade definitions
+
+    /// <summary>One purchasable upgrade: its name, crystal cost, the action that applies it, and a description.</summary>
     private struct UpgradeDef
     {
         public string Name;
@@ -285,10 +302,15 @@ public partial class Ship
 
     private UpgradeDef[] _upgrades;
 
-    // =========================================================================
-    //  CONSTRUCTOR
-    // =========================================================================
+    #endregion
 
+    #region Constructor
+
+    /// <summary>
+    /// Creates a ship: wires up the audio and speech services, seeds the drive and target
+    /// frequencies to random starting values, builds the upgrade list, and selects the
+    /// default Tuaoi mode.
+    /// </summary>
     public Ship(AudioSystem audioSystem, TolkSpeechService tolk)
     {
         _audio = audioSystem;
@@ -320,10 +342,15 @@ public partial class Ship
         DebugLogger.Log("Ship", $"  FTarget=[{FTarget[0]:F1},{FTarget[1]:F1},{FTarget[2]:F1},{FTarget[3]:F1},{FTarget[4]:F1}]");
     }
 
-    // =========================================================================
-    //  SPEECH HELPER
-    // =========================================================================
+    #endregion
 
+    #region Speech helper
+
+    /// <summary>
+    /// Announces a message through the screen reader, but only if the same message hasn't been
+    /// spoken within the cooldown window — this is what keeps per-frame alerts from spamming.
+    /// The actual speaking is done by whoever is listening on the event bus.
+    /// </summary>
     public void Speak(string msg)
     {
         if (_lastSpoken.TryGetValue(msg, out float last) &&
@@ -333,16 +360,21 @@ public partial class Ship
         GameEvents.RaiseSpeak(this, msg);
     }
 
-    // =========================================================================
-    //  UTILITY METHODS
-    // =========================================================================
+    #endregion
 
+    #region Utility methods
+
+    /// <summary>Switches the Tuaoi crystal to a new mode and caches its info for fast per-frame lookups.</summary>
     public void SetTuaoiMode(TuaoiMode mode)
     {
         TuaoiMode = mode;
         _cachedTuaoiInfo = GameConstants.TuaoiModes[mode];
     }
 
+    /// <summary>
+    /// How far the ship can sense objects. Communication mode widens this (2x), letting the
+    /// player detect temples, pyramids and bodies from further away.
+    /// </summary>
     public float GetEffectiveScanRange()
     {
         float range = GameConstants.InteractionDistance;
@@ -351,6 +383,10 @@ public partial class Ship
         return range;
     }
 
+    /// <summary>
+    /// Maps a frequency to its crystal type (Ruby through Quartz, by chakra band).
+    /// Falls back to quartz for anything above the top of the spectrum.
+    /// </summary>
     public (string Name, CrystalSpectrumInfo Info) GetCrystalType(float frequency)
     {
         foreach (var (name, info) in GameConstants.CrystalSpectrum)
@@ -361,30 +397,37 @@ public partial class Ship
         return ("quartz", GameConstants.CrystalSpectrum["quartz"]);
     }
 
+    /// <summary>Looks up the Atlantean-flavoured name for a plain term (e.g. "rift" -> "Harmonic Chamber").</summary>
     public string GetAtlanteanTerm(string term)
     {
         return GameConstants.AtlanteanTerms.TryGetValue(term.ToLower(), out var at) ? at : term;
     }
 
-    // =========================================================================
-    //  UPGRADE FUNCTIONS
-    // =========================================================================
+    #endregion
 
+    #region Upgrade functions
+
+    /// <summary>Widens the tuning tolerance by a golden-ratio increment, making frequencies easier to match.</summary>
     public void UpgradeWidth() => ResonanceWidth += PHI * 0.5f;
 
+    /// <summary>Restores ship harmony (integrity) by a golden-ratio amount, capped at full.</summary>
     public void UpgradeIntegrity() =>
         ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + PHI * 0.2f);
 
+    /// <summary>Boosts top speed by the golden ratio.</summary>
     public void UpgradeVelocity() => MaxVelocity *= PHI;
 
+    /// <summary>Nudges every drive frequency a tenth of the way toward its target — a gentle auto-align.</summary>
     public void AutoTune()
     {
         for (int i = 0; i < N; i++)
             RDrive[i] += (FTarget[i] - RDrive[i]) * 0.1f;
     }
 
+    /// <summary>Increases the number of crystals each planet yields.</summary>
     public void UpgradeCrystalCount() => CrystalBonus += 1;
 
+    /// <summary>The capstone upgrade: a permanent golden-ratio multiplier on speed and tuning width.</summary>
     public void ActivateGoldenHarmony()
     {
         GoldenHarmonyActive = true;
@@ -393,10 +436,15 @@ public partial class Ship
         Speak("Golden Harmony activated. The universe sings in perfect proportion.");
     }
 
-    // =========================================================================
-    //  HELPER METHODS
-    // =========================================================================
+    #endregion
 
+    #region Helper methods
+
+    /// <summary>
+    /// Projects a target's 5D position into the ship-relative 2D plane the player "sees", applying
+    /// the current view rotation. The higher dimensions (indices 3 and 4) fold into the same x/y
+    /// so they can be heard/seen as direction. Used for panning sounds and angle announcements.
+    /// </summary>
     private (float X, float Y) ProjectRelative(float[] targetPos)
     {
         float[] rel = Vec5.Subtract(targetPos, Position);
@@ -407,6 +455,7 @@ public partial class Ship
         return (x, y);
     }
 
+    /// <summary>Plain 2D (x/y only) distance between two 5D points.</summary>
     private static float Dist2D(float[] a, float[] b)
     {
         float dx = a[0] - b[0];
@@ -414,19 +463,23 @@ public partial class Ship
         return MathF.Sqrt(dx * dx + dy * dy);
     }
 
+    /// <summary>Upper-cases the first letter of a string (leaving the rest as-is).</summary>
     private static string Capitalize(string s) =>
         string.IsNullOrEmpty(s) ? s : char.ToUpper(s[0]) + s[1..];
 
+    /// <summary>Turns a snake_case identifier into spaced, Capitalised words (e.g. "ocean_world" -> "Ocean World").</summary>
     private static string FormatName(string s) =>
         string.Join(' ', s.Split('_').Select(Capitalize));
 
+    /// <summary>Formats a frequency array as a comma-separated, whole-number list for speech/HUD.</summary>
     private static string FormatFreqs(float[] freqs) =>
         string.Join(", ", freqs.Select(f => $"{f:F0}"));
 
-    // =========================================================================
-    //  INNER TYPES FOR MENUS
-    // =========================================================================
+    #endregion
 
+    #region Inner types for menus
+
+    /// <summary>One row in the starmap scanner: a label, an optional target position, what kind of object it is, and any rift it points at.</summary>
     public class StarmapItem
     {
         public string Label = "";
@@ -438,6 +491,7 @@ public partial class Ship
         public Rift? ItemRift;
     }
 
+    /// <summary>One row in the rift-selection menu: a label, the rift's position, and the rift itself.</summary>
     public class RiftMenuItem
     {
         public string Label = "";
@@ -447,10 +501,13 @@ public partial class Ship
         public Rift? Rift;
     }
 
+    /// <summary>A detected harmonic relationship: its interval type, the two dimensions involved, and their frequency ratio.</summary>
     public class HarmonicInfo
     {
         public HarmonicType HType;
         public int[] Dims = Array.Empty<int>();
         public float Ratio;
     }
+
+    #endregion
 }

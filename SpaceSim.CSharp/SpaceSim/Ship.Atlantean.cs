@@ -11,10 +11,13 @@ namespace SpaceSim;
 
 public partial class Ship
 {
-    // =========================================================================
-    //  PORTAL ANCHOR SYSTEM
-    // =========================================================================
+    #region Portal Anchor System
 
+    /// <summary>
+    /// Drops a portal anchor at the ship's current position so it can be teleported back to later.
+    /// Costs <see cref="GameConstants.PortalAnchorCost"/> crystals and is capped at
+    /// <see cref="GameConstants.MaxPortalAnchors"/>; both limits are announced if hit.
+    /// </summary>
     public void CreatePortalAnchor()
     {
         if (PortalAnchors.Count >= GameConstants.MaxPortalAnchors)
@@ -39,6 +42,11 @@ public partial class Ship
         Speak($"Portal anchor '{name}' created. {PortalAnchors.Count}/{GameConstants.MaxPortalAnchors} anchors set.");
     }
 
+    /// <summary>
+    /// Teleports the ship to its first portal anchor. Gated by a cooldown
+    /// (<see cref="GameConstants.PortalCooldown"/>) and a minimum average resonance
+    /// (<see cref="GameConstants.PortalTravelResonance"/>); the reason is spoken if travel is denied.
+    /// </summary>
     public void UsePortalAnchor()
     {
         if (PortalAnchors.Count == 0)
@@ -64,10 +72,15 @@ public partial class Ship
         Speak($"Portal activated. Teleported to {anchor.Name}.");
     }
 
-    // =========================================================================
-    //  ASTRAL PROJECTION
-    // =========================================================================
+    #endregion
 
+    #region Astral Projection
+
+    /// <summary>
+    /// Leaves the body to fly free as a disembodied form. Requires high resonance
+    /// (<see cref="GameConstants.AstralProjectionResonance"/>) and respects a post-return cooldown.
+    /// Stores the body's position so <see cref="ExitAstralMode"/> can snap back to it.
+    /// </summary>
     public void EnterAstralMode()
     {
         if (Vec5.Mean(ResonanceLevels) < GameConstants.AstralProjectionResonance)
@@ -88,6 +101,10 @@ public partial class Ship
         Speak("Astral projection initiated. Your consciousness expands beyond your light vehicle. Press B to return.");
     }
 
+    /// <summary>
+    /// Returns the consciousness to the physical body, restoring the saved position and starting the
+    /// astral cooldown. Safe to call when not projecting (it simply does nothing).
+    /// </summary>
     public void ExitAstralMode()
     {
         if (!AstralMode) return;
@@ -98,6 +115,11 @@ public partial class Ship
         Speak("Returning to physical form. Astral projection complete.");
     }
 
+    /// <summary>
+    /// Per-frame astral tick: counts down the duration (auto-returning at zero), tugs the form back
+    /// toward the body if it strays past <see cref="GameConstants.AstralProjectionRange"/>, and
+    /// applies the astral speed multiplier to the current velocity.
+    /// </summary>
     public void UpdateAstralMode(float dt)
     {
         if (!AstralMode) return;
@@ -130,10 +152,15 @@ public partial class Ship
         Vec5.ScaleInPlace(Velocity, GameConstants.AstralSpeedMult);
     }
 
-    // =========================================================================
-    //  INTENTION NAVIGATION
-    // =========================================================================
+    #endregion
 
+    #region Intention Navigation
+
+    /// <summary>
+    /// Begins focusing intention on the locked target. Requires a minimum resonance
+    /// (<see cref="GameConstants.IntentionResonanceThreshold"/>); once started, the manifestation
+    /// resolves after a short focus delay in <see cref="UpdateIntentionNavigation"/>.
+    /// </summary>
     public void StartIntentionNavigation()
     {
         if (Vec5.Mean(ResonanceLevels) < GameConstants.IntentionResonanceThreshold)
@@ -147,6 +174,11 @@ public partial class Ship
         Speak("Intention navigation activated. Focus your intention on your destination...");
     }
 
+    /// <summary>
+    /// Per-frame intention tick: once the focus time elapses, leaps a fraction of the way toward the
+    /// locked target (capped by <see cref="GameConstants.IntentionRange"/>), then clears the state.
+    /// With no target locked, the intention simply dissipates.
+    /// </summary>
     public void UpdateIntentionNavigation(float dt)
     {
         if (!IntentionActive) return;
@@ -176,10 +208,15 @@ public partial class Ship
         }
     }
 
-    // =========================================================================
-    //  TEMPLE / LEY LINE / PYRAMID PROXIMITY
-    // =========================================================================
+    #endregion
 
+    #region Temple / Ley Line / Pyramid Proximity
+
+    /// <summary>
+    /// Throttled (once per second) scan for a nearby temple. Tuning to a minor temple's frequency at
+    /// high enough resonance collects its key; reaching the Halls of Amenti with all keys and an
+    /// enlightened/ascended mind grants the ascension blessing. Sets <see cref="NearTemple"/>.
+    /// </summary>
     public void CheckTempleProximity(List<Temple> temples)
     {
         if (SimulationTime - _lastTempleCheck < 1f) return;
@@ -258,6 +295,11 @@ public partial class Ship
         _lastTempleCheck = SimulationTime;
     }
 
+    /// <summary>
+    /// Tests whether the ship is riding any ley line this frame (point-to-segment distance within
+    /// <see cref="GameConstants.LeyLineWidth"/>) and announces entering/leaving. Sets
+    /// <see cref="OnLeyLine"/> / <see cref="CurrentLeyLine"/> for the speed boost applied elsewhere.
+    /// </summary>
     public void CheckLeyLineProximity(List<LeyLine> leyLines)
     {
         bool wasOnLeyLine = OnLeyLine;
@@ -289,6 +331,10 @@ public partial class Ship
         }
     }
 
+    /// <summary>
+    /// Scans for a nearby pyramid (within the effective scan range) and announces entering/leaving its
+    /// resonance chamber. Sets <see cref="NearPyramid"/>, which feeds the consciousness boost.
+    /// </summary>
     public void CheckPyramidProximity(List<Pyramid> pyramids)
     {
         bool wasNear = NearPyramid != null;
@@ -317,10 +363,15 @@ public partial class Ship
         }
     }
 
-    // =========================================================================
-    //  CONSCIOUSNESS & BRAINWAVE
-    // =========================================================================
+    #endregion
 
+    #region Consciousness & Brainwave
+
+    /// <summary>
+    /// Per-frame consciousness drift: rises while average resonance is high, falls while it is low,
+    /// and gains extra inside a tuned pyramid chamber. Promotes/demotes the
+    /// <see cref="ConsciousnessStage"/> as thresholds are crossed and announces each change once.
+    /// </summary>
     public void UpdateConsciousness(float dt)
     {
         float avgRes = Vec5.Mean(ResonanceLevels);
@@ -368,6 +419,11 @@ public partial class Ship
         }
     }
 
+    /// <summary>
+    /// Maps the current drive frequencies onto a brainwave band (Delta/Theta/Alpha/Beta/Gamma) and,
+    /// on entering a new band, announces it and applies its effect (e.g. auto-repair). Falls back to
+    /// Beta when no band matches.
+    /// </summary>
     public void DetectBrainwaveState()
     {
         foreach (var (stateName, stateInfo) in GameConstants.BrainwaveStates)
@@ -398,10 +454,15 @@ public partial class Ship
             CurrentBrainwave = BrainwaveState.Beta;
     }
 
-    // =========================================================================
-    //  HARMONIC DETECTION
-    // =========================================================================
+    #endregion
 
+    #region Harmonic Detection
+
+    /// <summary>
+    /// Examines every pair of drive frequencies and reports the musical interval (octave, fifth,
+    /// golden ratio, etc.) each pair currently forms, keyed by interval + dimension pair.
+    /// </summary>
+    /// <returns>A map of detected harmonics for this frame, consumed by <see cref="ApplyHarmonicBonuses"/>.</returns>
     public Dictionary<string, HarmonicInfo> DetectHarmonicRelationships()
     {
         var detected = new Dictionary<string, HarmonicInfo>();
@@ -421,6 +482,12 @@ public partial class Ship
         return detected;
     }
 
+    /// <summary>
+    /// Refreshes the set of active harmonics from this frame's detections, announcing and chiming any
+    /// newly formed interval, then applies each still-active harmonic's ongoing gameplay bonus and
+    /// expires the ones whose duration has elapsed.
+    /// </summary>
+    /// <param name="harmonics">The harmonics detected this frame (from <see cref="DetectHarmonicRelationships"/>).</param>
     public void ApplyHarmonicBonuses(Dictionary<string, HarmonicInfo> harmonics)
     {
         if (harmonics.Count == 0) return;
@@ -490,10 +557,14 @@ public partial class Ship
         foreach (string k in toRemove) ActiveHarmonics.Remove(k);
     }
 
-    // =========================================================================
-    //  ASCENSION
-    // =========================================================================
+    #endregion
 
+    #region Ascension
+
+    /// <summary>
+    /// The endgame transition: resets position to the origin, switches on Golden Harmony, flags the
+    /// universe for regeneration, clears rifts and sounds, and broadcasts the ascension event.
+    /// </summary>
     public void Ascend()
     {
         DebugLogger.Log("Ship", $"ASCENSION triggered with {CrystalsCollected} crystals");
@@ -507,10 +578,15 @@ public partial class Ship
         GameEvents.RaiseAscension(this);
     }
 
-    // =========================================================================
-    //  RIFT ENTRY
-    // =========================================================================
+    #endregion
 
+    #region Rift Entry
+
+    /// <summary>
+    /// Warps the ship through a rift: jitters the position by a golden-ratio-scaled offset, applies
+    /// the rift kind's payoff (crystal gain, integrity damage, or a perfect-fifth crystal bonus),
+    /// then silences and removes the rift and clears any lock targeting it.
+    /// </summary>
     public void EnterRift(Rift rift)
     {
         DebugLogger.Log("Ship", $"Entering rift: type={rift.RiftKind}, pos={Vec5.Format(rift.Position)}");
@@ -538,6 +614,7 @@ public partial class Ship
         StopLockSound();
     }
 
+    /// <summary>Silences and releases the active target-lock loop sound, if one is playing.</summary>
     private void StopLockSound()
     {
         if (LockSound != null)
@@ -547,4 +624,6 @@ public partial class Ship
             LockSound = null;
         }
     }
+
+    #endregion
 }

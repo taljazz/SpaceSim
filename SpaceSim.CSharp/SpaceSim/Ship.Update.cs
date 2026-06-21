@@ -11,13 +11,23 @@ namespace SpaceSim;
 
 public partial class Ship
 {
-    // =========================================================================
-    //  MAIN UPDATE
-    // =========================================================================
+    #region Main update
 
+    /// <summary>
+    /// The per-frame heartbeat of the ship — run once each tick while the player is flying.
+    ///
+    /// <para>
+    /// It walks through the whole simulation in order: sensing nearby Atlantean structures,
+    /// letting the surrounding universe pull the target frequencies around, running the autopilot,
+    /// turning resonance into velocity, applying all the Atlantean systems (Merkaba, Solfeggio,
+    /// temples, Tuaoi modes), spawning and ageing rifts, moving the ship, and finally handling
+    /// landing and autosave. While a menu is open the whole thing is skipped.
+    /// </para>
+    /// </summary>
     public void Update(float dt, List<CelestialBody> celestialBodies, KeyboardState keys,
                        List<Temple>? temples, List<LeyLine>? leyLines, List<Pyramid>? pyramids)
     {
+        // Time freezes while the player is reading a menu — no physics, no audio motion.
         if (IsInMenuMode) return;
 
         // Atlantean structure proximity
@@ -55,6 +65,8 @@ public partial class Ship
         }
 
         // Environmental influence on targets (uses spatial grid for O(small) instead of O(810))
+        // Nearby celestial bodies tug each dimension's target frequency away from its base value,
+        // so where you are in the universe changes what you must tune to.
         Array.Clear(_envInfluence);
         if (SpatialGrid != null)
             SpatialGrid.GetNearby(Position, GameConstants.InteractionDistance, _nearbyBuffer);
@@ -65,12 +77,14 @@ public partial class Ship
             if (LockedTarget != null)
             {
                 // Skip influence from locked target
+                // (otherwise it would fight the autopilot that's steering us toward it).
                 bool isLocked = true;
                 for (int d = 0; d < N; d++)
                     if (MathF.Abs(body.Position[d] - LockedTarget[d]) > 0.001f) { isLocked = false; break; }
                 if (isLocked) continue;
             }
 
+            // Measure per-dimension distance; a body only influences dimensions it's actually close in.
             bool anyClose = false;
             for (int d = 0; d < N; d++)
             {
@@ -81,11 +95,14 @@ public partial class Ship
             {
                 for (int d = 0; d < N; d++)
                 {
+                    // Closer = stronger pull, scaled by the body's frequency and a golden-ratio weight
+                    // that grows with the dimension index (higher realms feel the body more strongly).
                     if (_dists[d] < GameConstants.InteractionDistance)
                         _envInfluence[d] += (GameConstants.InteractionDistance - _dists[d]) / GameConstants.InteractionDistance * body.Frequency * MathF.Pow(PHI, d);
                 }
             }
         }
+        // Final target = the dimension's base target plus everything pulling on it, clamped to the legal band.
         for (int i = 0; i < N; i++)
         {
             FTarget[i] = BaseFTarget[i] + _envInfluence[i];
@@ -119,19 +136,24 @@ public partial class Ship
             }
             else
             {
+                // Ease off as we approach: full speed far out, tapering to a crawl near the target.
                 float slowdownFactor = MathF.Min(1f, norm / GameConstants.SlowdownDist);
                 for (int i = 0; i < N; i++)
                 {
+                    // Work out the velocity we'd like in this dimension, then the resonance (and hence the
+                    // drive frequency) that produces it — this is the inverse of the resonance->velocity rule.
                     float dirI = _dirVecBuffer[i];
                     float desiredVelI = (dirI / norm) * MaxVelocity * slowdownFactor;
                     float targetRes = MathF.Abs(desiredVelI) > 0.01f ? MathF.Min(0.999f, MathF.Abs(desiredVelI) / MaxVelocity) : 0;
                     float targetDrive = ResonancePhysics.DriveForTargetResonance(
                         FTarget[i], targetRes, ResonanceWidth, MathF.Sign(desiredVelI));
 
+                    // Snap straight to the drive frequency when very close; otherwise glide toward it.
                     if (norm < GameConstants.SlowdownDist / 2f)
                         RDrive[i] = targetDrive;
                     else
                     {
+                        // Navigation mode tunes faster (its rate multiplies the glide speed).
                         float autopilotRate = 0.1f;
                         if (TuaoiMode == TuaoiMode.Navigation)
                             autopilotRate *= _cachedTuaoiInfo.Rate;
@@ -177,23 +199,31 @@ public partial class Ship
         }
 
         // Calculate resonance and velocity
+        // This is the core of how the ship moves. For each dimension: how closely the drive matches
+        // the target sets the resonance (0..1), and resonance times max speed (in the direction of
+        // the frequency offset) sets the velocity.
         for (int i = 0; i < N; i++)
         {
+            // df is the frequency offset; its sign is the direction of travel in this dimension.
             float df = RDrive[i] - FTarget[i];
             float effectiveWidth = ResonanceWidth;
+            // Transcendence mode makes the two higher realms (dims 4 & 5) more forgiving to tune.
             if (TuaoiMode == TuaoiMode.Transcendence && i >= 3)
                 effectiveWidth *= GameConstants.TuaoiModes[TuaoiMode.Transcendence].Rate;
             ResonanceLevels[i] = ResonancePhysics.Resonance(df, effectiveWidth);
 
+            // Play a satisfying click the instant a dimension crosses into "perfect" resonance.
             if (ResonanceLevels[i] > GameConstants.PerfectResonanceThreshold &&
                 _prevResonanceLevels[i] <= GameConstants.PerfectResonanceThreshold)
                 GameEvents.RaisePlaySound(this, _audio.ClickWaveform, volume: _audio.EffectVolume);
 
+            // Hold a dimension in tune and "power" builds over time; lose tune and it resets.
             if (ResonanceLevels[i] > GameConstants.PowerBuildThreshold)
                 ResonancePower[i] += dt;
             else
                 ResonancePower[i] = 0;
 
+            // Sustained power adds a golden-ratio boost on top of the base resonance-driven speed.
             float boost = 1f + (ResonancePower[i] / GameConstants.PowerBuildTime) * PHI;
             Velocity[i] = MaxVelocity * ResonanceLevels[i] * MathF.Sign(df) * boost;
         }
@@ -255,6 +285,8 @@ public partial class Ship
         }
 
         // Merkaba activation
+        // When every single dimension is above the threshold at once, the light-vehicle field
+        // engages (and collapses again the moment any dimension drops out).
         bool allAbove = Vec5.All(ResonanceLevels, r => r > GameConstants.MerkabaActivationThreshold);
         if (allAbove && !MerkabaActive)
         {
@@ -347,6 +379,8 @@ public partial class Ship
         else EasterEggAnnounced = false;
 
         // Random rift generation
+        // While flying in near-perfect resonance, rifts occasionally open nearby. The higher-dimension
+        // coordinates are placed on the golden spiral relative to x/y.
         if (Random.Shared.NextSingle() < 0.001f && avgRes > 0.9f)
         {
             var riftPos = new float[N];
@@ -389,6 +423,9 @@ public partial class Ship
         }
 
         // Update rifts
+        // Age each one, fade out and remove the expired ones (clearing any lock and silencing its
+        // hum), keep the survivors' spatial sound panned, beep the locked rift, and jostle the ship
+        // if it tries to enter without enough resonance. Iterate backwards so we can remove in place.
         for (int i = Rifts.Count - 1; i >= 0; i--)
         {
             var rift = Rifts[i];
@@ -410,6 +447,7 @@ public partial class Ship
                 continue;
             }
 
+            // Flying in high resonance feeds the rift, extending its lifetime by a golden-ratio amount.
             if (avgRes > 0.9f) rift.Timer += dt * PHI;
 
             float dist = rift.DistanceTo(Position);
@@ -444,6 +482,8 @@ public partial class Ship
         }
 
         // Update position with wrap
+        // Each axis wraps into [-100, 100] so the universe is a seamless torus (fly off one edge and
+        // reappear on the opposite side). The double-modulo keeps it correct for negative coordinates too.
         for (int i = 0; i < N; i++)
         {
             Position[i] += Velocity[i] * dt;
@@ -614,11 +654,13 @@ public partial class Ship
         }
 
         // Landing timer
+        // When the countdown started by the L key runs out, decide success or failure.
         if (LandingTimer > 0)
         {
             LandingTimer -= dt;
             if (LandingTimer <= 0)
             {
+                // Harder worlds demand higher average resonance to anchor (difficulty scales the bar).
                 float landingThreshold = GameConstants.LandingThreshold;
                 if (NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
                     landingThreshold *= NearestBody.Difficulty;
@@ -651,10 +693,13 @@ public partial class Ship
         }
 
         // Autosave
+        // Persist the game at a fixed interval so progress survives a crash or quit.
         if (AutosaveEnabled && SimulationTime - _lastAutosaveTime > GameConstants.AutosaveInterval)
         {
             SaveGame();
             _lastAutosaveTime = SimulationTime;
         }
     }
+
+    #endregion
 }

@@ -3,6 +3,11 @@ using System.Runtime.InteropServices;
 
 namespace SpaceSim;
 
+/// <summary>
+/// Raw P/Invoke bindings to Tolk.dll, the screen-reader abstraction library. Tolk talks to whatever
+/// reader is running (NVDA, JAWS, SAPI fallback). Use <see cref="TolkSpeechService"/> rather than
+/// calling these directly.
+/// </summary>
 internal static class TolkNative
 {
     private const string DllName = "Tolk.dll";
@@ -32,11 +37,17 @@ internal static class TolkNative
     internal static extern bool Tolk_HasSpeech();
 }
 
+/// <summary>
+/// Friendly wrapper over <see cref="TolkNative"/>. Loads Tolk on construction and, if no screen
+/// reader is available, gracefully falls back to writing speech to the console so the game stays
+/// usable everywhere.
+/// </summary>
 public sealed class TolkSpeechService : IDisposable
 {
     private readonly bool _isActive;
     private bool _disposed;
 
+    /// <summary>Loads Tolk (with SAPI fallback) and records whether speech output is available.</summary>
     public TolkSpeechService()
     {
         try
@@ -51,8 +62,10 @@ public sealed class TolkSpeechService : IDisposable
         }
     }
 
+    /// <summary>True if a real screen reader is driving output (false means console fallback).</summary>
     public bool IsScreenReaderActive => _isActive;
 
+    /// <summary>Speak <paramref name="text"/>; <paramref name="interrupt"/> cuts off any current speech.</summary>
     public void Speak(string text, bool interrupt = false)
     {
         if (_isActive)
@@ -61,12 +74,14 @@ public sealed class TolkSpeechService : IDisposable
             Console.WriteLine(text);
     }
 
+    /// <summary>Stop any speech currently being read out.</summary>
     public void Silence()
     {
         if (_isActive)
             TolkNative.Tolk_Silence();
     }
 
+    /// <summary>Unloads Tolk on shutdown (no-op if it was never active).</summary>
     public void Dispose()
     {
         if (_disposed) return;

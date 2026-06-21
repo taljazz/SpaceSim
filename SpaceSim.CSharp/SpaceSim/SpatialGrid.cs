@@ -12,19 +12,27 @@ namespace SpaceSim;
 /// </summary>
 public class SpatialGrid
 {
+    #region Grid layout
+
     private const float CellSize = 25f;
     private const int GridDim = 8; // 200 / 25
     private const float WorldOffset = 100f; // shifts [-100, 100] to [0, 200]
     private const int TotalCells = GridDim * GridDim;
 
+    /// <summary>Flat GridDim×GridDim array of buckets; each holds the bodies hashed into that cell.</summary>
     private readonly List<CelestialBody>[] _cells;
 
+    /// <summary>Allocates the cell buckets once, pre-sized for a typical body count.</summary>
     public SpatialGrid()
     {
         _cells = new List<CelestialBody>[TotalCells];
         for (int i = 0; i < TotalCells; i++)
             _cells[i] = new List<CelestialBody>(16); // pre-size for typical load
     }
+
+    #endregion
+
+    #region Build & query
 
     /// <summary>
     /// Rebuild the grid from scratch. Call once per frame after positions are updated.
@@ -66,6 +74,13 @@ public class SpatialGrid
         }
     }
 
+    #endregion
+
+    #region Cell math
+
+    // Map a world coordinate to a wrapped cell index along one axis. The double-modulo keeps the
+    // result in [0, GridDim) even for negative coordinates.
+
     private static int CellX(float x)
     {
         int c = (int)MathF.Floor((x + WorldOffset) / CellSize);
@@ -78,8 +93,11 @@ public class SpatialGrid
         return ((c % GridDim) + GridDim) % GridDim;
     }
 
+    /// <summary>Flat bucket index for a position, hashed on dimensions 0 and 1.</summary>
     private static int CellIndex(float[] pos)
     {
         return CellY(pos[1]) * GridDim + CellX(pos[0]);
     }
+
+    #endregion
 }

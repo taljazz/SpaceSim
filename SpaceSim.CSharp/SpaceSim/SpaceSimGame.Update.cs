@@ -10,6 +10,13 @@ namespace SpaceSim;
 
 public partial class SpaceSimGame
 {
+    #region Game loop
+
+    /// <summary>
+    /// The per-frame game loop: reads input, handles global keys (exit, fullscreen, renderer
+    /// toggle, zoom, camera orbit), advances celestial mechanics and the ship, regenerates the
+    /// universe after a rift transit, and updates audio and camera.
+    /// </summary>
     protected override void Update(GameTime gameTime)
     {
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
@@ -147,6 +154,11 @@ public partial class SpaceSimGame
         base.Update(gameTime);
     }
 
+    #endregion
+
+    #region Rendering
+
+    /// <summary>Clears the screen, draws the world via the active renderer, then overlays the HUD text.</summary>
     protected override void Draw(GameTime gameTime)
     {
         // Clear screen
@@ -169,15 +181,20 @@ public partial class SpaceSimGame
         base.Draw(gameTime);
     }
 
-    // =========================================================================
-    //  HELPERS
-    // =========================================================================
+    #endregion
 
+    #region Helpers
+
+    /// <summary>True only on the frame a key transitions from up to down (edge-triggered).</summary>
     private bool IsKeyPressed(KeyboardState current, Keys key)
     {
         return current.IsKeyDown(key) && !_prevKeyState.IsKeyDown(key);
     }
 
+    /// <summary>
+    /// (Re)generate the entire universe and store the results in the world-data fields.
+    /// Called at startup and again after a rift transit to spawn a fresh universe.
+    /// </summary>
     private void GenerateUniverse()
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -195,6 +212,7 @@ public partial class SpaceSimGame
             $"{_temples.Count} temples, {_leyLines.Count} ley lines, {_pyramids.Count} pyramids");
     }
 
+    /// <summary>Pushes the current world-data lists (and zoom) into both renderers so they draw the latest universe.</summary>
     private void UpdateRendererWorldData()
     {
         _renderer3D.Stars = _stars;
@@ -237,4 +255,6 @@ public partial class SpaceSimGame
                 _audio.ClickWaveform, volume: 0.3f * avgResonance));
         }
     }
+
+    #endregion
 }

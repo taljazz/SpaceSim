@@ -11,10 +11,21 @@ namespace SpaceSim;
 
 public partial class Ship
 {
-    // =========================================================================
-    //  INPUT HANDLING
-    // =========================================================================
+    #region Input Handling
 
+    /// <summary>
+    /// The per-frame keyboard/mouse dispatcher — the single place every player action enters the
+    /// game. Reads the current and previous device state (so it can tell a fresh key-press from a
+    /// held key), then routes to the right behaviour: menu navigation when a menu is open, otherwise
+    /// the full flight/tuning/exploration control set.
+    /// </summary>
+    /// <param name="keys">This frame's keyboard snapshot.</param>
+    /// <param name="prevKeys">Last frame's keyboard snapshot, used for edge (just-pressed) detection.</param>
+    /// <param name="mouse">This frame's mouse snapshot (used for the zoom wheel).</param>
+    /// <param name="prevMouse">Last frame's mouse snapshot, used to measure scroll-wheel delta.</param>
+    /// <param name="stars">Star bodies (passed through for context-sensitive actions).</param>
+    /// <param name="planets">Planet bodies (passed through for context-sensitive actions).</param>
+    /// <param name="nebulae">Nebula bodies (passed through for context-sensitive actions).</param>
     public void HandleInput(KeyboardState keys, KeyboardState prevKeys,
                             MouseState mouse, MouseState prevMouse,
                             List<CelestialBody> stars, List<CelestialBody> planets,
@@ -46,7 +57,11 @@ public partial class Ship
         bool ctrlPressed = keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl);
         bool altPressed = keys.IsKeyDown(Keys.LeftAlt) || keys.IsKeyDown(Keys.RightAlt);
 
+        #region Number keys (presets / dimension select)
+
         // --- Number keys ---
+        // 1-9 are overloaded by modifier: Ctrl = save preset, Shift = recall preset,
+        // bare 1-5 = pick which dimension the Up/Down tuning keys act on.
         Keys[] numKeys = { Keys.D1, Keys.D2, Keys.D3, Keys.D4, Keys.D5, Keys.D6, Keys.D7, Keys.D8, Keys.D9 };
         for (int idx = 0; idx < numKeys.Length; idx++)
         {
@@ -102,6 +117,10 @@ public partial class Ship
             }
         }
 
+        #endregion
+
+        #region Single-press action keys
+
         // --- Single press keys ---
         if (IsKeyPressed(Keys.J))
         {
@@ -138,6 +157,10 @@ public partial class Ship
 
         if (IsKeyPressed(Keys.Q))
             Speak($"Target in selected dim: {FTarget[SelectedDim]:F2} Hz.");
+
+        #endregion
+
+        #region Landing, takeoff, status & menus
 
         // Landing
         if (IsKeyPressed(Keys.L) && !LandedMode && !ctrlPressed)
@@ -196,6 +219,10 @@ public partial class Ship
                 OpenMenu(new HudMenuMode(this));
         }
 
+        #endregion
+
+        #region Rift interaction
+
         // Rift interaction
         if (IsKeyPressed(Keys.E) && !LandedMode)
         {
@@ -223,6 +250,10 @@ public partial class Ship
                     Speak("No Harmonic Chambers detected.");
             }
         }
+
+        #endregion
+
+        #region Speed, save/load & Atlantean actions
 
         // Speed mode toggle
         if (IsKeyPressed(Keys.Z) && !TuningMode)
@@ -257,6 +288,10 @@ public partial class Ship
         if (IsKeyPressed(Keys.I) && !LandedMode && !IntentionActive)
             StartIntentionNavigation();
 
+        #endregion
+
+        #region Landed-mode controls (crystal grid)
+
         // Landed-mode specific
         if (LandedMode)
         {
@@ -280,6 +315,10 @@ public partial class Ship
                 }
             }
         }
+
+        #endregion
+
+        #region Volume & water blessing
 
         // Volume controls
         HandleVolumeKeys(keys, prevKeys, shiftPressed, ctrlPressed, altPressed, IsKeyPressed);
@@ -307,6 +346,10 @@ public partial class Ship
                 _spacebarHoldTimer = 0f;
             }
         }
+
+        #endregion
+
+        #region Frequency tuning (Up/Down)
 
         // Tuning with Up/Down
         float rate = LandedMode ? GameConstants.TuningRatePlanet : GameConstants.TuningRate;
@@ -351,6 +394,10 @@ public partial class Ship
         {
             Speak("Spatial dimension tuning locked in manual mode. Toggle with J for full access.");
         }
+
+        #endregion
+
+        #region View rotation & manual navigation
 
         // Rotation (disabled on planet)
         if (LandedMode)
@@ -400,6 +447,10 @@ public partial class Ship
             }
         }
 
+        #endregion
+
+        #region Zoom
+
         // Zoom (mouse wheel)
         int scrollDelta = mouse.ScrollWheelValue - prevMouse.ScrollWheelValue;
         if (scrollDelta != 0)
@@ -415,8 +466,18 @@ public partial class Ship
             ZoomLevel = MathF.Max(ZoomLevel - GameConstants.ZoomStep, GameConstants.ZoomMin);
         if (IsKeyPressed(Keys.OemPipe) || IsKeyPressed(Keys.OemBackslash)) // backslash
             ZoomLevel = 1f;
+
+        #endregion
     }
 
+    #endregion
+
+    #region Menu & volume input helpers
+
+    /// <summary>
+    /// Routes input to the currently open <see cref="MenuMode"/>: its exit key closes it, Up/Down
+    /// move the highlight (wrapping), Enter selects, and the menu may claim extra keys of its own.
+    /// </summary>
     private void HandleMenuInput(Func<Keys, bool> IsKeyPressed)
     {
         if (ActiveMenu == null) return;
@@ -437,6 +498,10 @@ public partial class Ship
         ActiveMenu.HandleExtraKeys(IsKeyPressed);
     }
 
+    /// <summary>
+    /// Handles the +/- volume keys. The active modifier picks which mixer level moves: Alt = drive,
+    /// Shift = beeps, Ctrl = effects, none = master. Each step is 1% and the new level is announced.
+    /// </summary>
     private void HandleVolumeKeys(KeyboardState keys, KeyboardState prevKeys,
                                    bool shift, bool ctrl, bool alt,
                                    Func<Keys, bool> IsKeyPressed)
@@ -456,4 +521,6 @@ public partial class Ship
             else { _audio.MasterVolume = MathF.Max(0f, _audio.MasterVolume - 0.01f); Speak($"Master volume at {(int)(_audio.MasterVolume * 100)} percent."); }
         }
     }
+
+    #endregion
 }

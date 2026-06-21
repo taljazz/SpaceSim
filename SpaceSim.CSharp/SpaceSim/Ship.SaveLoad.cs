@@ -11,14 +11,18 @@ namespace SpaceSim;
 
 public partial class Ship
 {
-    // =========================================================================
-    //  SAVE / LOAD
-    // =========================================================================
+    #region Save / load
 
+    /// <summary>
+    /// Serialize the player's progress (position, drive state, crystals, upgrades, consciousness,
+    /// temple keys, portal anchors, and accessibility settings) to <c>savegame.json</c>. Mutable
+    /// arrays and collections are cloned so the snapshot can't be altered by later play.
+    /// </summary>
     public void SaveGame()
     {
         try
         {
+            // Snapshot everything worth persisting; clone arrays/dicts so the save is a frozen copy.
             var state = new SaveGameState
             {
                 Position = Vec5.Clone(Position),
@@ -64,6 +68,11 @@ public partial class Ship
         }
     }
 
+    /// <summary>
+    /// Restore progress from <c>savegame.json</c> back onto this ship, then flag the universe for
+    /// regeneration so the world matches the loaded position. Missing or corrupt saves are reported
+    /// to the player rather than throwing.
+    /// </summary>
     public void LoadGame()
     {
         try
@@ -77,6 +86,7 @@ public partial class Ship
             var state = JsonSerializer.Deserialize<SaveGameState>(json);
             if (state == null) { Speak("Save file corrupted."); return; }
 
+            // Copy saved values back onto the live ship; Array.Copy fills the existing N-length buffers.
             Array.Copy(state.Position, Position, N);
             Array.Copy(state.Velocity, Velocity, N);
             Array.Copy(state.RDrive, RDrive, N);
@@ -107,6 +117,7 @@ public partial class Ship
             AmbientSoundsEnabled = state.AmbientSoundsEnabled;
             NebulaDissonanceEnabled = state.NebulaDissonanceEnabled;
 
+            // Rebuild celestial bodies around the restored position on the next update.
             NeedsUniverseRegeneration = true;
             Speak("Game loaded.");
             DebugLogger.Log("Save", $"Game loaded: pos={Vec5.Format(Position)}, crystals={CrystalsCollected}, consciousness={ConsciousnessStage}");
@@ -117,4 +128,6 @@ public partial class Ship
             DebugLogger.LogError("Save", "LoadGame failed", ex);
         }
     }
+
+    #endregion
 }

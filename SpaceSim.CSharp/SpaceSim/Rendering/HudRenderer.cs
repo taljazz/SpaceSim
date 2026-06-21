@@ -11,6 +11,8 @@ namespace SpaceSim.Rendering;
 /// </summary>
 public static class HudRenderer
 {
+    #region Colors
+
     /// <summary>
     /// The color used for the currently selected menu item.
     /// </summary>
@@ -20,6 +22,10 @@ public static class HudRenderer
     /// The default text color for HUD and menu items.
     /// </summary>
     private static readonly Color DefaultColor = Color.White;
+
+    #endregion
+
+    #region Public entry point
 
     /// <summary>
     /// Draws the HUD overlay. Renders menu items when in a menu mode,
@@ -33,6 +39,8 @@ public static class HudRenderer
     public static void DrawHud(SpriteBatch spriteBatch, SpriteFont font, Ship ship, int screenW, int screenH)
     {
         int textSize = ship.HudTextSize;
+        // Scale the font relative to the baseline size so the player's text-size
+        // preference enlarges/shrinks the whole HUD proportionally.
         float scale = textSize / (float)GameConstants.HudTextSizeBase;
         int lineHeight = textSize + 5;
         int x = 10;
@@ -48,6 +56,10 @@ public static class HudRenderer
         // Normal gameplay HUD
         DrawHudItems(spriteBatch, font, ship.HudItems, x, y, lineHeight, scale);
     }
+
+    #endregion
+
+    #region Menu & HUD item drawing
 
     /// <summary>
     /// Draws a list of menu items with the selected item highlighted in green.
@@ -106,4 +118,6 @@ public static class HudRenderer
                 0f);
         }
     }
+
+    #endregion
 }

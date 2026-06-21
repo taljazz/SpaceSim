@@ -6,6 +6,9 @@ namespace SpaceSim;
 /// and compile-time safety.
 /// </summary>
 
+#region Celestial bodies
+
+/// <summary>The three kinds of object that make up the procedural universe.</summary>
 public enum CelestialBodyType
 {
     Star,
@@ -13,6 +16,7 @@ public enum CelestialBodyType
     Nebula
 }
 
+/// <summary>Stellar evolution class — drives a star's color, frequency, and ambient sound.</summary>
 public enum StellarType
 {
     MainSequence,
@@ -21,6 +25,7 @@ public enum StellarType
     BrownDwarf
 }
 
+/// <summary>Nebula classification — drives color, frequency band, and dissonance.</summary>
 public enum NebulaType
 {
     Emission,
@@ -29,6 +34,7 @@ public enum NebulaType
     SupernovaRemnant
 }
 
+/// <summary>Exoplanet classification — drives size, crystal yield, and landing difficulty.</summary>
 public enum ExoplanetType
 {
     HotJupiter,
@@ -38,6 +44,11 @@ public enum ExoplanetType
     IceGiant
 }
 
+#endregion
+
+#region Atlantean systems & navigation
+
+/// <summary>The six faces of the Tuaoi Crystal — press G to cycle; each grants a different tactical bonus.</summary>
 public enum TuaoiMode
 {
     Healing,
@@ -48,12 +59,14 @@ public enum TuaoiMode
     Transcendence
 }
 
+/// <summary>Whether a temple is one of the 12 zodiac (minor) temples or the central master temple.</summary>
 public enum TempleType
 {
     Minor,
     Master
 }
 
+/// <summary>What a rift does when the player charges into it (a plain warp, a reward, a hazard, …).</summary>
 public enum RiftType
 {
     Normal,
@@ -63,6 +76,7 @@ public enum RiftType
     PerfectFifth
 }
 
+/// <summary>The player's awareness tier — rises with sustained high resonance and scales all stats.</summary>
 public enum ConsciousnessLevel
 {
     Dormant,
@@ -73,6 +87,7 @@ public enum ConsciousnessLevel
     Ascended
 }
 
+/// <summary>Consciousness state inferred from drive frequency, from deep delta to transcendent gamma.</summary>
 public enum BrainwaveState
 {
     Delta,
@@ -82,12 +97,14 @@ public enum BrainwaveState
     Gamma
 }
 
+/// <summary>Whether a planet's surface is welcoming (harmonic) or hostile (dissonant).</summary>
 public enum PlanetBiome
 {
     Harmonic,
     Dissonant
 }
 
+/// <summary>The musical interval detected between two dimensions' frequencies, each with its own bonus.</summary>
 public enum HarmonicType
 {
     Octave,
@@ -100,6 +117,10 @@ public enum HarmonicType
     Tritone,
     Golden
 }
+
+#endregion
+
+#region Patterns, UI & reserved
 
 /// <summary>Sacred-geometry crystal layouts that can appear on a landed planet.</summary>
 public enum SacredGeometryPattern
@@ -168,3 +189,5 @@ public enum CymaticsPattern
     Spiral,
     Merkaba
 }
+
+#endregion

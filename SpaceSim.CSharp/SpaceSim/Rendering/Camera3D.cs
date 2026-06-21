@@ -10,6 +10,8 @@ namespace SpaceSim.Rendering;
 /// </summary>
 public class Camera3D
 {
+    #region Orbit state (yaw / pitch / zoom)
+
     /// <summary>
     /// Horizontal orbit angle around the ship in radians.
     /// Controlled by Left/Right arrow keys (replaces Python's view_rotation).
@@ -47,6 +49,10 @@ public class Camera3D
     /// </summary>
     public const float MaxZoom = 150f;
 
+    #endregion
+
+    #region Computed matrices & positions
+
     /// <summary>
     /// The world-space position the camera is looking at (the ship).
     /// </summary>
@@ -69,6 +75,10 @@ public class Camera3D
 
     private float _aspectRatio = 4f / 3f;
 
+    #endregion
+
+    #region Per-frame update
+
     /// <summary>
     /// Updates the camera based on the ship's 5D position.
     /// Uses the first 3 components as 3D world-space coordinates.
@@ -84,6 +94,8 @@ public class Camera3D
         float pitchRad = MathHelper.ToRadians(PitchAngle);
 
         // Camera offset: behind the ship at yaw angle, elevated by pitch
+        // Split the orbit distance into horizontal/vertical legs using pitch (the
+        // elevation angle), then spread the horizontal leg around the yaw circle.
         float horizontalDist = ZoomDistance * MathF.Cos(pitchRad);
         float verticalDist = ZoomDistance * MathF.Sin(pitchRad);
 
@@ -94,8 +106,13 @@ public class Camera3D
         Position = Target + new Vector3(offsetX, offsetY, offsetZ);
 
         // Build view and projection matrices
+        // (view looks from the orbited camera position back at the ship).
         ViewMatrix = Matrix.CreateLookAt(Position, Target, Vector3.Up);
     }
+
+    #endregion
+
+    #region Projection & input controls
 
     /// <summary>
     /// Updates the projection matrix. Call when the screen size changes.
@@ -104,6 +121,7 @@ public class Camera3D
     /// <param name="screenH">Screen height.</param>
     public void UpdateProjection(int screenW, int screenH)
     {
+        // Recompute aspect ratio from the live viewport (guard against a zero-height window).
         _aspectRatio = screenH > 0 ? (float)screenW / screenH : 4f / 3f;
         ProjectionMatrix = Matrix.CreatePerspectiveFieldOfView(
             MathHelper.ToRadians(60f),
@@ -140,4 +158,6 @@ public class Camera3D
     {
         ZoomDistance = MathHelper.Clamp(ZoomDistance + delta, MinZoom, MaxZoom);
     }
+
+    #endregion
 }

@@ -11,10 +11,16 @@ namespace SpaceSim;
 
 public partial class Ship
 {
-    // =========================================================================
-    //  PROXIMITY AMBIENT AUDIO HELPERS
-    // =========================================================================
+    #region Proximity ambient audio helpers
 
+    /// <summary>
+    /// Drive the looping ambient soundscape for a nearby celestial body. Picks a type-specific
+    /// waveform (red giant pulse, nebula drone, ocean-world flow, etc.) and fades its volume with
+    /// distance, so flying past objects produces a living, positional soundscape.
+    /// </summary>
+    /// <param name="body">The celestial body being approached.</param>
+    /// <param name="dist">Distance from the ship to the body, in world units.</param>
+    /// <param name="pan">Stereo pan toward the body (-1 left .. +1 right).</param>
     private void HandleProximityAmbient(CelestialBody body, float dist, float pan)
     {
         if (body.BodyType == CelestialBodyType.Star && dist < GameConstants.StarHarmonyRadius)
@@ -61,6 +67,11 @@ public partial class Ship
         }
     }
 
+    /// <summary>
+    /// Reconcile a single looping ambient slot with the desired waveform. If the slot already plays
+    /// that waveform, just refresh its pan/volume; if it plays a different one, stop the old loop and
+    /// start the new one. A null waveform leaves the slot untouched.
+    /// </summary>
     private void UpdateAmbientSound(ref GameSoundEffect? current, float[]? waveform, float pan, float volume)
     {
         if (waveform == null) return;
@@ -84,6 +95,7 @@ public partial class Ship
         _audio.AddSoundEffect(current);
     }
 
+    /// <summary>Stop every looping proximity ambient (star, nebula, planet) — e.g. when none are in range.</summary>
     private void StopAllAmbientSounds()
     {
         StopAmbient(ref _starSound);
@@ -91,6 +103,7 @@ public partial class Ship
         StopAmbient(ref _planetSound);
     }
 
+    /// <summary>Stop one ambient slot by ending its loop and silencing it, then clear the reference.</summary>
     private static void StopAmbient(ref GameSoundEffect? sfx)
     {
         if (sfx == null) return;
@@ -98,4 +111,6 @@ public partial class Ship
         sfx.Volume = 0;
         sfx = null;
     }
+
+    #endregion
 }

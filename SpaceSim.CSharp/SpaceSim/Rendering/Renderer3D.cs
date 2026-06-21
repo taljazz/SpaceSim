@@ -12,6 +12,8 @@ namespace SpaceSim.Rendering;
 /// </summary>
 public class Renderer3D : BaseGameRenderer
 {
+    #region Fields & initialization
+
     private Camera3D? _camera;
 
     // Rendering limits to avoid drawing too many distant objects
@@ -31,11 +33,21 @@ public class Renderer3D : BaseGameRenderer
     /// </summary>
     public void SetCamera(Camera3D camera) => _camera = camera;
 
+    /// <inheritdoc/>
     protected override void OnInitialize(ContentManager content)
     {
         // No 3D-specific initialization needed beyond what base handles
     }
 
+    #endregion
+
+    #region World drawing
+
+    /// <summary>
+    /// Draws the full 3D scene: celestial bodies, Atlantean structures, rifts, the
+    /// ship, and speed lines, using the camera's view/projection matrices. Distant
+    /// objects beyond <see cref="MaxRenderDistance"/> are culled to keep the frame cheap.
+    /// </summary>
     public override void DrawWorld(SpriteBatch spriteBatch, Ship ship, GameTime gameTime, int screenW, int screenH)
     {
         if (_camera == null)
@@ -211,14 +223,15 @@ public class Renderer3D : BaseGameRenderer
         }
     }
 
+    /// <inheritdoc/>
     public override void DrawHud(SpriteBatch spriteBatch, SpriteFont font, Ship ship, int screenW, int screenH)
     {
         // HUD drawing is handled by HudRenderer in SpaceSimGame.Draw
     }
 
-    // =========================================================================
-    //  SHIP DRAWING
-    // =========================================================================
+    #endregion
+
+    #region Ship drawing
 
     private void DrawShip(Ship ship, GameTime gameTime, Matrix view, Matrix proj)
     {
@@ -251,9 +264,9 @@ public class Renderer3D : BaseGameRenderer
         }
     }
 
-    // =========================================================================
-    //  SPEED LINES
-    // =========================================================================
+    #endregion
+
+    #region Speed lines
 
     private void DrawSpeedLines(Ship ship, GameTime gameTime, Matrix view, Matrix proj)
     {
@@ -291,9 +304,9 @@ public class Renderer3D : BaseGameRenderer
         }
     }
 
-    // =========================================================================
-    //  HELPERS (3D-specific)
-    // =========================================================================
+    #endregion
+
+    #region Helpers (3D-specific)
 
     /// <summary>
     /// Extracts the first 3 components of a 5D position as a 3D Vector3.
@@ -303,6 +316,9 @@ public class Renderer3D : BaseGameRenderer
         return new Vector3(pos5D[0], pos5D[1], pos5D[2]);
     }
 
+    /// <summary>
+    /// Squared distance between two points — avoids the sqrt for cheap proximity culling.
+    /// </summary>
     private static float DistanceSquared(Vector3 a, Vector3 b)
     {
         var d = a - b;
@@ -319,4 +335,6 @@ public class Renderer3D : BaseGameRenderer
             _ => 1.5f, // MainSequence
         };
     }
+
+    #endregion
 }

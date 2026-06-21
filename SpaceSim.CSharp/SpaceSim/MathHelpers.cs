@@ -3,8 +3,18 @@ using System.Collections.Generic;
 
 namespace SpaceSim;
 
+/// <summary>
+/// Small numeric helpers that fill in for the handful of numpy/random utilities the original Python
+/// relied on. Generic, stateless, and used all over generation and gameplay.
+/// </summary>
 public static class MathHelpers
 {
+    #region Arrays (numpy stand-ins)
+
+    /// <summary>
+    /// Evenly spaced values from <paramref name="start"/> to <paramref name="end"/> inclusive — the
+    /// equivalent of numpy's <c>linspace</c>. A <paramref name="count"/> of 1 just returns <paramref name="start"/>.
+    /// </summary>
     public static float[] Linspace(float start, float end, int count)
     {
         var result = new float[count];
@@ -19,6 +29,7 @@ public static class MathHelpers
         return result;
     }
 
+    /// <summary>Index of the smallest value in <paramref name="values"/> (first one wins on ties).</summary>
     public static int ArgMin(IList<float> values)
     {
         int minIdx = 0;
@@ -34,6 +45,7 @@ public static class MathHelpers
         return minIdx;
     }
 
+    /// <summary>Index of the largest value in <paramref name="values"/> (first one wins on ties).</summary>
     public static int ArgMax(float[] values)
     {
         int maxIdx = 0;
@@ -49,6 +61,14 @@ public static class MathHelpers
         return maxIdx;
     }
 
+    #endregion
+
+    #region Random
+
+    /// <summary>
+    /// Picks a key at random, weighted by its associated probability (the values should sum to ~1).
+    /// Used to roll celestial types from their distribution tables.
+    /// </summary>
     public static TEnum WeightedRandomChoice<TEnum>(Dictionary<TEnum, float> probabilities, Random? rng = null) where TEnum : notnull
     {
         rng ??= Random.Shared;
@@ -66,15 +86,24 @@ public static class MathHelpers
         return last;
     }
 
+    /// <summary>A uniform random float in the half-open range [<paramref name="min"/>, <paramref name="max"/>).</summary>
     public static float RandomRange(float min, float max, Random? rng = null)
     {
         rng ??= Random.Shared;
         return min + rng.NextSingle() * (max - min);
     }
 
+    #endregion
+
+    #region Scalar
+
+    /// <summary>Clamp <paramref name="value"/> into [<paramref name="min"/>, <paramref name="max"/>].</summary>
     public static float Clamp(float value, float min, float max)
         => Math.Clamp(value, min, max);
 
+    /// <summary>Linear interpolation from <paramref name="a"/> to <paramref name="b"/> by fraction <paramref name="t"/>.</summary>
     public static float Lerp(float a, float b, float t)
         => a + (b - a) * t;
+
+    #endregion
 }

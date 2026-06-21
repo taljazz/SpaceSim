@@ -6,9 +6,7 @@ namespace SpaceSim;
 
 public partial class AudioSystem
 {
-    // ========================================================================
-    //  ISampleProvider.Read  -- the audio callback
-    // ========================================================================
+    #region ISampleProvider.Read -- the audio callback
 
     /// <summary>
     /// Called by NAudio on the audio thread. Fills the interleaved stereo buffer [L,R,L,R,...].
@@ -207,25 +205,27 @@ public partial class AudioSystem
         return count;
     }
 
-    // ========================================================================
-    //  Vibrato helper
-    // ========================================================================
+    #endregion
+
+    #region Vibrato helper
 
     /// <summary>
     /// Compute vibrato phase offset from two LFOs modulated by golden ratio.
     /// </summary>
     private static float GetVibratoPhase(float t, float resLevel)
     {
+        // Higher resonance => deeper, faster vibrato. depth/rate lerp linearly with resLevel.
         float depth = 0.25f + (1.1f - 0.25f) * resLevel;
         float rate = 3.4f + (4.3f - 3.4f) * resLevel;
+        // Primary LFO plus a quieter PHI-detuned LFO for a richer, organic warble.
         float lfo1 = MathF.Sin(TwoPi * rate * t);
         float lfo2 = 0.3f * MathF.Sin(TwoPi * rate * PHI * t);
         return depth * (lfo1 + lfo2);
     }
 
-    // ========================================================================
-    //  Harmonic pair detection
-    // ========================================================================
+    #endregion
+
+    #region Harmonic pair detection
 
     /// <summary>
     /// Check all dimension pairs for known harmonic ratios.
@@ -242,4 +242,6 @@ public partial class AudioSystem
                 if (HarmonicMath.TryMatchRatio(rDrive[i], rDrive[j], out var hType))
                     result.Add((i, j, hType));
     }
+
+    #endregion
 }

@@ -11,10 +11,12 @@ namespace SpaceSim;
 
 public partial class Ship
 {
-    // =========================================================================
-    //  UPGRADE APPLY
-    // =========================================================================
+    #region Upgrade apply
 
+    /// <summary>
+    /// Apply the upgrade highlighted in the attunement menu, spending its crystal cost. Does nothing
+    /// (beyond an "insufficient crystals" announcement) when the player can't afford it.
+    /// </summary>
     internal void ApplyUpgrade()
     {
         var upgrade = _upgrades[HudIndex];
@@ -30,9 +32,9 @@ public partial class Ship
         }
     }
 
-    // =========================================================================
-    //  HUD / STARMAP / RIFT MENUS
-    // =========================================================================
+    #endregion
+
+    #region HUD / starmap / rift menus
 
     /// <summary>Open a menu: make it active, build its rows, select the first, and announce it.</summary>
     private void OpenMenu(MenuMode menu)
@@ -43,16 +45,24 @@ public partial class Ship
         menu.SpeakCurrent();
     }
 
+    /// <summary>
+    /// Rebuild the rows shown by the status/upgrade menu. When <paramref name="upgrade"/> is true the
+    /// rows are the purchasable attunements; otherwise they are the live ship read-out (selected realm,
+    /// frequencies, integrity, Tuaoi mode, and — when anchored — cursor position and crystals left).
+    /// </summary>
+    /// <param name="upgrade">True to list upgrades, false to list the status read-out.</param>
     public void UpdateHudItems(bool upgrade = false)
     {
         HudItems.Clear();
         if (upgrade)
         {
+            // Attunement menu: one row per upgrade, showing its description and crystal cost.
             foreach (var u in _upgrades)
                 HudItems.Add($"{u.Name}: {u.Desc} Cost: {u.Cost}");
         }
         else
         {
+            // Status read-out: a snapshot of the ship's current resonance/navigation state.
             HudItems.Add($"Selected Realm: {SelectedDim + 1}");
             HudItems.Add($"Drive Freq: {RDrive[SelectedDim]:F2} Hz");
             HudItems.Add($"Target Freq: {FTarget[SelectedDim]:F2} Hz");
@@ -78,12 +88,18 @@ public partial class Ship
         }
     }
 
+    /// <summary>Announce the currently highlighted status/upgrade row via the screen reader.</summary>
     internal void SpeakHudItem()
     {
         if (HudItems.Count == 0) return;
         Speak(HudItems[HudIndex]);
     }
 
+    /// <summary>
+    /// Rebuild the starmap scanner list: every star, planet, nebula, and rift within scanner range,
+    /// each labelled with its type, distance, and bearing, then sorted nearest-first. Prepends an
+    /// "Unlock target" row when a non-rift target is currently locked, and a placeholder when empty.
+    /// </summary>
     public void UpdateStarmapItems(List<CelestialBody> stars, List<CelestialBody> planets, List<CelestialBody> nebulae)
     {
         StarmapItems.Clear();
@@ -146,6 +162,7 @@ public partial class Ship
             }
         }
 
+        // Present nearest objects first so the most relevant targets are at the top of the list.
         items.Sort((a, b) => a.Dist.CompareTo(b.Dist));
         foreach (var (_, item) in items)
             StarmapItems.Add(item);
@@ -154,12 +171,17 @@ public partial class Ship
             StarmapItems.Add(new StarmapItem { Label = "No objects in scanner range." });
     }
 
+    /// <summary>Announce the currently highlighted starmap row via the screen reader.</summary>
     internal void SpeakStarmapItem()
     {
         if (StarmapItems.Count == 0) return;
         Speak(StarmapItems[StarmapIndex].Label);
     }
 
+    /// <summary>
+    /// Act on the highlighted starmap row: either unlock the current target, or lock onto the selected
+    /// object — starting a looping homing beep (rift-flavoured for rifts) for audio navigation.
+    /// </summary>
     internal void LockOnStarmapItem()
     {
         var sel = StarmapItems[StarmapIndex];
@@ -188,6 +210,10 @@ public partial class Ship
         Speak($"Locked on to {name}.");
     }
 
+    /// <summary>
+    /// Rebuild the rift-selection list: every known rift labelled with its kind, distance, and bearing,
+    /// sorted nearest-first. Prepends an "Unlock rift" row when a rift is locked, placeholder when empty.
+    /// </summary>
     public void UpdateRiftItems()
     {
         RiftItems.Clear();
@@ -210,12 +236,17 @@ public partial class Ship
             RiftItems.Add(new RiftMenuItem { Label = "No rifts detected." });
     }
 
+    /// <summary>Announce the currently highlighted rift row via the screen reader.</summary>
     internal void SpeakRiftItem()
     {
         if (RiftItems.Count == 0) return;
         Speak(RiftItems[RiftSelectionIndex].Label);
     }
 
+    /// <summary>
+    /// Act on the highlighted rift row: either unlock the current rift, or lock onto the selected one —
+    /// starting the looping rift homing beep for audio navigation toward the harmonic chamber.
+    /// </summary>
     internal void LockOnRiftItem()
     {
         var sel = RiftItems[RiftSelectionIndex];
@@ -242,4 +273,6 @@ public partial class Ship
         string name = sel.Label.Contains(" at") ? sel.Label[..sel.Label.IndexOf(" at")] : sel.Label;
         Speak($"Locked on to {name} for beeping and navigation.");
     }
+
+    #endregion
 }

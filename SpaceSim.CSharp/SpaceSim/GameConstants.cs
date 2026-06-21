@@ -7,29 +7,53 @@ namespace SpaceSim;
 
 /// <summary>
 /// All game constants, mirroring constants.py from the Python version.
+///
+/// <para>
+/// This is the single source of truth for every tunable number in the simulator — physics,
+/// audio, celestial generation, and the whole Atlantean layer (Solfeggio tones, crystals,
+/// temples, ley lines, pyramids, consciousness). Nothing here is hardcoded elsewhere, so a
+/// value changed here changes it everywhere. The members are grouped into <c>#region</c>
+/// blocks by theme so you can find a knob without scrolling the whole file.
+/// </para>
+///
+/// <para>
+/// The golden ratio <see cref="PHI"/> threads through nearly every section — positioning,
+/// audio overtones, upgrade costs, sacred geometry — because resonance and proportion are the
+/// game's core conceit.
+/// </para>
 /// </summary>
 public static class GameConstants
 {
-    // Core dimensions and display
+    #region Core dimensions and display
+
     public const int NDimensions = 5;
     public const int ScreenWidth = 800;
     public const int ScreenHeight = 600;
     public const int Fps = 60;
     public const float Dt = 1f / Fps;
 
-    // Physics constants
+    #endregion
+
+    #region Physics constants
+
     public const float MaxVelocityBase = 10f;
     public const float ResonanceWidthBase = 10f;
     public const float FrequencyMin = 110f;
     public const float FrequencyMax = 963f;
     public const float PHI = 1.6180339887f; // Golden ratio
 
-    // Audio settings
+    #endregion
+
+    #region Audio settings
+
     public const int SampleRate = 44100;
     public const float SchumannFreq = 7.83f;
     public const float SchumannVolume = 0.01f;
 
-    // Celestial body generation
+    #endregion
+
+    #region Celestial body generation
+
     public const int NStars = 200;
     public const int NPlanetsPerStar = 3;
     public const int NNebulae = 10;
@@ -37,34 +61,52 @@ public static class GameConstants
     public const float PlanetRadius = 10f;
     public const float InteractionDistance = 15f;
 
+    #endregion
+
+    #region Fibonacci sequence and derived costs
+
     // Fibonacci sequence (F(0) through F(NFibonacci-1))
     // FibSeq is used for celestial/crystal positioning; UpgradeCosts is derived from it (F(1)..F(8))
     public const int NFibonacci = 9; // 0,1,1,2,3,5,8,13,21
+    /// <summary>Fibonacci sequence F(0)..F(NFibonacci-1), built in the static constructor. Drives spiral positioning scales.</summary>
     public static readonly int[] FibSeq;
+    /// <summary>Scale factor that maps the largest Fibonacci term onto ~100 world units. Built in the static constructor.</summary>
     public static readonly float ScaleFactor;
 
-    // Speech and audio feedback
+    #endregion
+
+    #region Speech and audio feedback
+
     public const float SpeechCooldown = 0.5f;
     public const float ViewLandmarkThreshold = 10f;
     public const float RotationSoundDuration = 0.2f;
     public const float LandmarkSpeechCooldown = 1f;
     public const float CursorSpeechCooldown = 0.2f;
 
-    // Landing and planet exploration
+    #endregion
+
+    #region Landing and planet exploration
+
     public const float LandingThreshold = 0.8f;
     public const float LandingTime = 3f;
     public const int CrystalCountBase = 3;
     public const int GridSize = 10;
     public const float CrystalCollectionThreshold = 0.8f;
 
-    // Resonance and power mechanics
+    #endregion
+
+    #region Resonance and power mechanics
+
     public const float PowerBuildThreshold = 0.8f;
     public const float PowerBuildTime = 5f;
     public const float DissonanceThreshold = 0.2f;
     public const float DissonanceDuration = 10f;
     public const float PerfectResonanceThreshold = 0.999f;
 
-    // Rift mechanics
+    #endregion
+
+    #region Rift mechanics
+
     public const float RiftAlignmentTolerance = 20f;
     public const float RiftFadeTime = 30f;
     public const float RiftEntryResThreshold = 0.6f;
@@ -76,15 +118,26 @@ public static class GameConstants
     public const float PerfectFifthTolerance = 0.5f;
     public const float PerfectFifthProb = 0.0001f;
 
-    // UI and display
+    #endregion
+
+    #region UI and display
+
     public const int HudTextSizeBase = 24;
     public const float ClickInterval = 0.5f;
 
+    #endregion
+
+    #region Upgrades and progression
+
     // Upgrades and progression — derived from FibSeq: F(1) through F(8)
+    /// <summary>Crystal cost per upgrade tier, F(1)..F(8) = {1,1,2,3,5,8,13,21}. Built in the static constructor.</summary>
     public static readonly int[] UpgradeCosts;
     public const int AscensionCrystalThreshold = 21;
 
-    // Navigation and tuning
+    #endregion
+
+    #region Navigation and tuning
+
     public const float RotationSpeed = 3f;
     public const float TuningRate = 100f;
     public const float TuningRatePlanet = 20f;
@@ -93,16 +146,27 @@ public static class GameConstants
     public const float AutoSnapThreshold = 0.5f;
     public const float ApproachingLockThreshold = 10f;
 
-    // Speed modes
+    #endregion
+
+    #region Speed modes
+
+    /// <summary>Velocity scaling for each speed mode (Approach / Cruise / Quantum).</summary>
     public static readonly float[] SpeedFactors = { 0.3f, 0.6f, 1f };
+    /// <summary>Display names for the speed modes, indexed in lockstep with <see cref="SpeedFactors"/>.</summary>
     public static readonly string[] SpeedModeNames = { "Approach", "Cruise", "Quantum" };
 
-    // Celestial body effects
+    #endregion
+
+    #region Celestial body effects
+
     public const float StarHarmonyRadius = 12f;
     public const float StarMaxBenefitRadius = 6f;
     public const float NebulaDissonanceRadius = 10f;
 
-    // Special mechanics
+    #endregion
+
+    #region Special mechanics
+
     public const float IdleTimeThreshold = 120f;
     public const float PitchRecordDuration = 1f;
     public const float EasterEggFreq = 432f;
@@ -115,13 +179,20 @@ public static class GameConstants
     public const float SingSilenceThreshold = 4f;
     public const float HeartbeatVolume = 0.1f;
 
-    // Zoom
+    #endregion
+
+    #region Zoom
+
     public const float ZoomMin = 0.2f;
     public const float ZoomMax = 5f;
     public const float ZoomStep = 0.1f;
 
-    // Harmonic relationship system
+    #endregion
+
+    #region Harmonic relationship system
+
     public const float HarmonicTolerance = 0.02f;
+    /// <summary>Frequency ratios for each detectable musical interval. A pair of dimensions whose frequencies match one of these (within <see cref="HarmonicTolerance"/>) triggers that harmonic's bonus.</summary>
     public static readonly Dictionary<HarmonicType, float> HarmonicRatios = new()
     {
         [HarmonicType.Octave] = 2f,
@@ -138,13 +209,20 @@ public static class GameConstants
     public const float HarmonicBonusDuration = 2f;
     public const float HarmonicBonusMultiplier = 1.15f;
 
-    // Harmonic series settings
+    #endregion
+
+    #region Harmonic series settings
+
     public const int NHarmonics = 7;
     public const float HarmonicFalloff = 1.5f;
     public const float SubharmonicDepth = 0.15f;
     public const float IntermodDepth = 0.08f;
 
-    // Stellar types
+    #endregion
+
+    #region Stellar types
+
+    /// <summary>Per-stellar-class data (color, frequency multiplier, description, ambient audio range).</summary>
     public static readonly Dictionary<StellarType, StellarTypeInfo> StellarTypes = new()
     {
         [StellarType.MainSequence] = new(new Color(255, 255, 200), 1f, "stable hydrogen-burning star", 200f, 400f),
@@ -152,6 +230,7 @@ public static class GameConstants
         [StellarType.WhiteDwarf] = new(new Color(200, 220, 255), 1.8f, "dense stellar core", 1200f, 1500f),
         [StellarType.BrownDwarf] = new(new Color(100, 50, 30), 0.3f, "failed star", 20f, 30f),
     };
+    /// <summary>Spawn weights for each stellar class (sum to 1.0).</summary>
     public static readonly Dictionary<StellarType, float> StellarTypeProbabilities = new()
     {
         [StellarType.MainSequence] = 0.70f,
@@ -160,7 +239,11 @@ public static class GameConstants
         [StellarType.BrownDwarf] = 0.05f,
     };
 
-    // Nebula types
+    #endregion
+
+    #region Nebula types
+
+    /// <summary>Per-nebula-class data (color, frequency range, dissonance level, description).</summary>
     public static readonly Dictionary<NebulaType, NebulaTypeInfo> NebulaTypes = new()
     {
         [NebulaType.Emission] = new(new Color(255, 50, 50), 200f, 300f, 0.5f, "ionized gas cloud"),
@@ -168,6 +251,7 @@ public static class GameConstants
         [NebulaType.Planetary] = new(new Color(150, 255, 150), 400f, 600f, 0.4f, "dying star shell"),
         [NebulaType.SupernovaRemnant] = new(new Color(255, 150, 100), 100f, 900f, 0.9f, "expanding blast wave"),
     };
+    /// <summary>Spawn weights for each nebula class (sum to 1.0).</summary>
     public static readonly Dictionary<NebulaType, float> NebulaTypeProbabilities = new()
     {
         [NebulaType.Emission] = 0.40f,
@@ -176,7 +260,11 @@ public static class GameConstants
         [NebulaType.SupernovaRemnant] = 0.10f,
     };
 
-    // Exoplanet types
+    #endregion
+
+    #region Exoplanet types
+
+    /// <summary>Per-exoplanet-class data (size multiplier, crystal multiplier, landing difficulty, description).</summary>
     public static readonly Dictionary<ExoplanetType, ExoplanetTypeInfo> ExoplanetTypes = new()
     {
         [ExoplanetType.HotJupiter] = new(3f, 0.5f, 1.5f, "scorching gas giant"),
@@ -185,6 +273,7 @@ public static class GameConstants
         [ExoplanetType.RoguePlanet] = new(1f, 2f, 2f, "sunless wanderer"),
         [ExoplanetType.IceGiant] = new(2.5f, 0.8f, 1.3f, "frozen methane world"),
     };
+    /// <summary>Spawn weights for each exoplanet class (sum to 1.0).</summary>
     public static readonly Dictionary<ExoplanetType, float> ExoplanetTypeProbabilities = new()
     {
         [ExoplanetType.SuperEarth] = 0.35f,
@@ -194,7 +283,11 @@ public static class GameConstants
         [ExoplanetType.RoguePlanet] = 0.05f,
     };
 
-    // Solfeggio Frequencies
+    #endregion
+
+    #region Solfeggio Frequencies
+
+    /// <summary>The ten sacred Solfeggio tones (keyed by Hz). Tuning a drive within <see cref="SolfeggioTolerance"/> of one grants its effect.</summary>
     public static readonly Dictionary<int, SolfeggioInfo> SolfeggioFrequencies = new()
     {
         [174] = new("Foundation", SolfeggioEffect.PainRelief, "natural anesthetic", "shield", 1.1f),
@@ -210,7 +303,11 @@ public static class GameConstants
     };
     public const float SolfeggioTolerance = 5f;
 
-    // Crystal Color Spectrum
+    #endregion
+
+    #region Crystal Color Spectrum
+
+    /// <summary>Crystal types keyed by name, each mapping a frequency band to a chakra color and gameplay bonus.</summary>
     public static readonly Dictionary<string, CrystalSpectrumInfo> CrystalSpectrum = new()
     {
         ["ruby"] = new(110f, 285f, new Color(220, 20, 60), "root", "stability", 1.2f),
@@ -222,20 +319,30 @@ public static class GameConstants
         ["quartz"] = new(741f, 963f, new Color(255, 255, 255), "crown", "universal", 1.1f),
     };
 
-    // Temple Resonance
+    #endregion
+
+    #region Temple Resonance
+
     public const float TempleResonanceFreq = 110f;
     public static readonly (float Min, float Max) TempleResonanceRange = (95f, 120f);
     public const int TempleCount = 7;
     public const float TempleHealingRate = 0.02f;
     public const float TempleConsciousnessBoost = 1.5f;
 
-    // Merkaba Activation
+    #endregion
+
+    #region Merkaba Activation
+
     public const float MerkabaActivationThreshold = 0.9f;
     public const float MerkabaShieldStrength = 0.5f;
     public const float MerkabaVelocityBoost = 1.3f;
     public const float MerkabaDetectionRange = 2f;
 
-    // Tuaoi Crystal Modes
+    #endregion
+
+    #region Tuaoi Crystal Modes
+
+    /// <summary>The six faces of the Tuaoi Stone, each a selectable drive mode with its own frequency, color, and effect.</summary>
     public static readonly Dictionary<TuaoiMode, TuaoiModeInfo> TuaoiModes = new()
     {
         [TuaoiMode.Healing] = new(432f, new Color(0, 255, 128), "integrity_regen", 0.01f, "Atlantean healing frequency"),
@@ -245,17 +352,27 @@ public static class GameConstants
         [TuaoiMode.Regeneration] = new(285f, new Color(200, 100, 255), "resonance_recovery", 1.3f, "Cellular regeneration frequency"),
         [TuaoiMode.Transcendence] = new(963f, new Color(255, 255, 200), "higher_dim_sensitivity", 1.4f, "Divine connection frequency"),
     };
+    /// <summary>Cycle order for the G key, defining the index that <see cref="TuaoiModeInfoByIndex"/> follows.</summary>
     public static readonly TuaoiMode[] TuaoiModeOrder = { TuaoiMode.Healing, TuaoiMode.Navigation, TuaoiMode.Communication, TuaoiMode.Power, TuaoiMode.Regeneration, TuaoiMode.Transcendence };
+    /// <summary>Tuaoi mode info pre-flattened into <see cref="TuaoiModeOrder"/> order for fast indexed lookup. Built in the static constructor.</summary>
     public static readonly TuaoiModeInfo[] TuaoiModeInfoByIndex;
     public const float TuaoiModeSwitchCooldown = 2f;
 
-    // Halls of Amenti
+    #endregion
+
+    #region Halls of Amenti
+
     public const float AmentiResonanceThreshold = 0.95f;
     public const float AmentiTimeDilation = 0.5f;
     public const float AmentiWisdomBonus = 2f;
+    /// <summary>World position of the master temple — the universe center (origin).</summary>
     public static readonly float[] HallsOfAmentiPos = Vec5.Zero();
 
-    // Sacred Geometry Patterns
+    #endregion
+
+    #region Sacred Geometry Patterns
+
+    /// <summary>Crystal-arrangement patterns keyed by name, each with its point count and completion bonus.</summary>
     public static readonly Dictionary<SacredGeometryPattern, SacredPatternInfo> SacredPatterns = new()
     {
         [SacredGeometryPattern.VesicaPiscis] = new(2, "creation", 1.2f),
@@ -266,7 +383,11 @@ public static class GameConstants
         [SacredGeometryPattern.GoldenSpiral] = new(5, "phi_stacking", PHI),
     };
 
-    // Brainwave States
+    #endregion
+
+    #region Brainwave States
+
+    /// <summary>Consciousness states keyed by brainwave band, each detected by frequency and granting an effect.</summary>
     public static readonly Dictionary<BrainwaveState, BrainwaveStateInfo> BrainwaveStates = new()
     {
         [BrainwaveState.Delta] = new(0.5f, 4f, "deep_healing", BrainwaveEffect.AutoRepair, 2f),
@@ -276,7 +397,11 @@ public static class GameConstants
         [BrainwaveState.Gamma] = new(30f, 100f, "transcendence", BrainwaveEffect.AllBonus, 1.4f),
     };
 
-    // Atlantean Terminology
+    #endregion
+
+    #region Atlantean Terminology
+
+    /// <summary>Plain-English to Atlantean word substitutions used to flavor screen-reader announcements.</summary>
     public static readonly Dictionary<string, string> AtlanteanTerms = new()
     {
         ["rift"] = "Harmonic Chamber",
@@ -295,47 +420,69 @@ public static class GameConstants
         ["ship"] = "Light Vehicle",
     };
 
-    // Ley Line Highways
+    #endregion
+
+    #region Ley Line Highways
+
     public const int LeyLineCount = 12;
     public const float LeyLineSpeedMult = 3f;
     public const float LeyLineWidth = 8f;
     public const float LeyLineDetectionRange = 25f;
     public const float LeyLineFreq = 432f;
 
-    // Portal Anchor System
+    #endregion
+
+    #region Portal Anchor System
+
     public const int MaxPortalAnchors = 7;
     public const int PortalAnchorCost = 3;
     public const float PortalTravelResonance = 0.85f;
     public const float PortalCooldown = 30f;
 
-    // Crystal Activation Sequences
+    #endregion
+
+    #region Crystal Activation Sequences
+
     public const int ActivationSequenceLength = 5;
+    /// <summary>The frequency sequence (Hz) that must be played in order to trigger a crystal activation bonus.</summary>
     public static readonly int[] ActivationFrequencies = { 396, 417, 528, 639, 741 };
     public const float ActivationTolerance = 8f;
     public const float ActivationTimeLimit = 30f;
     public const float ActivationRewardMult = 2f;
 
-    // 12+1 Temple System
+    #endregion
+
+    #region 12+1 Temple System
+
     public const int MinorTempleCount = 12;
+    /// <summary>Zodiac names for the 12 minor temple keys, indexed in lockstep with <see cref="TempleKeyFrequencies"/>.</summary>
     public static readonly string[] TempleKeyNames =
     {
         "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
         "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
     };
+    /// <summary>Resonance frequency (Hz) for each zodiac temple, indexed in lockstep with <see cref="TempleKeyNames"/>.</summary>
     public static readonly int[] TempleKeyFrequencies =
     {
         396, 417, 432, 444, 480, 512, 528, 576, 594, 639, 672, 741
     };
     public const int MasterTempleUnlockKeys = 12;
 
-    // Pyramid Resonance Chambers
+    #endregion
+
+    #region Pyramid Resonance Chambers
+
     public const float PyramidResonanceFreq = 118f;
     public static readonly (float Min, float Max) PyramidResonanceRange = (117f, 121f);
     public const float PyramidHealingMult = 3f;
     public const float PyramidConsciousnessBoost = 2f;
     public const int PyramidCount = 3;
 
-    // Atlantean Crystal Types
+    #endregion
+
+    #region Atlantean Crystal Types
+
+    /// <summary>Rare special crystals keyed by name, each with a color, frequency band, unique effect, and lore description.</summary>
     public static readonly Dictionary<string, AtlanteanCrystalTypeInfo> AtlanteanCrystalTypes = new()
     {
         ["fire_crystal"] = new(new Color(255, 69, 0), 200f, 300f, CrystalEffect.VelocityBurst, 2f, "Volcanic energy crystal from Atlantean forges"),
@@ -348,7 +495,11 @@ public static class GameConstants
     };
     public const float AtlanteanCrystalChance = 0.15f;
 
-    // Consciousness Level System
+    #endregion
+
+    #region Consciousness Level System
+
+    /// <summary>The six consciousness tiers, each with the resonance threshold to reach it and a stat multiplier.</summary>
     public static readonly Dictionary<ConsciousnessLevel, ConsciousnessLevelInfo> ConsciousnessLevels = new()
     {
         [ConsciousnessLevel.Dormant] = new(0f, 1f, "Unawakened state"),
@@ -358,25 +509,36 @@ public static class GameConstants
         [ConsciousnessLevel.Enlightened] = new(0.85f, 1.8f, "Mastery of harmonic navigation"),
         [ConsciousnessLevel.Ascended] = new(0.95f, 2f, "One with the universal frequency"),
     };
+    /// <summary>Low-to-high ordering of consciousness tiers, used to detect level-up/level-down transitions.</summary>
     public static readonly ConsciousnessLevel[] ConsciousnessLevelOrder = { ConsciousnessLevel.Dormant, ConsciousnessLevel.Awakening, ConsciousnessLevel.Aware, ConsciousnessLevel.Attuned, ConsciousnessLevel.Enlightened, ConsciousnessLevel.Ascended };
     public const float ConsciousnessGainRate = 0.001f;
     public const float ConsciousnessDecayRate = 0.0005f;
 
-    // Astral Projection Mode
+    #endregion
+
+    #region Astral Projection Mode
+
     public const float AstralProjectionResonance = 0.9f;
     public const float AstralProjectionRange = 200f;
     public const float AstralSpeedMult = 5f;
     public const float AstralDuration = 30f;
     public const float AstralCooldown = 60f;
 
-    // Intention-Based Navigation
+    #endregion
+
+    #region Intention-Based Navigation
+
     public const float IntentionActivationTime = 5f;
     public const float IntentionResonanceThreshold = 0.8f;
     public const float IntentionRange = 100f;
     public const float IntentionPrecision = 0.9f;
 
-    // Cymatics Visualization
+    #endregion
+
+    #region Cymatics Visualization
+
     public const bool CymaticsEnabled = true;
+    /// <summary>Cymatic figures keyed by name, each mapping a frequency band to a symmetry value for visualization.</summary>
     public static readonly Dictionary<CymaticsPattern, CymaticsPatternInfo> CymaticsPatterns = new()
     {
         [CymaticsPattern.Hexagon] = new(200f, 300f, 6f),
@@ -387,7 +549,15 @@ public static class GameConstants
         [CymaticsPattern.Merkaba] = new(700f, 800f, 24f),
     };
 
-    // Static constructor to generate Fibonacci sequence and derived arrays
+    #endregion
+
+    #region Static initialization
+
+    /// <summary>
+    /// Static constructor — builds the runtime-computed tables: the Fibonacci sequence and the
+    /// arrays derived from it (<see cref="UpgradeCosts"/>, <see cref="ScaleFactor"/>), plus the
+    /// flattened <see cref="TuaoiModeInfoByIndex"/> lookup.
+    /// </summary>
     static GameConstants()
     {
         FibSeq = new int[NFibonacci];
@@ -407,4 +577,6 @@ public static class GameConstants
         for (int i = 0; i < TuaoiModeOrder.Length; i++)
             TuaoiModeInfoByIndex[i] = TuaoiModes[TuaoiModeOrder[i]];
     }
+
+    #endregion
 }

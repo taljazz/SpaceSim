@@ -15,7 +15,7 @@ public partial class Ship
     //  UPGRADE APPLY
     // =========================================================================
 
-    private void ApplyUpgrade()
+    internal void ApplyUpgrade()
     {
         var upgrade = _upgrades[HudIndex];
         if (CrystalsCollected >= upgrade.Cost)
@@ -33,6 +33,15 @@ public partial class Ship
     // =========================================================================
     //  HUD / STARMAP / RIFT MENUS
     // =========================================================================
+
+    /// <summary>Open a menu: make it active, build its rows, select the first, and announce it.</summary>
+    private void OpenMenu(MenuMode menu)
+    {
+        ActiveMenu = menu;
+        menu.Populate();
+        menu.SelectedIndex = 0;
+        menu.SpeakCurrent();
+    }
 
     public void UpdateHudItems(bool upgrade = false)
     {
@@ -69,7 +78,7 @@ public partial class Ship
         }
     }
 
-    private void SpeakHudItem()
+    internal void SpeakHudItem()
     {
         if (HudItems.Count == 0) return;
         Speak(HudItems[HudIndex]);
@@ -145,13 +154,13 @@ public partial class Ship
             StarmapItems.Add(new StarmapItem { Label = "No objects in scanner range." });
     }
 
-    private void SpeakStarmapItem()
+    internal void SpeakStarmapItem()
     {
         if (StarmapItems.Count == 0) return;
         Speak(StarmapItems[StarmapIndex].Label);
     }
 
-    private void LockOnStarmapItem()
+    internal void LockOnStarmapItem()
     {
         var sel = StarmapItems[StarmapIndex];
         if (sel.IsUnlockAction)
@@ -201,13 +210,13 @@ public partial class Ship
             RiftItems.Add(new RiftMenuItem { Label = "No rifts detected." });
     }
 
-    private void SpeakRiftItem()
+    internal void SpeakRiftItem()
     {
         if (RiftItems.Count == 0) return;
         Speak(RiftItems[RiftSelectionIndex].Label);
     }
 
-    private void LockOnRiftItem()
+    internal void LockOnRiftItem()
     {
         var sel = RiftItems[RiftSelectionIndex];
         if (sel.IsUnlockAction)

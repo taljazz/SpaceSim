@@ -90,8 +90,10 @@ public partial class Ship
     // Debounce flags (replaced by edge-detection via prevKeys)
     // (No longer needed as individual flags; we use IsKeyPressed pattern)
 
-    // HUD
-    public bool HudMode;
+    // Active menu (polymorphic — null when no menu is open). See MenuMode.
+    public MenuMode? ActiveMenu;
+
+    // HUD menu state (HudItems doubles as the persistent gameplay HUD read-out).
     public int HudIndex;
     public List<string> HudItems = new();
 
@@ -104,11 +106,9 @@ public partial class Ship
     private bool _approachingLockAnnounced;
 
     // Upgrades
-    public bool UpgradeMode;
     public bool GoldenHarmonyActive;
 
     // Starmap
-    public bool StarmapMode;
     public int StarmapIndex;
     public List<StarmapItem> StarmapItems = new();
     public float[]? LockedTarget;
@@ -116,7 +116,6 @@ public partial class Ship
     public bool LockedIsRift;
 
     // Rift selection
-    public bool RiftSelectionMode;
     public int RiftSelectionIndex;
     public List<RiftMenuItem> RiftItems = new();
     public Rift? LockedRift;
@@ -259,32 +258,18 @@ public partial class Ship
     //  PROPERTIES
     // =========================================================================
 
-    public bool IsInMenuMode => HudMode || UpgradeMode || StarmapMode || RiftSelectionMode;
+    public bool IsInMenuMode => ActiveMenu != null;
 
     public bool IsChargingRift => RiftChargeTimer > 0;
 
     public float RiftChargeProgress =>
         RiftChargeTimer > 0 ? 1f - RiftChargeTimer / GameConstants.RiftChargeTime : 0f;
 
-    public int MenuSelectedIndex
-    {
-        get
-        {
-            if (RiftSelectionMode) return RiftSelectionIndex;
-            if (StarmapMode) return StarmapIndex;
-            return HudIndex;
-        }
-    }
+    /// <summary>Index of the highlighted row in the active menu (0 when no menu is open).</summary>
+    public int MenuSelectedIndex => ActiveMenu?.SelectedIndex ?? 0;
 
-    public List<string> MenuItems
-    {
-        get
-        {
-            if (RiftSelectionMode) return RiftItems.Select(r => r.Label).ToList();
-            if (StarmapMode) return StarmapItems.Select(s => s.Label).ToList();
-            return HudItems;
-        }
-    }
+    /// <summary>Row labels of the active menu (empty when no menu is open).</summary>
+    public IReadOnlyList<string> MenuItems => ActiveMenu?.ItemLabels ?? Array.Empty<string>();
 
     // =========================================================================
     //  UPGRADE DEFINITIONS

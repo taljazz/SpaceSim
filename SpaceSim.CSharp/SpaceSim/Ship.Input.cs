@@ -38,7 +38,7 @@ public partial class Ship
         // --- Menu mode input ---
         if (IsInMenuMode)
         {
-            HandleMenuInput(keys, prevKeys, stars, planets, nebulae, IsKeyPressed);
+            HandleMenuInput(IsKeyPressed);
             return;
         }
 
@@ -128,17 +128,7 @@ public partial class Ship
         }
 
         if (IsKeyPressed(Keys.M))
-        {
-            StarmapMode = !StarmapMode;
-            if (StarmapMode)
-            {
-                UpdateStarmapItems(stars, planets, nebulae);
-                StarmapIndex = 0;
-                SpeakStarmapItem();
-            }
-            else
-                Speak("Exiting starmap.");
-        }
+            OpenMenu(new StarmapMenuMode(this));
 
         if (IsKeyPressed(Keys.C))
         {
@@ -199,19 +189,11 @@ public partial class Ship
         {
             if (LandedMode && LockedCrystals.Count == CrystalCount)
             {
-                UpgradeMode = true;
-                HudIndex = 0;
-                UpdateHudItems(upgrade: true);
                 Speak($"Attunement menu. {CrystalsCollected} crystals available.");
-                SpeakHudItem();
+                OpenMenu(new UpgradeMenuMode(this));
             }
             else
-            {
-                HudMode = true;
-                HudIndex = 0;
-                UpdateHudItems();
-                SpeakHudItem();
-            }
+                OpenMenu(new HudMenuMode(this));
         }
 
         // Rift interaction
@@ -236,12 +218,7 @@ public partial class Ship
             else
             {
                 if (Rifts.Count > 0)
-                {
-                    RiftSelectionMode = true;
-                    UpdateRiftItems();
-                    RiftSelectionIndex = 0;
-                    SpeakRiftItem();
-                }
+                    OpenMenu(new RiftMenuMode(this));
                 else
                     Speak("No Harmonic Chambers detected.");
             }
@@ -440,91 +417,24 @@ public partial class Ship
             ZoomLevel = 1f;
     }
 
-    private void HandleMenuInput(KeyboardState keys, KeyboardState prevKeys,
-                                  List<CelestialBody> stars, List<CelestialBody> planets,
-                                  List<CelestialBody> nebulae,
-                                  Func<Keys, bool> IsKeyPressed)
+    private void HandleMenuInput(Func<Keys, bool> IsKeyPressed)
     {
-        string mode;
-        if (RiftSelectionMode) mode = "rift";
-        else if (StarmapMode) mode = "starmap";
-        else if (UpgradeMode) mode = "upgrade";
-        else mode = "hud";
+        if (ActiveMenu == null) return;
 
-        // Exit keys
-        if (IsKeyPressed(Keys.M) && mode == "starmap") { StarmapMode = false; Speak("Exiting starmap."); }
-        else if (IsKeyPressed(Keys.E) && mode == "rift") { RiftSelectionMode = false; Speak("Exiting rift selection."); }
-        else if (IsKeyPressed(Keys.U) && (mode == "hud" || mode == "upgrade"))
+        // Each menu closes on its own exit key.
+        if (IsKeyPressed(ActiveMenu.ExitKey))
         {
-            HudMode = false; UpgradeMode = false; Speak("Exiting menu.");
+            Speak(ActiveMenu.ExitMessage);
+            ActiveMenu = null;
+            return;
         }
 
-        // Navigation
-        if (IsKeyPressed(Keys.Up))
-        {
-            if (mode is "starmap" or "rift")
-            {
-                var items = mode == "starmap" ? StarmapItems : null;
-                int count = mode == "starmap" ? StarmapItems.Count : RiftItems.Count;
-                if (count > 1)
-                {
-                    if (mode == "starmap") { StarmapIndex = (StarmapIndex - 1 + count) % count; SpeakStarmapItem(); }
-                    else { RiftSelectionIndex = (RiftSelectionIndex - 1 + count) % count; SpeakRiftItem(); }
-                }
-            }
-            else if (HudItems.Count > 1)
-            {
-                HudIndex = (HudIndex - 1 + HudItems.Count) % HudItems.Count;
-                SpeakHudItem();
-            }
-        }
-
-        if (IsKeyPressed(Keys.Down))
-        {
-            if (mode is "starmap" or "rift")
-            {
-                int count = mode == "starmap" ? StarmapItems.Count : RiftItems.Count;
-                if (count > 1)
-                {
-                    if (mode == "starmap") { StarmapIndex = (StarmapIndex + 1) % count; SpeakStarmapItem(); }
-                    else { RiftSelectionIndex = (RiftSelectionIndex + 1) % count; SpeakRiftItem(); }
-                }
-            }
-            else if (HudItems.Count > 1)
-            {
-                HudIndex = (HudIndex + 1) % HudItems.Count;
-                SpeakHudItem();
-            }
-        }
-
-        // Select
-        if (IsKeyPressed(Keys.Enter))
-        {
-            if (mode == "upgrade") ApplyUpgrade();
-            else if (mode == "starmap") LockOnStarmapItem();
-            else if (mode == "rift") LockOnRiftItem();
-        }
-
-        // First-letter jump in starmap
-        if (mode == "starmap")
-        {
-            for (Keys k = Keys.A; k <= Keys.Z; k++)
-            {
-                if (!IsKeyPressed(k)) continue;
-                char ch = (char)('a' + (k - Keys.A));
-                for (int idx = 0; idx < StarmapItems.Count; idx++)
-                {
-                    if (StarmapItems[idx].Label.Length > 0 &&
-                        char.ToLower(StarmapItems[idx].Label[0]) == ch)
-                    {
-                        StarmapIndex = idx;
-                        SpeakStarmapItem();
-                        break;
-                    }
-                }
-                break;
-            }
-        }
+        // Up/Down navigate (with wrap), Enter selects, plus any menu-specific keys
+        // (e.g. the starmap's first-letter jump).
+        if (IsKeyPressed(Keys.Up)) ActiveMenu.MoveUp();
+        if (IsKeyPressed(Keys.Down)) ActiveMenu.MoveDown();
+        if (IsKeyPressed(Keys.Enter)) ActiveMenu.Select();
+        ActiveMenu.HandleExtraKeys(IsKeyPressed);
     }
 
     private void HandleVolumeKeys(KeyboardState keys, KeyboardState prevKeys,

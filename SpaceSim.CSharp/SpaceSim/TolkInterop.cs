@@ -100,8 +100,15 @@ public sealed class TolkSpeechService : IDisposable
     /// </summary>
     public void Speak(string text, bool interrupt = false)
     {
-        if (!_queue.IsAddingCompleted)
-            _queue.TryAdd(new SpeechCommand(CommandKind.Speak, text, interrupt));
+        if (_queue.IsAddingCompleted) return;
+
+        // An interrupting message supersedes anything still waiting, so drop the stale backlog first.
+        // This keeps rapid menu navigation snappy: the worker speaks the latest item right away
+        // instead of grinding through a queue of already-stale announcements.
+        if (interrupt)
+            while (_queue.TryTake(out _)) { }
+
+        _queue.TryAdd(new SpeechCommand(CommandKind.Speak, text, interrupt));
     }
 
     /// <summary>Queue a request to stop whatever is currently being read out.</summary>

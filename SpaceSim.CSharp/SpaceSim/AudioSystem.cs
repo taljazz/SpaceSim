@@ -273,7 +273,9 @@ public partial class AudioSystem : ISampleProvider, IDisposable
         {
             _waveOut = new WaveOutEvent
             {
-                DesiredLatency = 100,
+                // Lower latency = snappier audio feedback (menu ticks, beeps) right after a keypress.
+                // 60ms is a good balance for WaveOut; raise it again if any system crackles/underruns.
+                DesiredLatency = 60,
                 NumberOfBuffers = 3,
             };
             _waveOut.Init(this);

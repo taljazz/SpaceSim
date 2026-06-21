@@ -447,8 +447,11 @@ public partial class Ship
                 continue;
             }
 
-            // Flying in high resonance feeds the rift, extending its lifetime by a golden-ratio amount.
-            if (avgRes > 0.9f) rift.Timer += dt * PHI;
+            // Flying in high resonance feeds the rift, extending its lifetime by a golden-ratio
+            // amount — but capped at the normal fade time so sustained high resonance can't grow
+            // rifts forever (which previously let them accumulate without bound).
+            if (avgRes > 0.9f)
+                rift.Timer = MathF.Min(rift.Timer + dt * PHI, GameConstants.RiftFadeTime);
 
             float dist = rift.DistanceTo(Position);
             if (rift.Sound != null)

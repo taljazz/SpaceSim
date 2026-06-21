@@ -19,7 +19,7 @@ public static class CelestialGenerator
     /// <param name="n">Number of bodies to generate.</param>
     /// <param name="bodyType">Type of celestial body: "star", "planet", or "nebula".</param>
     /// <returns>List of generated celestial bodies.</returns>
-    public static List<CelestialBody> GenerateCelestial(int n, string bodyType = "star")
+    public static List<CelestialBody> GenerateCelestial(int n, CelestialBodyType bodyType = CelestialBodyType.Star)
     {
         var bodies = new List<CelestialBody>(n);
 
@@ -42,22 +42,22 @@ public static class CelestialGenerator
             {
                 Position = pos,
                 Frequency = freq,
-                Type = bodyType
+                BodyType = bodyType
             };
 
             // Assign stellar type for stars
-            if (bodyType == "star")
+            if (bodyType == CelestialBodyType.Star)
             {
-                string stellarType = MathHelpers.WeightedRandomChoice(GameConstants.StellarTypeProbabilities);
-                body.StellarType = stellarType;
+                var stellarType = MathHelpers.WeightedRandomChoice(GameConstants.StellarTypeProbabilities);
+                body.StellarClass = stellarType;
                 // Multiply frequency by stellar type multiplier
                 body.Frequency *= GameConstants.StellarTypes[stellarType].FreqMult;
             }
             // Assign nebula type for nebulae
-            else if (bodyType == "nebula")
+            else if (bodyType == CelestialBodyType.Nebula)
             {
-                string nebulaType = MathHelpers.WeightedRandomChoice(GameConstants.NebulaTypeProbabilities);
-                body.NebulaType = nebulaType;
+                var nebulaType = MathHelpers.WeightedRandomChoice(GameConstants.NebulaTypeProbabilities);
+                body.NebulaClass = nebulaType;
                 var info = GameConstants.NebulaTypes[nebulaType];
                 // Adjust frequency to nebula type range
                 body.Frequency = MathHelpers.RandomRange(info.FreqRangeMin, info.FreqRangeMax);
@@ -79,7 +79,7 @@ public static class CelestialGenerator
     public static (List<CelestialBody> Stars, List<CelestialBody> Planets, List<CelestialBody> Nebulae, List<CelestialBody> CelestialBodies) GenerateAllCelestialBodies()
     {
         // Generate stars using golden spiral
-        var stars = GenerateCelestial(GameConstants.NStars, "star");
+        var stars = GenerateCelestial(GameConstants.NStars, CelestialBodyType.Star);
 
         // Add subtle movement properties to stars (wobble from planetary gravity)
         for (int i = 0; i < stars.Count; i++)
@@ -114,15 +114,15 @@ public static class CelestialGenerator
                 float freq = MathHelpers.RandomRange(GameConstants.FrequencyMin, GameConstants.FrequencyMax);
 
                 // Assign exoplanet type
-                string exoplanetType = MathHelpers.WeightedRandomChoice(GameConstants.ExoplanetTypeProbabilities);
+                var exoplanetType = MathHelpers.WeightedRandomChoice(GameConstants.ExoplanetTypeProbabilities);
                 var typeInfo = GameConstants.ExoplanetTypes[exoplanetType];
 
                 var planet = new CelestialBody
                 {
                     Position = pos,
                     Frequency = freq,
-                    Type = "planet",
-                    ExoplanetType = exoplanetType,
+                    BodyType = CelestialBodyType.Planet,
+                    ExoplanetClass = exoplanetType,
                     SizeMult = typeInfo.SizeMult,
                     CrystalMult = typeInfo.CrystalMult,
                     Difficulty = typeInfo.Difficulty,
@@ -138,7 +138,7 @@ public static class CelestialGenerator
         }
 
         // Generate nebulae with drift/rotation properties
-        var nebulae = GenerateCelestial(GameConstants.NNebulae, "nebula");
+        var nebulae = GenerateCelestial(GameConstants.NNebulae, CelestialBodyType.Nebula);
         for (int i = 0; i < nebulae.Count; i++)
         {
             var nebula = nebulae[i];
@@ -254,8 +254,7 @@ public static class CelestialGenerator
             {
                 Position = pos,
                 Frequency = GameConstants.TempleKeyFrequencies[i],
-                Type = "temple",
-                TempleType = "minor",
+                Kind = TempleType.Minor,
                 KeyIndex = i,
                 KeyName = GameConstants.TempleKeyNames[i]
             };
@@ -267,8 +266,7 @@ public static class CelestialGenerator
         {
             Position = Vec5.Clone(GameConstants.HallsOfAmentiPos),
             Frequency = GameConstants.TempleResonanceFreq, // 110 Hz ancient healing frequency
-            Type = "temple",
-            TempleType = "master",
+            Kind = TempleType.Master,
             KeyIndex = -1, // Special index for master temple
             KeyName = "Amenti"
         };
@@ -298,7 +296,7 @@ public static class CelestialGenerator
                 Start = Vec5.Clone(temples[i].Position),
                 End = Vec5.Clone(temples[nextI].Position),
                 Frequency = GameConstants.LeyLineFreq,
-                Type = "ley_line",
+
                 Name = $"Ley Line: {temples[i].KeyName} to {temples[nextI].KeyName}",
                 TempleIndex1 = i,
                 TempleIndex2 = nextI,
@@ -318,7 +316,7 @@ public static class CelestialGenerator
                 Start = Vec5.Clone(temples[i].Position),
                 End = Vec5.Clone(temples[oppositeI].Position),
                 Frequency = GameConstants.LeyLineFreq * GameConstants.PHI, // Higher frequency for major ley lines
-                Type = "ley_line",
+
                 Name = $"Major Ley Line: {temples[i].KeyName} to {temples[oppositeI].KeyName}",
                 TempleIndex1 = i,
                 TempleIndex2 = oppositeI,
@@ -337,7 +335,7 @@ public static class CelestialGenerator
                 Start = Vec5.Clone(temples[i].Position),
                 End = Vec5.Clone(amenti.Position),
                 Frequency = GameConstants.TempleResonanceFreq, // 110 Hz for Amenti connections
-                Type = "ley_line",
+
                 Name = $"Amenti Path: {temples[i].KeyName} to Halls of Amenti",
                 TempleIndex1 = i,
                 TempleIndex2 = -1,
@@ -386,7 +384,6 @@ public static class CelestialGenerator
             {
                 Position = pyramidPositions[i],
                 Frequency = GameConstants.PyramidResonanceFreq, // 118 Hz
-                Type = "pyramid",
                 Name = pyramidNames[i],
                 Index = i,
                 Desc = $"{pyramidNames[i]} - sacred resonance chamber at 118 Hz"

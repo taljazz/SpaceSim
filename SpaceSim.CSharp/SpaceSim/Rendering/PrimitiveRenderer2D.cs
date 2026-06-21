@@ -13,6 +13,22 @@ public static class PrimitiveRenderer2D
     private static Texture2D? _pixel;
     private static bool _initialized;
 
+    // Pre-computed unit circle points for common segment counts (avoids per-call trig)
+    private static readonly Vector2[] _unitCircle32 = PrecomputeUnitCircle(32);
+    private static readonly Vector2[] _unitCircle20 = PrecomputeUnitCircle(20);
+
+    private static Vector2[] PrecomputeUnitCircle(int segments)
+    {
+        var points = new Vector2[segments + 1];
+        float step = MathHelper.TwoPi / segments;
+        for (int i = 0; i <= segments; i++)
+        {
+            float angle = step * i;
+            points[i] = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+        }
+        return points;
+    }
+
     /// <summary>
     /// Creates the shared 1x1 white pixel texture used for all 2D primitive drawing.
     /// Must be called once after the GraphicsDevice is ready.
@@ -62,17 +78,32 @@ public static class PrimitiveRenderer2D
         if (!_initialized || _pixel == null) return;
         if (segments < 3) segments = 3;
 
-        float angleStep = MathHelper.TwoPi / segments;
+        // Use pre-computed unit circle when available, fall back to trig
+        Vector2[]? unitCircle = segments == 32 ? _unitCircle32 : segments == 20 ? _unitCircle20 : null;
 
-        Vector2 prev = center + new Vector2(radius, 0);
-        for (int i = 1; i <= segments; i++)
+        if (unitCircle != null)
         {
-            float angle = angleStep * i;
-            Vector2 current = center + new Vector2(
-                radius * MathF.Cos(angle),
-                radius * MathF.Sin(angle));
-            DrawLine(sb, prev, current, color, 1);
-            prev = current;
+            Vector2 prev = center + unitCircle[0] * radius;
+            for (int i = 1; i <= segments; i++)
+            {
+                Vector2 current = center + unitCircle[i] * radius;
+                DrawLine(sb, prev, current, color, 1);
+                prev = current;
+            }
+        }
+        else
+        {
+            float angleStep = MathHelper.TwoPi / segments;
+            Vector2 prev = center + new Vector2(radius, 0);
+            for (int i = 1; i <= segments; i++)
+            {
+                float angle = angleStep * i;
+                Vector2 current = center + new Vector2(
+                    radius * MathF.Cos(angle),
+                    radius * MathF.Sin(angle));
+                DrawLine(sb, prev, current, color, 1);
+                prev = current;
+            }
         }
     }
 

@@ -17,32 +17,43 @@ public partial class AudioSystem
     {
         int frames = count / Channels;
 
-        // --- Snapshot ship state under lock so we don't race the game thread ---
-        float[] rDrive = Vec5.Zero();
-        float[] fTarget = Vec5.Zero();
+        // --- Drain pending sound effects into active playback list ---
+        // This is the only lock in the audio callback, held for microseconds (just a list swap).
+        if (_clearAllFlag) { _activePlayback.Clear(); _clearAllFlag = false; }
+        if (_clearLoopingFlag) { _activePlayback.RemoveAll(sfx => sfx.Loop); _clearLoopingFlag = false; }
+        if (_clearFinishedFlag) { _activePlayback.RemoveAll(sfx => sfx.IsFinished); _clearFinishedFlag = false; }
+        lock (_pendingLock)
+        {
+            if (_pendingSfx.Count > 0)
+            {
+                _activePlayback.AddRange(_pendingSfx);
+                _pendingSfx.Clear();
+            }
+        }
+
+        // --- Snapshot ship state (volatile read, no lock needed) ---
+        Array.Clear(_snapRDrive);
+        Array.Clear(_snapFTarget);
         float resonanceWidth = GameConstants.ResonanceWidthBase;
         bool isCharging = false;
         float chargeProgress = 0f;
-        List<(int, int, string)>? harmonicPairs = null;
+        bool hasHarmonicPairs = false;
 
-        Ship? ship;
-        lock (_lock)
-        {
-            ship = _ship;
-        }
+        Ship? ship = _ship; // volatile read
 
         if (ship != null)
         {
-            // Copy volatile ship state
+            // Copy volatile ship state into pre-allocated buffers
             for (int i = 0; i < NDimensions; i++)
             {
-                rDrive[i] = ship.RDrive[i];
-                fTarget[i] = ship.FTarget[i];
+                _snapRDrive[i] = ship.RDrive[i];
+                _snapFTarget[i] = ship.FTarget[i];
             }
             resonanceWidth = ship.ResonanceWidth;
             isCharging = ship.IsChargingRift;
             chargeProgress = ship.RiftChargeProgress;
-            harmonicPairs = DetectHarmonicPairs(rDrive);
+            DetectHarmonicPairs(_harmonicPairsBuffer, _snapRDrive);
+            hasHarmonicPairs = _harmonicPairsBuffer.Count > 0;
         }
 
         double audioTimeStart = _audioTime;
@@ -63,11 +74,11 @@ public partial class AudioSystem
             {
                 for (int dim = 0; dim < NDimensions; dim++)
                 {
-                    float baseFreq = rDrive[dim] / 2f;
+                    float baseFreq = _snapRDrive[dim] / 2f;
                     if (baseFreq < 1f) continue;
 
-                    float delta = MathF.Abs(rDrive[dim] - fTarget[dim]);
-                    float resLevel = 1f / (1f + (delta / resonanceWidth) * (delta / resonanceWidth));
+                    float delta = MathF.Abs(_snapRDrive[dim] - _snapFTarget[dim]);
+                    float resLevel = ResonancePhysics.Resonance(delta, resonanceWidth);
 
                     float vibratoPhase = GetVibratoPhase(t, resLevel);
 
@@ -101,12 +112,12 @@ public partial class AudioSystem
                 }
 
                 // --- 3. Intermodulation tones for harmonic pairs ---
-                if (harmonicPairs != null)
+                if (hasHarmonicPairs)
                 {
-                    foreach (var (dimA, dimB, _) in harmonicPairs)
+                    foreach (var (dimA, dimB, _) in _harmonicPairsBuffer)
                     {
-                        float freqA = rDrive[dimA] / 2f;
-                        float freqB = rDrive[dimB] / 2f;
+                        float freqA = _snapRDrive[dimA] / 2f;
+                        float freqB = _snapRDrive[dimB] / 2f;
                         if (freqA < 1f || freqB < 1f) continue;
 
                         float sumFreq = freqA + freqB;
@@ -133,36 +144,33 @@ public partial class AudioSystem
                 }
             }
 
-            // --- 5. Mix active sound effects ---
-            lock (_lock)
+            // --- 5. Mix active sound effects (no lock — audio thread owns _activePlayback) ---
+            for (int s = _activePlayback.Count - 1; s >= 0; s--)
             {
-                for (int s = _activeSoundEffects.Count - 1; s >= 0; s--)
+                var sfx = _activePlayback[s];
+                if (sfx.Position >= sfx.Waveform.Length)
                 {
-                    var sfx = _activeSoundEffects[s];
-                    if (sfx.Position >= sfx.Waveform.Length)
+                    if (sfx.Loop)
                     {
-                        if (sfx.Loop)
-                        {
-                            sfx.Position = 0;
-                        }
-                        else
-                        {
-                            _activeSoundEffects.RemoveAt(s);
-                            continue;
-                        }
+                        sfx.Position = 0;
                     }
-
-                    // sfx.Volume already contains the appropriate level (BeepVolume, EffectVolume, etc.)
-                    // set by the caller — do NOT multiply by EffectVolume again.
-                    float sample = sfx.Waveform[sfx.Position] * sfx.Volume;
-                    sfx.Position++;
-
-                    // Pan: -1 = full left, 0 = center, +1 = full right
-                    float sL = sample * (1f - MathF.Max(0f, sfx.Pan));
-                    float sR = sample * (1f + MathF.Min(0f, sfx.Pan));
-                    left += sL;
-                    right += sR;
+                    else
+                    {
+                        _activePlayback.RemoveAt(s);
+                        continue;
+                    }
                 }
+
+                // sfx.Volume already contains the appropriate level (BeepVolume, EffectVolume, etc.)
+                // set by the caller — do NOT multiply by EffectVolume again.
+                float sample = sfx.Waveform[sfx.Position] * sfx.Volume;
+                sfx.Position++;
+
+                // Pan: -1 = full left, 0 = center, +1 = full right
+                float sL = sample * (1f - MathF.Max(0f, sfx.Pan));
+                float sR = sample * (1f + MathF.Min(0f, sfx.Pan));
+                left += sL;
+                right += sR;
             }
 
             // --- 6. Apply master volume and clip ---
@@ -189,8 +197,7 @@ public partial class AudioSystem
         double currentSec = _audioTime / SampleRate;
         if (currentSec - _lastLogTimeSec >= 1.0)
         {
-            int sfxCount;
-            lock (_lock) { sfxCount = _activeSoundEffects.Count; }
+            int sfxCount = _activePlayback.Count;
             DebugLogger.Log("Audio", $"Stats: {_readCallCount} callbacks, {_clippingCount} clips, {sfxCount} active SFX");
             _readCallCount = 0;
             _clippingCount = 0;
@@ -222,41 +229,17 @@ public partial class AudioSystem
 
     /// <summary>
     /// Check all dimension pairs for known harmonic ratios.
-    /// Returns a list of (dimA, dimB, harmonicName) tuples.
+    /// Fills the provided list with (dimA, dimB, harmonicName) tuples (clears it first).
     /// </summary>
-    public List<(int DimA, int DimB, string Name)> DetectHarmonicPairs(float[]? rDrive = null)
+    public void DetectHarmonicPairs(List<(int DimA, int DimB, HarmonicType HType)> result, float[] rDrive)
     {
-        var result = new List<(int, int, string)>();
-        if (rDrive == null)
-        {
-            lock (_lock)
-            {
-                if (_ship == null) return result;
-                rDrive = Vec5.Clone(_ship.RDrive);
-            }
-        }
+        result.Clear();
 
+        // Check every unique pair of dimensions for a recognised musical interval. The shared
+        // HarmonicMath helper keeps this detection identical to the Ship's gameplay-side version.
         for (int i = 0; i < NDimensions; i++)
-        {
             for (int j = i + 1; j < NDimensions; j++)
-            {
-                float freqI = rDrive[i];
-                float freqJ = rDrive[j];
-                if (freqI < 1f || freqJ < 1f) continue;
-
-                float ratio = MathF.Max(freqI, freqJ) / MathF.Min(freqI, freqJ);
-
-                foreach (var (name, targetRatio) in GameConstants.HarmonicRatios)
-                {
-                    if (MathF.Abs(ratio - targetRatio) / targetRatio < GameConstants.HarmonicTolerance)
-                    {
-                        result.Add((i, j, name));
-                        break; // only one harmonic per pair
-                    }
-                }
-            }
-        }
-
-        return result;
+                if (HarmonicMath.TryMatchRatio(rDrive[i], rDrive[j], out var hType))
+                    result.Add((i, j, hType));
     }
 }

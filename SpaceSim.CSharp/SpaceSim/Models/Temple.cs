@@ -1,11 +1,9 @@
 namespace SpaceSim.Models;
 
-public class Temple
+public class Temple : WorldObject
 {
-    public float[] Position = Vec5.Zero();
     public float Frequency;
-    public string Type = "temple";
-    public string TempleType = "minor"; // "minor" or "master"
+    public TempleType Kind = TempleType.Minor;
     public int KeyIndex;
     public string KeyName = "";
 }

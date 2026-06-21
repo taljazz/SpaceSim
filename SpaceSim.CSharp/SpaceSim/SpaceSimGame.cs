@@ -41,6 +41,7 @@ public partial class SpaceSimGame : Game
     private List<Temple> _temples = new();
     private List<LeyLine> _leyLines = new();
     private List<Pyramid> _pyramids = new();
+    private readonly SpatialGrid _spatialGrid = new();
 
     // --- Input state ---
     private KeyboardState _prevKeyState;

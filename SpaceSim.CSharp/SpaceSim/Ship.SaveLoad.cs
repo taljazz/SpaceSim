@@ -35,7 +35,7 @@ public partial class Ship
                 TuaoiMode = TuaoiMode,
                 TuaoiModeIndex = TuaoiModeIndex,
                 ConsciousnessValue = ConsciousnessValue,
-                ConsciousnessName = ConsciousnessName,
+                ConsciousnessStage = ConsciousnessStage,
                 TempleKeys = TempleKeys.ToList(),
                 VisitedAmenti = VisitedAmenti,
                 AmentiBlessingActive = AmentiBlessingActive,
@@ -88,10 +88,10 @@ public partial class Ship
             CrystalBonus = state.CrystalBonus;
             GoldenHarmonyActive = state.GoldenHarmonyActive;
             FrequencyPresets = state.FrequencyPresets ?? new();
-            TuaoiMode = state.TuaoiMode;
+            SetTuaoiMode(state.TuaoiMode);
             TuaoiModeIndex = state.TuaoiModeIndex;
             ConsciousnessValue = state.ConsciousnessValue;
-            ConsciousnessName = state.ConsciousnessName;
+            ConsciousnessStage = state.ConsciousnessStage;
             TempleKeys = new HashSet<int>(state.TempleKeys);
             VisitedAmenti = state.VisitedAmenti;
             AmentiBlessingActive = state.AmentiBlessingActive;
@@ -109,7 +109,7 @@ public partial class Ship
 
             NeedsUniverseRegeneration = true;
             Speak("Game loaded.");
-            DebugLogger.Log("Save", $"Game loaded: pos={Vec5.Format(Position)}, crystals={CrystalsCollected}, consciousness={ConsciousnessName}");
+            DebugLogger.Log("Save", $"Game loaded: pos={Vec5.Format(Position)}, crystals={CrystalsCollected}, consciousness={ConsciousnessStage}");
         }
         catch (Exception ex)
         {

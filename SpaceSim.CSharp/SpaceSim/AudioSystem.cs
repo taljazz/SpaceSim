@@ -22,13 +22,24 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     private WaveOutEvent? _waveOut;
     public WaveFormat WaveFormat { get; }
 
-    // --- Ship reference ---
-    private Ship? _ship;
-    private readonly object _lock = new();
+    // --- Ship reference (volatile for lock-free audio thread read) ---
+    private volatile Ship? _ship;
 
-    // --- Audio state ---
+    // --- Audio state: double-buffer pattern for thread safety ---
+    // Game thread writes to _pendingSfx; audio thread drains into _activePlayback.
+    // _activePlayback is exclusively owned by the audio thread after draining.
     private double _audioTime;
-    private readonly List<GameSoundEffect> _activeSoundEffects = new();
+    private readonly List<GameSoundEffect> _pendingSfx = new();
+    private readonly List<GameSoundEffect> _activePlayback = new();
+    private readonly object _pendingLock = new();
+    private volatile bool _clearAllFlag;
+    private volatile bool _clearLoopingFlag;
+    private volatile bool _clearFinishedFlag;
+
+    // --- Pre-allocated buffers for Read() to avoid per-callback GC pressure ---
+    private readonly float[] _snapRDrive = new float[NDimensions];
+    private readonly float[] _snapFTarget = new float[NDimensions];
+    private readonly List<(int DimA, int DimB, HarmonicType HType)> _harmonicPairsBuffer = new();
 
     // --- Logging stats (throttled to once per second) ---
     private double _lastLogTimeSec;
@@ -139,11 +150,7 @@ public partial class AudioSystem : ISampleProvider, IDisposable
 
     private void HandleStopAmbientSounds(object? sender, EventArgs e)
     {
-        // Remove all looping effects
-        lock (_lock)
-        {
-            _activeSoundEffects.RemoveAll(sfx => sfx.Loop);
-        }
+        _clearLoopingFlag = true;
     }
 
     // ========================================================================
@@ -195,10 +202,7 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// </summary>
     public void SetShip(Ship ship)
     {
-        lock (_lock)
-        {
-            _ship = ship;
-        }
+        _ship = ship; // volatile write, no lock needed
         DebugLogger.Log("Audio", "Ship reference set");
     }
 
@@ -207,9 +211,9 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// </summary>
     public void AddSoundEffect(GameSoundEffect effect)
     {
-        lock (_lock)
+        lock (_pendingLock)
         {
-            _activeSoundEffects.Add(effect);
+            _pendingSfx.Add(effect);
         }
         DebugLogger.Log("Audio", $"SoundEffect added: {effect.Waveform.Length} samples, loop={effect.Loop}, vol={effect.Volume:F2}");
     }
@@ -219,10 +223,7 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// </summary>
     public void ClearFinishedEffects()
     {
-        lock (_lock)
-        {
-            _activeSoundEffects.RemoveAll(sfx => sfx.IsFinished);
-        }
+        _clearFinishedFlag = true;
     }
 
     /// <summary>
@@ -230,10 +231,7 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// </summary>
     public void ClearAllEffects()
     {
-        lock (_lock)
-        {
-            _activeSoundEffects.Clear();
-        }
+        _clearAllFlag = true;
     }
 
     // ========================================================================

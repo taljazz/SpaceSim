@@ -1,8 +1,7 @@
 namespace SpaceSim.Models;
 
-public class PortalAnchor
+public class PortalAnchor : WorldObject
 {
-    public float[] Position = Vec5.Zero();
     public string Name = "";
     public float CreatedTime;
 }

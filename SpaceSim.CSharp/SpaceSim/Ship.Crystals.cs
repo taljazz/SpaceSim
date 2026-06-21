@@ -20,7 +20,7 @@ public partial class Ship
         CrystalPositions.Clear();
         CrystalFreqs.Clear();
         LockedCrystals.Clear();
-        PlanetBiome = Random.Shared.NextDouble() < 0.5 ? "harmonic" : "dissonant";
+        Biome = Random.Shared.NextDouble() < 0.5 ? PlanetBiome.Harmonic : PlanetBiome.Dissonant;
         PatternProgress.Clear();
 
         float crystalMult = 1f;
@@ -41,14 +41,14 @@ public partial class Ship
             }
         }
 
-        string exoType = LandedPlanetBody?.ExoplanetType ?? "super_earth";
+        var exoType = LandedPlanetBody?.ExoplanetClass ?? ExoplanetType.SuperEarth;
         string exoDesc = GameConstants.ExoplanetTypes[exoType].Desc;
 
         string patternMsg = "";
         if (CurrentPattern != null)
             patternMsg = $" Sacred {FormatName(CurrentPattern)} pattern detected!";
-        Speak($"Anchored on {PlanetBiome} biome planet. {Capitalize(exoDesc)}. {CrystalCount} Atlantean crystals detected.{patternMsg}");
-        DebugLogger.Log("Ship", $"GenerateCrystals: {CrystalCount} crystals, biome={PlanetBiome}, pattern={CurrentPattern ?? "none"}, mult={crystalMult:F1}");
+        Speak($"Anchored on {Biome} biome planet. {Capitalize(exoDesc)}. {CrystalCount} Atlantean crystals detected.{patternMsg}");
+        DebugLogger.Log("Ship", $"GenerateCrystals: {CrystalCount} crystals, biome={Biome}, pattern={CurrentPattern ?? "none"}, mult={crystalMult:F1}");
 
         float scaleFactor = GameConstants.ScaleFactor;
 
@@ -130,7 +130,7 @@ public partial class Ship
 
         // Play biome sound
         StopBiomeSound();
-        float[] waveform = PlanetBiome == "harmonic"
+        float[] waveform = Biome == PlanetBiome.Harmonic
             ? _audio.GoldenChordWaveform
             : _audio.SupernovaChaos; // dissonant waveform
         _biomeSound = new GameSoundEffect(waveform, loop: true, volume: _audio.EffectVolume * 0.5f);
@@ -176,7 +176,7 @@ public partial class Ship
         for (int i = 0; i < N; i++)
         {
             float df = RDrive[i] - cFreqs[i];
-            tempRes[i] = 1f / (1f + (df / ResonanceWidth) * (df / ResonanceWidth));
+            tempRes[i] = ResonancePhysics.Resonance(df, ResonanceWidth);
         }
         if (Vec5.Mean(tempRes) > GameConstants.AutoSnapThreshold)
         {
@@ -229,7 +229,7 @@ public partial class Ship
         for (int i = 0; i < N; i++)
         {
             float df = RDrive[i] - cFreqs[i];
-            ResonanceLevels[i] = 1f / (1f + (df / ResonanceWidth) * (df / ResonanceWidth));
+            ResonanceLevels[i] = ResonancePhysics.Resonance(df, ResonanceWidth);
         }
 
         if (Vec5.Mean(ResonanceLevels) > GameConstants.CrystalCollectionThreshold)

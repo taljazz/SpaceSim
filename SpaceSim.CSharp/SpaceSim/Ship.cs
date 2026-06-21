@@ -100,7 +100,7 @@ public partial class Ship
     public List<float[]> CrystalPositions = new();
     public List<CrystalData> CrystalFreqs = new();
     public HashSet<int> LockedCrystals = new();
-    public string PlanetBiome = "harmonic";
+    public PlanetBiome Biome = PlanetBiome.Harmonic;
     private bool _approachingLockAnnounced;
 
     // Upgrades
@@ -163,12 +163,13 @@ public partial class Ship
     public bool NeedsUniverseRegeneration;
 
     // Harmonic tracking
-    public Dictionary<string, (int[] Dims, float Expiry)> ActiveHarmonics = new();
+    public Dictionary<string, (HarmonicType Type, int[] Dims, float Expiry)> ActiveHarmonics = new();
     private float _lastHarmonicCheck;
 
     // ===== ATLANTEAN STATE =====
-    public string TuaoiMode = "navigation";
+    public TuaoiMode TuaoiMode = TuaoiMode.Navigation;
     public int TuaoiModeIndex = 1;
+    private TuaoiModeInfo _cachedTuaoiInfo = null!;
     private float _lastTuaoiSwitch;
 
     public bool MerkabaActive;
@@ -180,7 +181,7 @@ public partial class Ship
     public bool InTempleResonance;
     private bool _templeAnnounced;
 
-    public string ConsciousnessLevel = "beta";
+    public BrainwaveState CurrentBrainwave = BrainwaveState.Beta;
     private bool _consciousnessAnnounced;
 
     // Sacred geometry
@@ -210,7 +211,7 @@ public partial class Ship
 
     // Consciousness value
     public float ConsciousnessValue = 0.3f;
-    public string ConsciousnessName = "awakening";
+    public ConsciousnessLevel ConsciousnessStage = ConsciousnessLevel.Awakening;
 
     // Astral projection
     public bool AstralMode;
@@ -240,6 +241,16 @@ public partial class Ship
 
     // Nebula dissonance announcement
     private bool _nebulaDissonanceAnnounced;
+
+    // Pre-allocated buffers for Update() to avoid per-frame GC pressure
+    private readonly float[] _envInfluence = new float[N];
+    private readonly float[] _dists = new float[N];
+    private readonly float[] _dirVecBuffer = new float[N];
+    private readonly List<int> _expiredKeys = new();
+    private readonly List<CelestialBody> _nearbyBuffer = new();
+
+    // Spatial grid for fast proximity queries (set by SpaceSimGame each frame)
+    public SpatialGrid? SpatialGrid;
 
     // Zoom (managed externally but stored here for convenience)
     public float ZoomLevel = 1f;
@@ -318,6 +329,7 @@ public partial class Ship
         };
 
         _lastInputTime = SimulationTime;
+        SetTuaoiMode(TuaoiMode.Navigation);
 
         DebugLogger.Log("Ship", $"Ship created. RDrive=[{RDrive[0]:F1},{RDrive[1]:F1},{RDrive[2]:F1},{RDrive[3]:F1},{RDrive[4]:F1}]");
         DebugLogger.Log("Ship", $"  FTarget=[{FTarget[0]:F1},{FTarget[1]:F1},{FTarget[2]:F1},{FTarget[3]:F1},{FTarget[4]:F1}]");
@@ -340,11 +352,17 @@ public partial class Ship
     //  UTILITY METHODS
     // =========================================================================
 
+    public void SetTuaoiMode(TuaoiMode mode)
+    {
+        TuaoiMode = mode;
+        _cachedTuaoiInfo = GameConstants.TuaoiModes[mode];
+    }
+
     public float GetEffectiveScanRange()
     {
         float range = GameConstants.InteractionDistance;
-        if (TuaoiMode == "communication")
-            range *= GameConstants.TuaoiModes["communication"].Rate; // 2.0x
+        if (TuaoiMode == TuaoiMode.Communication)
+            range *= _cachedTuaoiInfo.Rate; // 2.0x
         return range;
     }
 
@@ -442,7 +460,7 @@ public partial class Ship
 
     public class HarmonicInfo
     {
-        public string Name = "";
+        public HarmonicType HType;
         public int[] Dims = Array.Empty<int>();
         public float Ratio;
     }

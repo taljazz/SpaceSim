@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
-using SpaceSim.Models;
 
 namespace SpaceSim.Rendering;
 
@@ -12,39 +10,33 @@ namespace SpaceSim.Rendering;
 /// Draws celestial bodies as wireframe spheres, the ship as a cone,
 /// and Atlantean structures as pyramids and lines in 3D space.
 /// </summary>
-public class Renderer3D : IGameRenderer
+public class Renderer3D : BaseGameRenderer
 {
-    private GraphicsDevice _device = null!;
     private Camera3D? _camera;
-
-    // Logging throttle
-    private int _frameCount;
-    private double _lastLogTime;
-
-    // World data references (set by SpaceSimGame)
-    public List<CelestialBody>? Stars;
-    public List<CelestialBody>? Planets;
-    public List<CelestialBody>? Nebulae;
-    public List<Temple>? Temples;
-    public List<LeyLine>? LeyLines;
-    public List<Pyramid>? Pyramids;
 
     // Rendering limits to avoid drawing too many distant objects
     private const float MaxRenderDistance = 500f;
     private const float MaxRenderDistanceSq = MaxRenderDistance * MaxRenderDistance;
+
+    // Static color constants to avoid per-frame reconstruction
+    private static readonly Color SpeedLineColor = new(200, 200, 255, 60);
+    private static readonly Color TempleGoldColor = new(255, 215, 0);
+    private static readonly Color PyramidGoldenrodColor = new(218, 165, 32);
+    private static readonly Color LeyLineAmentiColor = new(255, 215, 0, 60);
+    private static readonly Color LeyLineCollectedColor = new(255, 200, 100, 80);
+    private static readonly Color LeyLineDefaultColor = new(200, 180, 100, 40);
 
     /// <summary>
     /// Sets the Camera3D reference used for view/projection matrices.
     /// </summary>
     public void SetCamera(Camera3D camera) => _camera = camera;
 
-    public void Initialize(GraphicsDevice device, ContentManager content)
+    protected override void OnInitialize(ContentManager content)
     {
-        _device = device;
-        DebugLogger.Log("Render", "Renderer3D initialized");
+        // No 3D-specific initialization needed beyond what base handles
     }
 
-    public void DrawWorld(SpriteBatch spriteBatch, Ship ship, GameTime gameTime, int screenW, int screenH)
+    public override void DrawWorld(SpriteBatch spriteBatch, Ship ship, GameTime gameTime, int screenW, int screenH)
     {
         if (_camera == null)
         {
@@ -60,9 +52,9 @@ public class Renderer3D : IGameRenderer
         var shipPos3D = GetPosition3D(ship.Position);
 
         // Enable depth buffer for 3D rendering
-        _device.DepthStencilState = DepthStencilState.Default;
-        _device.RasterizerState = RasterizerState.CullCounterClockwise;
-        _device.BlendState = BlendState.Opaque;
+        Device.DepthStencilState = DepthStencilState.Default;
+        Device.RasterizerState = RasterizerState.CullCounterClockwise;
+        Device.BlendState = BlendState.Opaque;
 
         // --- Draw stars ---
         if (Stars != null)
@@ -72,9 +64,9 @@ public class Renderer3D : IGameRenderer
                 var pos = GetPosition3D(star.Position);
                 if (DistanceSquared(pos, shipPos3D) > MaxRenderDistanceSq) continue;
 
-                Color color = GetStellarColor(star.StellarType);
-                float size = GetStellarSize(star.StellarType);
-                PrimitiveRenderer.DrawSphere(_device, pos, size, color, view, proj, 12);
+                Color color = GetStellarColor(star.StellarClass);
+                float size = GetStellarSize(star.StellarClass);
+                PrimitiveRenderer.DrawSphere(Device, pos, size, color, view, proj, 12);
             }
         }
 
@@ -86,14 +78,14 @@ public class Renderer3D : IGameRenderer
                 var pos = GetPosition3D(planet.Position);
                 if (DistanceSquared(pos, shipPos3D) > MaxRenderDistanceSq) continue;
 
-                Color color = GetPlanetColor(planet.ExoplanetType);
+                Color color = GetPlanetColor(planet.ExoplanetClass);
                 float size = 0.8f * planet.SizeMult;
-                PrimitiveRenderer.DrawSphere(_device, pos, size, color, view, proj, 10);
+                PrimitiveRenderer.DrawSphere(Device, pos, size, color, view, proj, 10);
             }
         }
 
         // --- Draw nebulae (semi-transparent, larger) ---
-        _device.BlendState = BlendState.AlphaBlend;
+        Device.BlendState = BlendState.AlphaBlend;
         if (Nebulae != null)
         {
             foreach (var nebula in Nebulae)
@@ -101,12 +93,12 @@ public class Renderer3D : IGameRenderer
                 var pos = GetPosition3D(nebula.Position);
                 if (DistanceSquared(pos, shipPos3D) > MaxRenderDistanceSq) continue;
 
-                Color color = GetNebulaColor(nebula.NebulaType);
+                Color color = GetNebulaColor(nebula.NebulaClass);
                 color = new Color(color.R, color.G, color.B, (byte)80);
-                PrimitiveRenderer.DrawSphere(_device, pos, 5f, color, view, proj, 8);
+                PrimitiveRenderer.DrawSphere(Device, pos, 5f, color, view, proj, 8);
             }
         }
-        _device.BlendState = BlendState.Opaque;
+        Device.BlendState = BlendState.Opaque;
 
         // --- Draw temples ---
         if (Temples != null)
@@ -116,14 +108,14 @@ public class Renderer3D : IGameRenderer
                 var pos = GetPosition3D(temple.Position);
                 if (DistanceSquared(pos, shipPos3D) > MaxRenderDistanceSq) continue;
 
-                bool isMaster = temple.TempleType == "master";
+                bool isMaster = temple.Kind == TempleType.Master;
                 bool hasKey = ship.TempleKeys.Contains(temple.KeyIndex);
 
                 Color color;
                 float size;
                 if (isMaster)
                 {
-                    color = new Color(255, 215, 0); // Gold
+                    color = TempleGoldColor;
                     size = 4f;
                 }
                 else if (hasKey)
@@ -133,11 +125,11 @@ public class Renderer3D : IGameRenderer
                 }
                 else
                 {
-                    color = new Color(218, 165, 32); // Goldenrod
+                    color = PyramidGoldenrodColor;
                     size = 2f;
                 }
 
-                PrimitiveRenderer.DrawPyramid(_device, pos, size, color, view, proj);
+                PrimitiveRenderer.DrawPyramid(Device, pos, size, color, view, proj);
             }
         }
 
@@ -149,13 +141,12 @@ public class Renderer3D : IGameRenderer
                 var pos = GetPosition3D(pyramid.Position);
                 if (DistanceSquared(pos, shipPos3D) > MaxRenderDistanceSq) continue;
 
-                Color color = new Color(218, 165, 32); // Goldenrod
-                PrimitiveRenderer.DrawPyramid(_device, pos, 3f, color, view, proj);
+                PrimitiveRenderer.DrawPyramid(Device, pos, 3f, PyramidGoldenrodColor, view, proj);
             }
         }
 
         // --- Draw ley lines ---
-        _device.BlendState = BlendState.AlphaBlend;
+        Device.BlendState = BlendState.AlphaBlend;
         if (LeyLines != null)
         {
             foreach (var ley in LeyLines)
@@ -169,15 +160,15 @@ public class Renderer3D : IGameRenderer
                     continue;
 
                 Color color = ley.AmentiPath
-                    ? new Color(255, 215, 0, 60) // Gold, faint
+                    ? LeyLineAmentiColor
                     : ley.Major
-                        ? new Color(255, 200, 100, 80)
-                        : new Color(200, 180, 100, 40);
+                        ? LeyLineCollectedColor
+                        : LeyLineDefaultColor;
 
-                PrimitiveRenderer.DrawLine3D(_device, start, end, color, view, proj);
+                PrimitiveRenderer.DrawLine3D(Device, start, end, color, view, proj);
             }
         }
-        _device.BlendState = BlendState.Opaque;
+        Device.BlendState = BlendState.Opaque;
 
         // --- Draw rifts ---
         if (ship.Rifts.Count > 0)
@@ -190,7 +181,7 @@ public class Renderer3D : IGameRenderer
 
                 int alpha = 150 + (int)(105 * pulse);
                 Color riftColor = new Color(150, 50, 200 + (int)(55 * pulse), alpha);
-                PrimitiveRenderer.DrawSphere(_device, pos, 1.5f + pulse * 0.5f, riftColor, view, proj, 8);
+                PrimitiveRenderer.DrawSphere(Device, pos, 1.5f + pulse * 0.5f, riftColor, view, proj, 8);
             }
         }
 
@@ -201,16 +192,16 @@ public class Renderer3D : IGameRenderer
         DrawSpeedLines(ship, gameTime, view, proj);
 
         // Throttled stats logging (every 5 seconds)
-        _frameCount++;
+        FrameCount++;
         double elapsed = gameTime.TotalGameTime.TotalSeconds;
-        if (elapsed - _lastLogTime >= 5.0)
+        if (elapsed - LastLogTime >= 5.0)
         {
-            DebugLogger.Log("Render", $"3D stats: {_frameCount} frames/5s, " +
+            DebugLogger.Log("Render", $"3D stats: {FrameCount} frames/5s, " +
                 $"stars={Stars?.Count ?? 0}, planets={Planets?.Count ?? 0}, " +
                 $"nebulae={Nebulae?.Count ?? 0}, temples={Temples?.Count ?? 0}, " +
                 $"rifts={ship.Rifts.Count}");
-            _frameCount = 0;
-            _lastLogTime = elapsed;
+            FrameCount = 0;
+            LastLogTime = elapsed;
         }
 
         } // end try
@@ -220,7 +211,7 @@ public class Renderer3D : IGameRenderer
         }
     }
 
-    public void DrawHud(SpriteBatch spriteBatch, SpriteFont font, Ship ship, int screenW, int screenH)
+    public override void DrawHud(SpriteBatch spriteBatch, SpriteFont font, Ship ship, int screenW, int screenH)
     {
         // HUD drawing is handled by HudRenderer in SpaceSimGame.Draw
     }
@@ -241,14 +232,14 @@ public class Renderer3D : IGameRenderer
         Matrix world = Matrix.CreateRotationY(-heading) * Matrix.CreateTranslation(shipPos);
 
         // Draw the cone at origin (the world matrix handles positioning)
-        PrimitiveRenderer.DrawCone(_device, shipPos, 0.5f, 1.5f, shipColor, view, proj, 8);
+        PrimitiveRenderer.DrawCone(Device, shipPos, 0.5f, 1.5f, shipColor, view, proj, 8);
 
         // Draw Merkaba indicator if active
         if (ship.MerkabaActive)
         {
             float merkabaPulse = 0.5f + 0.5f * MathF.Sin((float)gameTime.TotalGameTime.TotalSeconds * 5f);
             Color merkabaColor = new Color(255, 255, 200, 100 + (int)(155 * merkabaPulse));
-            PrimitiveRenderer.DrawSphere(_device, shipPos, 2f + merkabaPulse * 0.5f, merkabaColor, view, proj, 6);
+            PrimitiveRenderer.DrawSphere(Device, shipPos, 2f + merkabaPulse * 0.5f, merkabaColor, view, proj, 6);
         }
 
         // Draw rift charge indicator
@@ -256,7 +247,7 @@ public class Renderer3D : IGameRenderer
         {
             float progress = ship.RiftChargeProgress;
             Color chargeColor = new Color((byte)(255 * progress), 100, 255);
-            PrimitiveRenderer.DrawSphere(_device, shipPos, 1f + progress * 2f, chargeColor, view, proj, 6);
+            PrimitiveRenderer.DrawSphere(Device, shipPos, 1f + progress * 2f, chargeColor, view, proj, 6);
         }
     }
 
@@ -277,8 +268,8 @@ public class Renderer3D : IGameRenderer
         int lineCount = Math.Min((int)(speed * 3), 30);
         float time = (float)gameTime.TotalGameTime.TotalSeconds;
 
-        var rng = new Random((int)(time * 10));
-        Color lineColor = new Color(200, 200, 255, 60);
+        var rng = Random.Shared;
+        Color lineColor = SpeedLineColor;
 
         for (int i = 0; i < lineCount; i++)
         {
@@ -296,12 +287,12 @@ public class Renderer3D : IGameRenderer
             Vector3 dir = Vector3.Normalize(shipPos - start);
             Vector3 end = start + dir * lineLen;
 
-            PrimitiveRenderer.DrawLine3D(_device, start, end, lineColor, view, proj);
+            PrimitiveRenderer.DrawLine3D(Device, start, end, lineColor, view, proj);
         }
     }
 
     // =========================================================================
-    //  HELPERS
+    //  HELPERS (3D-specific)
     // =========================================================================
 
     /// <summary>
@@ -318,50 +309,14 @@ public class Renderer3D : IGameRenderer
         return d.X * d.X + d.Y * d.Y + d.Z * d.Z;
     }
 
-    private static Color GetStellarColor(string? stellarType)
+    private static float GetStellarSize(StellarType? stellarClass)
     {
-        if (stellarType == null) return Color.Yellow;
-        if (GameConstants.StellarTypes.TryGetValue(stellarType, out var info))
-            return info.Color;
-        return Color.Yellow;
-    }
-
-    private static float GetStellarSize(string? stellarType)
-    {
-        return stellarType switch
+        return stellarClass switch
         {
-            "red_giant" => 3f,
-            "white_dwarf" => 0.8f,
-            "brown_dwarf" => 0.6f,
-            _ => 1.5f, // main_sequence
+            StellarType.RedGiant => 3f,
+            StellarType.WhiteDwarf => 0.8f,
+            StellarType.BrownDwarf => 0.6f,
+            _ => 1.5f, // MainSequence
         };
-    }
-
-    private static Color GetPlanetColor(string? exoplanetType)
-    {
-        return exoplanetType switch
-        {
-            "hot_jupiter" => new Color(255, 120, 50),
-            "super_earth" => new Color(100, 180, 100),
-            "ocean_world" => new Color(50, 100, 200),
-            "rogue_planet" => new Color(80, 80, 100),
-            "ice_giant" => new Color(150, 200, 255),
-            _ => Color.Gray,
-        };
-    }
-
-    private static Color GetNebulaColor(string? nebulaType)
-    {
-        if (nebulaType == null) return new Color(100, 50, 150);
-        if (GameConstants.NebulaTypes.TryGetValue(nebulaType, out var info))
-            return info.Color;
-        return new Color(100, 50, 150);
-    }
-
-    private static Color GetTuaoiColor(string tuaoiMode)
-    {
-        if (GameConstants.TuaoiModes.TryGetValue(tuaoiMode, out var info))
-            return info.Color;
-        return Color.Cyan;
     }
 }

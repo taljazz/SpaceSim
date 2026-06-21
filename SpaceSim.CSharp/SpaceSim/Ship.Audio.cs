@@ -17,44 +17,44 @@ public partial class Ship
 
     private void HandleProximityAmbient(CelestialBody body, float dist, float pan)
     {
-        if (body.Type == "star" && dist < GameConstants.StarHarmonyRadius)
+        if (body.BodyType == CelestialBodyType.Star && dist < GameConstants.StarHarmonyRadius)
         {
-            string sType = body.StellarType ?? "main_sequence";
+            var sType = body.StellarClass ?? StellarType.MainSequence;
             float volume = _audio.EffectVolume * (1f - dist / GameConstants.StarHarmonyRadius) * 0.3f;
             float[]? waveform = sType switch
             {
-                "red_giant" => _audio.RedGiantPulse,
-                "white_dwarf" => _audio.WhiteDwarfWhine,
-                "brown_dwarf" => _audio.BrownDwarfRumble,
+                StellarType.RedGiant => _audio.RedGiantPulse,
+                StellarType.WhiteDwarf => _audio.WhiteDwarfWhine,
+                StellarType.BrownDwarf => _audio.BrownDwarfRumble,
                 _ => null
             };
             UpdateAmbientSound(ref _starSound, waveform, pan, volume);
         }
-        else if (body.Type == "nebula" && dist < GameConstants.NebulaDissonanceRadius)
+        else if (body.BodyType == CelestialBodyType.Nebula && dist < GameConstants.NebulaDissonanceRadius)
         {
-            string nType = body.NebulaType ?? "emission";
+            var nType = body.NebulaClass ?? NebulaType.Emission;
             float volume = _audio.EffectVolume * (1f - dist / GameConstants.NebulaDissonanceRadius) * 0.4f;
             float[]? waveform = nType switch
             {
-                "emission" => _audio.EmissionDrone,
-                "reflection" => _audio.ReflectionShimmer,
-                "planetary" => _audio.PlanetaryLayers,
-                "supernova_remnant" => _audio.SupernovaChaos,
+                NebulaType.Emission => _audio.EmissionDrone,
+                NebulaType.Reflection => _audio.ReflectionShimmer,
+                NebulaType.Planetary => _audio.PlanetaryLayers,
+                NebulaType.SupernovaRemnant => _audio.SupernovaChaos,
                 _ => null
             };
             UpdateAmbientSound(ref _nebulaSound, waveform, pan, volume);
         }
-        else if (body.Type == "planet" && dist < GameConstants.InteractionDistance)
+        else if (body.BodyType == CelestialBodyType.Planet && dist < GameConstants.InteractionDistance)
         {
-            string eType = body.ExoplanetType ?? "super_earth";
+            var eType = body.ExoplanetClass ?? ExoplanetType.SuperEarth;
             float volume = _audio.EffectVolume * (1f - dist / GameConstants.InteractionDistance) * 0.3f;
             float[]? waveform = eType switch
             {
-                "hot_jupiter" => _audio.HotJupiterRoar,
-                "super_earth" => _audio.SuperEarthTone,
-                "ocean_world" => _audio.OceanWorldFlow,
-                "rogue_planet" => _audio.RogueOminous,
-                "ice_giant" => _audio.IceChime,
+                ExoplanetType.HotJupiter => _audio.HotJupiterRoar,
+                ExoplanetType.SuperEarth => _audio.SuperEarthTone,
+                ExoplanetType.OceanWorld => _audio.OceanWorldFlow,
+                ExoplanetType.RoguePlanet => _audio.RogueOminous,
+                ExoplanetType.IceGiant => _audio.IceChime,
                 _ => null
             };
             UpdateAmbientSound(ref _planetSound, waveform, pan, volume);

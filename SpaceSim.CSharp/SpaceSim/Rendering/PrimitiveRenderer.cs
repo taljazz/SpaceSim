@@ -14,6 +14,14 @@ public static class PrimitiveRenderer
     private static BasicEffect? _effect;
     private static bool _initialized;
 
+    // Pre-allocated vertex buffers — reused each call to avoid per-frame GC pressure.
+    // Only accessed from the render thread, so no concurrency issue.
+    private const int MaxSegments = 16;
+    private static readonly VertexPositionColor[] _sphereVerts = new VertexPositionColor[(MaxSegments + 1) * 3];
+    private static readonly VertexPositionColor[] _lineVerts = new VertexPositionColor[2];
+    private static readonly VertexPositionColor[] _pyramidVerts = new VertexPositionColor[18];
+    private static readonly VertexPositionColor[] _coneVerts = new VertexPositionColor[MaxSegments * 3 + (MaxSegments - 2) * 3];
+
     /// <summary>
     /// Initializes the shared BasicEffect. Must be called once after the GraphicsDevice is ready.
     /// </summary>
@@ -46,17 +54,14 @@ public static class PrimitiveRenderer
         _effect.Projection = projection;
         _effect.World = Matrix.Identity;
 
-        // Generate vertices for longitude rings
-        int totalVerts = (segments + 1) * 2; // per ring, 2 rings (XZ and XY planes + extras)
-        var vertices = new VertexPositionColor[(segments + 1) * 3];
-
+        // Fill pre-allocated vertex buffer for 3 rings
         // Ring in XZ plane (equator)
         for (int i = 0; i <= segments; i++)
         {
             float angle = MathHelper.TwoPi * i / segments;
             float x = center.X + radius * MathF.Cos(angle);
             float z = center.Z + radius * MathF.Sin(angle);
-            vertices[i] = new VertexPositionColor(new Vector3(x, center.Y, z), color);
+            _sphereVerts[i] = new VertexPositionColor(new Vector3(x, center.Y, z), color);
         }
 
         // Ring in XY plane (meridian)
@@ -66,7 +71,7 @@ public static class PrimitiveRenderer
             float angle = MathHelper.TwoPi * i / segments;
             float x = center.X + radius * MathF.Cos(angle);
             float y = center.Y + radius * MathF.Sin(angle);
-            vertices[offset1 + i] = new VertexPositionColor(new Vector3(x, y, center.Z), color);
+            _sphereVerts[offset1 + i] = new VertexPositionColor(new Vector3(x, y, center.Z), color);
         }
 
         // Ring in YZ plane
@@ -76,18 +81,15 @@ public static class PrimitiveRenderer
             float angle = MathHelper.TwoPi * i / segments;
             float y = center.Y + radius * MathF.Cos(angle);
             float z = center.Z + radius * MathF.Sin(angle);
-            vertices[offset2 + i] = new VertexPositionColor(new Vector3(center.X, y, z), color);
+            _sphereVerts[offset2 + i] = new VertexPositionColor(new Vector3(center.X, y, z), color);
         }
 
         foreach (var pass in _effect.CurrentTechnique.Passes)
         {
             pass.Apply();
-            // Draw equator ring
-            device.DrawUserPrimitives(PrimitiveType.LineStrip, vertices, 0, segments);
-            // Draw meridian ring
-            device.DrawUserPrimitives(PrimitiveType.LineStrip, vertices, offset1, segments);
-            // Draw YZ ring
-            device.DrawUserPrimitives(PrimitiveType.LineStrip, vertices, offset2, segments);
+            device.DrawUserPrimitives(PrimitiveType.LineStrip, _sphereVerts, 0, segments);
+            device.DrawUserPrimitives(PrimitiveType.LineStrip, _sphereVerts, offset1, segments);
+            device.DrawUserPrimitives(PrimitiveType.LineStrip, _sphereVerts, offset2, segments);
         }
     }
 
@@ -108,14 +110,13 @@ public static class PrimitiveRenderer
         _effect.Projection = projection;
         _effect.World = Matrix.Identity;
 
-        var vertices = new VertexPositionColor[2];
-        vertices[0] = new VertexPositionColor(start, color);
-        vertices[1] = new VertexPositionColor(end, color);
+        _lineVerts[0] = new VertexPositionColor(start, color);
+        _lineVerts[1] = new VertexPositionColor(end, color);
 
         foreach (var pass in _effect.CurrentTechnique.Passes)
         {
             pass.Apply();
-            device.DrawUserPrimitives(PrimitiveType.LineList, vertices, 0, 1);
+            device.DrawUserPrimitives(PrimitiveType.LineList, _lineVerts, 0, 1);
         }
     }
 
@@ -154,25 +155,17 @@ public static class PrimitiveRenderer
             color.A);
 
         // 4 triangular faces + 2 base triangles = 18 vertices
-        var vertices = new VertexPositionColor[]
-        {
-            // Front face
-            new(apex, color), new(fl, color), new(fr, color),
-            // Right face
-            new(apex, color), new(fr, color), new(br, color),
-            // Back face
-            new(apex, color), new(br, color), new(bl, color),
-            // Left face
-            new(apex, color), new(bl, color), new(fl, color),
-            // Base (two triangles)
-            new(bl, baseColor), new(br, baseColor), new(fr, baseColor),
-            new(bl, baseColor), new(fr, baseColor), new(fl, baseColor),
-        };
+        _pyramidVerts[0]  = new(apex, color); _pyramidVerts[1]  = new(fl, color);  _pyramidVerts[2]  = new(fr, color);
+        _pyramidVerts[3]  = new(apex, color); _pyramidVerts[4]  = new(fr, color);  _pyramidVerts[5]  = new(br, color);
+        _pyramidVerts[6]  = new(apex, color); _pyramidVerts[7]  = new(br, color);  _pyramidVerts[8]  = new(bl, color);
+        _pyramidVerts[9]  = new(apex, color); _pyramidVerts[10] = new(bl, color);  _pyramidVerts[11] = new(fl, color);
+        _pyramidVerts[12] = new(bl, baseColor); _pyramidVerts[13] = new(br, baseColor); _pyramidVerts[14] = new(fr, baseColor);
+        _pyramidVerts[15] = new(bl, baseColor); _pyramidVerts[16] = new(fr, baseColor); _pyramidVerts[17] = new(fl, baseColor);
 
         foreach (var pass in _effect.CurrentTechnique.Passes)
         {
             pass.Apply();
-            device.DrawUserPrimitives(PrimitiveType.TriangleList, vertices, 0, 6);
+            device.DrawUserPrimitives(PrimitiveType.TriangleList, _pyramidVerts, 0, 6);
         }
     }
 
@@ -198,9 +191,6 @@ public static class PrimitiveRenderer
 
         Vector3 apex = center + new Vector3(0, height, 0);
 
-        // Side triangles + base triangles
-        var vertices = new VertexPositionColor[segments * 3 + (segments - 2) * 3];
-
         // Darker color for the base
         Color baseColor = new Color(
             (byte)(color.R * 0.6f),
@@ -218,14 +208,13 @@ public static class PrimitiveRenderer
             Vector3 p1 = center + new Vector3(radius * MathF.Cos(a1), 0, radius * MathF.Sin(a1));
 
             int idx = i * 3;
-            vertices[idx] = new VertexPositionColor(apex, color);
-            vertices[idx + 1] = new VertexPositionColor(p0, color);
-            vertices[idx + 2] = new VertexPositionColor(p1, color);
+            _coneVerts[idx] = new VertexPositionColor(apex, color);
+            _coneVerts[idx + 1] = new VertexPositionColor(p0, color);
+            _coneVerts[idx + 2] = new VertexPositionColor(p1, color);
         }
 
         // Base (triangle fan from center)
         int baseOffset = segments * 3;
-        Vector3 baseCenter = center;
         for (int i = 0; i < segments - 2; i++)
         {
             float a0 = 0f;
@@ -237,9 +226,9 @@ public static class PrimitiveRenderer
             Vector3 p2 = center + new Vector3(radius * MathF.Cos(a2), 0, radius * MathF.Sin(a2));
 
             int idx = baseOffset + i * 3;
-            vertices[idx] = new VertexPositionColor(p0, baseColor);
-            vertices[idx + 1] = new VertexPositionColor(p1, baseColor);
-            vertices[idx + 2] = new VertexPositionColor(p2, baseColor);
+            _coneVerts[idx] = new VertexPositionColor(p0, baseColor);
+            _coneVerts[idx + 1] = new VertexPositionColor(p1, baseColor);
+            _coneVerts[idx + 2] = new VertexPositionColor(p2, baseColor);
         }
 
         int totalTriangles = segments + (segments - 2);
@@ -247,7 +236,7 @@ public static class PrimitiveRenderer
         foreach (var pass in _effect.CurrentTechnique.Passes)
         {
             pass.Apply();
-            device.DrawUserPrimitives(PrimitiveType.TriangleList, vertices, 0, totalTriangles);
+            device.DrawUserPrimitives(PrimitiveType.TriangleList, _coneVerts, 0, totalTriangles);
         }
     }
 }

@@ -108,13 +108,17 @@ public partial class SpaceSimGame
 
         // --- Ship input and update ---
         _ship.ZoomLevel = _zoomLevel;
+
+        // Update celestial positions (orbital mechanics) BEFORE ship update
+        // so the spatial grid and proximity queries use fresh positions.
+        CelestialGenerator.UpdateCelestialPositions(_stars, _planets, _nebulae,
+                                                     _ship.SimulationTime);
+        _spatialGrid.Rebuild(_celestialBodies);
+        _ship.SpatialGrid = _spatialGrid;
+
         _ship.HandleInput(keys, _prevKeyState, mouse, _prevMouseState,
                           _stars, _planets, _nebulae);
         _ship.Update(dt, _celestialBodies, keys, _temples, _leyLines, _pyramids);
-
-        // Update celestial positions (orbital mechanics)
-        CelestialGenerator.UpdateCelestialPositions(_stars, _planets, _nebulae,
-                                                     _ship.SimulationTime);
 
         // Check if universe needs regeneration (after rift transit)
         if (_ship.NeedsUniverseRegeneration)

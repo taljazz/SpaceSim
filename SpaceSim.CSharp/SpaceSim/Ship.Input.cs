@@ -121,9 +121,8 @@ public partial class Ship
         if (IsKeyPressed(Keys.G) && SimulationTime - _lastTuaoiSwitch > GameConstants.TuaoiModeSwitchCooldown)
         {
             TuaoiModeIndex = (TuaoiModeIndex + 1) % GameConstants.TuaoiModeOrder.Length;
-            TuaoiMode = GameConstants.TuaoiModeOrder[TuaoiModeIndex];
-            var modeInfo = GameConstants.TuaoiModes[TuaoiMode];
-            Speak($"Tuaoi Crystal: {Capitalize(TuaoiMode)} mode. {modeInfo.Desc}");
+            SetTuaoiMode(GameConstants.TuaoiModeOrder[TuaoiModeIndex]);
+            Speak($"Tuaoi Crystal: {TuaoiMode} mode. {_cachedTuaoiInfo.Desc}");
             DebugLogger.Log("Input", $"Tuaoi mode switched to: {TuaoiMode}");
             _lastTuaoiSwitch = SimulationTime;
         }
@@ -155,13 +154,13 @@ public partial class Ship
         {
             float avgRes = Vec5.Mean(ResonanceLevels);
             float landingThreshold = GameConstants.LandingThreshold;
-            if (NearestBody != null && NearestBody.Type == "planet")
+            if (NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
                 landingThreshold *= NearestBody.Difficulty;
 
-            if (NearObject && avgRes > landingThreshold && NearestBody != null && NearestBody.Type == "planet")
+            if (NearObject && avgRes > landingThreshold && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
             {
                 LandingTimer = GameConstants.LandingTime;
-                string eType = NearestBody.ExoplanetType ?? "super_earth";
+                var eType = NearestBody.ExoplanetClass ?? ExoplanetType.SuperEarth;
                 string eDesc = GameConstants.ExoplanetTypes[eType].Desc;
                 Speak($"Initiating anchoring sequence on {eDesc}.");
             }
@@ -416,12 +415,8 @@ public partial class Ship
                 {
                     float targetRes = MathF.Min(0.999f, MathF.Abs(desiredVel[i]) / MaxVelocity);
                     if (targetRes > 0)
-                    {
-                        float dOverW = MathF.Sqrt(1f / targetRes - 1f);
-                        float delta = ResonanceWidth * dOverW;
-                        float deltaF = MathF.Sign(desiredVel[i]) * delta;
-                        RDrive[i] = FTarget[i] + deltaF;
-                    }
+                        RDrive[i] = ResonancePhysics.DriveForTargetResonance(
+                            FTarget[i], targetRes, ResonanceWidth, MathF.Sign(desiredVel[i]));
                 }
                 else
                     RDrive[i] = FTarget[i];

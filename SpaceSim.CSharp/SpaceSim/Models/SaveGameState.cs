@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace SpaceSim.Models;
 
@@ -24,10 +25,12 @@ public class SaveGameState
     public Dictionary<int, float[]> FrequencyPresets { get; set; } = new();
 
     // Atlantean state
-    public string TuaoiMode { get; set; } = "navigation";
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public TuaoiMode TuaoiMode { get; set; } = TuaoiMode.Navigation;
     public int TuaoiModeIndex { get; set; } = 1;
     public float ConsciousnessValue { get; set; } = 0.3f;
-    public string ConsciousnessName { get; set; } = "awakening";
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public ConsciousnessLevel ConsciousnessStage { get; set; } = ConsciousnessLevel.Awakening;
     public List<int> TempleKeys { get; set; } = new();
     public bool VisitedAmenti { get; set; }
     public bool AmentiBlessingActive { get; set; }

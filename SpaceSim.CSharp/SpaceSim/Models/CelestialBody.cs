@@ -1,20 +1,19 @@
 namespace SpaceSim.Models;
 
-public class CelestialBody
+public class CelestialBody : WorldObject
 {
-    public float[] Position = Vec5.Zero();
+    public CelestialBodyType BodyType;
     public float Frequency;
-    public string Type = "star"; // "star", "planet", "nebula"
 
     // Star-specific
-    public string? StellarType;
+    public StellarType? StellarClass;
 
     // Nebula-specific
-    public string? NebulaType;
+    public NebulaType? NebulaClass;
     public float Dissonance;
 
     // Planet-specific
-    public string? ExoplanetType;
+    public ExoplanetType? ExoplanetClass;
     public float SizeMult = 1f;
     public float CrystalMult = 1f;
     public float Difficulty = 1f;

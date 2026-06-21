@@ -57,6 +57,12 @@ public static class Vec5
         return r;
     }
 
+    public static void SubtractInto(float[] a, float[] b, float[] result)
+    {
+        for (int i = 0; i < Dimensions; i++)
+            result[i] = a[i] - b[i];
+    }
+
     public static float Dot(float[] a, float[] b)
     {
         float sum = 0;
@@ -93,6 +99,52 @@ public static class Vec5
             if (!predicate(a[i])) return false;
         return true;
     }
+
+    #region Segment geometry
+
+    /// <summary>
+    /// Shortest distance from point <paramref name="p"/> to the line segment running from
+    /// <paramref name="a"/> to <paramref name="b"/>, computed <b>without allocating</b> (unlike
+    /// <see cref="Subtract"/> / <see cref="Scale"/> / <see cref="Add"/>). This runs every frame for
+    /// every ley line, so keeping it garbage-free matters.
+    /// </summary>
+    /// <param name="p">The query point.</param>
+    /// <param name="a">Segment start.</param>
+    /// <param name="b">Segment end.</param>
+    /// <returns>
+    /// The distance, plus <c>T</c> in [0, 1] giving where along the segment the closest point falls
+    /// (0 = at <paramref name="a"/>, 1 = at <paramref name="b"/>).
+    /// </returns>
+    public static (float Distance, float T) DistanceToSegment(float[] p, float[] a, float[] b)
+    {
+        // Project (p - a) onto (b - a): t = dot(p-a, b-a) / |b-a|^2, then clamp to the segment.
+        float abLenSq = 0f;
+        float dot = 0f;
+        for (int i = 0; i < Dimensions; i++)
+        {
+            float ab = b[i] - a[i];
+            abLenSq += ab * ab;
+            dot += (p[i] - a[i]) * ab;
+        }
+
+        // Degenerate segment (a == b): fall back to a plain point-to-point distance.
+        if (abLenSq < 1e-12f)
+            return (Distance(p, a), 0f);
+
+        float t = Math.Clamp(dot / abLenSq, 0f, 1f);
+
+        // Distance from p to the clamped closest point a + t*(b - a) — still allocation-free.
+        float sum = 0f;
+        for (int i = 0; i < Dimensions; i++)
+        {
+            float closest = a[i] + t * (b[i] - a[i]);
+            float d = p[i] - closest;
+            sum += d * d;
+        }
+        return (MathF.Sqrt(sum), t);
+    }
+
+    #endregion
 
     public static string Format(float[] a, int decimals = 1)
     {

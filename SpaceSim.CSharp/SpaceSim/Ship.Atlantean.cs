@@ -189,7 +189,7 @@ public partial class Ship
 
         foreach (var temple in temples)
         {
-            float dist = Vec5.Distance(Position, temple.Position);
+            float dist = temple.DistanceTo(Position);
             if (dist < scanRange)
             {
                 NearTemple = temple;
@@ -202,7 +202,7 @@ public partial class Ship
                     for (int i = 0; i < N; i++)
                     {
                         float delta = MathF.Abs(RDrive[i] - temple.Frequency);
-                        resAtFreq += 1f / (1f + (delta / ResonanceWidth) * (delta / ResonanceWidth));
+                        resAtFreq += ResonancePhysics.Resonance(delta, ResonanceWidth);
                     }
                     resAtFreq /= N;
 
@@ -225,7 +225,7 @@ public partial class Ship
                 else if (keyIdx == -1) // Halls of Amenti
                 {
                     if (TempleKeys.Count >= GameConstants.MasterTempleUnlockKeys &&
-                        (ConsciousnessName == "enlightened" || ConsciousnessName == "ascended"))
+                        (ConsciousnessStage == ConsciousnessLevel.Enlightened || ConsciousnessStage == ConsciousnessLevel.Ascended))
                     {
                         if (!VisitedAmenti)
                         {
@@ -234,7 +234,7 @@ public partial class Ship
                             AmentiBlessingActive = true;
                             ResonanceWidth *= PHI;
                             ConsciousnessValue = 1f;
-                            ConsciousnessName = "ascended";
+                            ConsciousnessStage = ConsciousnessLevel.Ascended;
                         }
                     }
                     else if (!_amentiSealedAnnounced)
@@ -266,16 +266,8 @@ public partial class Ship
 
         foreach (var line in leyLines)
         {
-            float[] lineVec = Vec5.Subtract(line.End, line.Start);
-            float lineLen = Vec5.Norm(lineVec);
-            if (lineLen < 1e-6f) continue;
-
-            float[] toPos = Vec5.Subtract(Position, line.Start);
-            float t = Vec5.Dot(toPos, lineVec) / (lineLen * lineLen);
-            t = Math.Clamp(t, 0f, 1f);
-
-            float[] closest = Vec5.Add(line.Start, Vec5.Scale(lineVec, t));
-            float distToLine = Vec5.Distance(Position, closest);
+            // Allocation-free point-to-segment distance — runs every frame for every ley line.
+            var (distToLine, _) = Vec5.DistanceToSegment(Position, line.Start, line.End);
 
             if (distToLine < GameConstants.LeyLineWidth)
             {
@@ -305,7 +297,7 @@ public partial class Ship
         float scanRange = GetEffectiveScanRange();
         foreach (var pyr in pyramids)
         {
-            float dist = Vec5.Distance(Position, pyr.Position);
+            float dist = pyr.DistanceTo(Position);
             if (dist < scanRange)
             {
                 NearPyramid = pyr;
@@ -355,22 +347,22 @@ public partial class Ship
                 ConsciousnessValue = MathF.Min(1f, ConsciousnessValue + GameConstants.ConsciousnessGainRate * GameConstants.PyramidConsciousnessBoost * dt);
         }
 
-        string oldName = ConsciousnessName;
+        var oldStage = ConsciousnessStage;
         foreach (var (levelName, levelInfo) in GameConstants.ConsciousnessLevels)
         {
             if (ConsciousnessValue >= levelInfo.Threshold)
-                ConsciousnessName = levelName;
+                ConsciousnessStage = levelName;
         }
 
-        if (ConsciousnessName != oldName && !_consciousnessAnnounced)
+        if (ConsciousnessStage != oldStage && !_consciousnessAnnounced)
         {
-            var info = GameConstants.ConsciousnessLevels[ConsciousnessName];
-            Speak($"Consciousness level: {Capitalize(ConsciousnessName)}. {info.Desc}.");
-            DebugLogger.Log("Ship", $"Consciousness changed: {oldName} -> {ConsciousnessName} (value={ConsciousnessValue:F3})");
-            GameEvents.RaiseConsciousnessChanged(this, oldName, ConsciousnessName, ConsciousnessValue);
+            var info = GameConstants.ConsciousnessLevels[ConsciousnessStage];
+            Speak($"Consciousness level: {ConsciousnessStage}. {info.Desc}.");
+            DebugLogger.Log("Ship", $"Consciousness changed: {oldStage} -> {ConsciousnessStage} (value={ConsciousnessValue:F3})");
+            GameEvents.RaiseConsciousnessChanged(this, oldStage.ToString(), ConsciousnessStage.ToString(), ConsciousnessValue);
             _consciousnessAnnounced = true;
         }
-        else if (ConsciousnessName == oldName)
+        else if (ConsciousnessStage == oldStage)
         {
             _consciousnessAnnounced = false;
         }
@@ -389,10 +381,10 @@ public partial class Ship
                 if ((driveFreq / 50f >= fMin && driveFreq / 50f <= fMax) ||
                     (driveFreq >= fMin * 50f && driveFreq <= fMax * 50f))
                 {
-                    if (ConsciousnessLevel != stateName)
+                    if (CurrentBrainwave != stateName)
                     {
-                        ConsciousnessLevel = stateName;
-                        Speak($"Brainwave state: {Capitalize(stateName)}. {FormatName(stateInfo.State)} mode.");
+                        CurrentBrainwave = stateName;
+                        Speak($"Brainwave state: {stateName}. {FormatName(stateInfo.State)} mode.");
                         if (stateInfo.Effect == "auto_repair")
                             ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + 0.05f);
                         else if (stateInfo.Effect == "rift_vision")
@@ -402,8 +394,8 @@ public partial class Ship
                 }
             }
         }
-        if (ConsciousnessLevel != "beta")
-            ConsciousnessLevel = "beta";
+        if (CurrentBrainwave != BrainwaveState.Beta)
+            CurrentBrainwave = BrainwaveState.Beta;
     }
 
     // =========================================================================
@@ -418,22 +410,11 @@ public partial class Ship
         {
             for (int j = i + 1; j < N; j++)
             {
-                float fi = RDrive[i];
-                float fj = RDrive[j];
-                if (fi < 1f || fj < 1f) continue;
+                if (!HarmonicMath.TryMatchRatio(RDrive[i], RDrive[j], out var hType)) continue;
 
-                float ratio = MathF.Max(fi, fj) / MathF.Min(fi, fj);
-
-                foreach (var (name, targetRatio) in GameConstants.HarmonicRatios)
-                {
-                    float tol = targetRatio * GameConstants.HarmonicTolerance;
-                    if (MathF.Abs(ratio - targetRatio) < tol)
-                    {
-                        string key = $"{name}_d{i + 1}_d{j + 1}";
-                        detected[key] = new HarmonicInfo { Name = name, Dims = new[] { i, j }, Ratio = ratio };
-                        break;
-                    }
-                }
+                float ratio = MathF.Max(RDrive[i], RDrive[j]) / MathF.Min(RDrive[i], RDrive[j]);
+                string key = $"{hType}_d{i + 1}_d{j + 1}";
+                detected[key] = new HarmonicInfo { HType = hType, Dims = new[] { i, j }, Ratio = ratio };
             }
         }
 
@@ -444,64 +425,63 @@ public partial class Ship
     {
         if (harmonics.Count == 0) return;
 
-        var newHarmonics = new List<(string Name, int[] Dims)>();
+        var newHarmonics = new List<(HarmonicType HType, int[] Dims)>();
 
         foreach (var (key, info) in harmonics)
         {
             if (!ActiveHarmonics.ContainsKey(key))
-                newHarmonics.Add((info.Name, info.Dims));
-            ActiveHarmonics[key] = (info.Dims, SimulationTime + GameConstants.HarmonicBonusDuration);
+                newHarmonics.Add((info.HType, info.Dims));
+            ActiveHarmonics[key] = (info.HType, info.Dims, SimulationTime + GameConstants.HarmonicBonusDuration);
         }
 
         // Announce & play chimes
-        foreach (var (name, dims) in newHarmonics)
+        foreach (var (hType, dims) in newHarmonics)
         {
             string dimNames = string.Join(" and ", dims.Select(d => $"dimension {d + 1}"));
-            Speak($"{FormatName(name)} harmonic detected between {dimNames}.");
+            // Space the PascalCase interval name so the screen reader says "Perfect Fifth", not "PerfectFifth".
+            Speak($"{GameUtils.SpacePascalCase(hType.ToString())} harmonic detected between {dimNames}.");
 
-            float[]? chime = name switch
+            float[]? chime = hType switch
             {
-                "octave" => _audio.OctaveChime,
-                "perfect_fifth" => _audio.FifthChime,
-                "golden" => _audio.GoldenChime,
-                "perfect_fourth" => _audio.FourthChime,
-                "major_third" => _audio.MajorThirdChime,
-                "minor_third" => _audio.MinorThirdChime,
-                "major_sixth" => _audio.MajorSixthChime,
-                "minor_sixth" => _audio.MinorSixthChime,
-                "tritone" => _audio.TritoneChime,
+                HarmonicType.Octave => _audio.OctaveChime,
+                HarmonicType.PerfectFifth => _audio.FifthChime,
+                HarmonicType.Golden => _audio.GoldenChime,
+                HarmonicType.PerfectFourth => _audio.FourthChime,
+                HarmonicType.MajorThird => _audio.MajorThirdChime,
+                HarmonicType.MinorThird => _audio.MinorThirdChime,
+                HarmonicType.MajorSixth => _audio.MajorSixthChime,
+                HarmonicType.MinorSixth => _audio.MinorSixthChime,
+                HarmonicType.Tritone => _audio.TritoneChime,
                 _ => null
             };
             if (chime != null)
                 GameEvents.RaisePlaySound(this, chime, volume: _audio.EffectVolume);
-            GameEvents.RaiseHarmonicDetected(this, name, dims);
+            GameEvents.RaiseHarmonicDetected(this, hType.ToString(), dims);
         }
 
         // Apply bonuses & expire old
         var toRemove = new List<string>();
-        foreach (var (key, (dims, expiry)) in ActiveHarmonics)
+        foreach (var (key, (hType, dims, expiry)) in ActiveHarmonics)
         {
             if (SimulationTime > expiry) { toRemove.Add(key); continue; }
 
-            string hType = key.Contains("_d") ? key[..key.IndexOf("_d")] : key;
-
             switch (hType)
             {
-                case "octave":
+                case HarmonicType.Octave:
                     foreach (int d in dims)
                         Velocity[d] *= 1.1f;
                     break;
-                case "perfect_fifth":
+                case HarmonicType.PerfectFifth:
                     DissonanceTimer = MathF.Max(0, DissonanceTimer - 0.1f);
                     break;
-                case "perfect_fourth":
+                case HarmonicType.PerfectFourth:
                     ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + 0.001f);
                     break;
-                case "major_sixth":
+                case HarmonicType.MajorSixth:
                     foreach (int d in dims)
                         ResonancePower[d] += 0.05f;
                     break;
-                case "tritone":
+                case HarmonicType.Tritone:
                     foreach (int d in dims)
                         Velocity[d] += MathHelpers.RandomRange(-0.2f, 0.2f);
                     break;
@@ -533,15 +513,15 @@ public partial class Ship
 
     public void EnterRift(Rift rift)
     {
-        DebugLogger.Log("Ship", $"Entering rift: type={rift.Type}, pos={Vec5.Format(rift.Position)}");
+        DebugLogger.Log("Ship", $"Entering rift: type={rift.RiftKind}, pos={Vec5.Format(rift.Position)}");
         for (int i = 0; i < N; i++)
             Position[i] += MathHelpers.RandomRange(-20f, 20f) * PHI;
 
-        Speak($"Entering {rift.Type} rift-golden warp activated.");
+        Speak($"Entering {rift.RiftKind} rift-golden warp activated.");
 
-        if (rift.Type == "crystal") CrystalsCollected += 1;
-        else if (rift.Type == "hazard") ResonanceIntegrity -= 0.1f;
-        else if (rift.Type == "perfect_fifth")
+        if (rift.RiftKind == RiftType.Crystal) CrystalsCollected += 1;
+        else if (rift.RiftKind == RiftType.Hazard) ResonanceIntegrity -= 0.1f;
+        else if (rift.RiftKind == RiftType.PerfectFifth)
         {
             CrystalBonus += 1;
             Speak("Perfect fifth rift grants eternal crystal bounty.");

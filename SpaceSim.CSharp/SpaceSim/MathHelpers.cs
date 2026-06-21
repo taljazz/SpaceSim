@@ -49,21 +49,20 @@ public static class MathHelpers
         return maxIdx;
     }
 
-    public static string WeightedRandomChoice(Dictionary<string, float> probabilities, Random? rng = null)
+    public static TEnum WeightedRandomChoice<TEnum>(Dictionary<TEnum, float> probabilities, Random? rng = null) where TEnum : notnull
     {
         rng ??= Random.Shared;
         float roll = rng.NextSingle();
         float cumulative = 0;
+        TEnum last = default!;
         foreach (var kvp in probabilities)
         {
             cumulative += kvp.Value;
+            last = kvp.Key;
             if (roll < cumulative)
                 return kvp.Key;
         }
         // Fallback to last item (rounding)
-        string last = "";
-        foreach (var kvp in probabilities)
-            last = kvp.Key;
         return last;
     }
 

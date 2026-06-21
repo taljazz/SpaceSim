@@ -79,6 +79,35 @@ public static class GameUtils
         return (screenX, screenY);
     }
 
+    #region Speech formatting
+
+    /// <summary>
+    /// Inserts spaces before interior capital letters so a PascalCase enum name reads naturally
+    /// through the screen reader — e.g. <c>"PerfectFifth"</c> becomes <c>"Perfect Fifth"</c> and
+    /// <c>"Octave"</c> stays <c>"Octave"</c>. Without this, the speech engine reads multi-word
+    /// interval names as a single run-on word.
+    /// </summary>
+    /// <param name="pascalCase">A PascalCase identifier (typically <c>someEnum.ToString()</c>).</param>
+    /// <returns>The same text with spaces inserted before interior capitals.</returns>
+    public static string SpacePascalCase(string pascalCase)
+    {
+        if (string.IsNullOrEmpty(pascalCase))
+            return pascalCase;
+
+        var sb = new System.Text.StringBuilder(pascalCase.Length + 4);
+        for (int i = 0; i < pascalCase.Length; i++)
+        {
+            char c = pascalCase[i];
+            // Space before any capital that follows another character (so the first letter is kept).
+            if (i > 0 && char.IsUpper(c))
+                sb.Append(' ');
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    #endregion
+
     /// <summary>
     /// Converts HSV color values to a MonoGame Color.
     /// </summary>

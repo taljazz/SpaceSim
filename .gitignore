@@ -84,3 +84,6 @@ savegame.json
 feedback.txt
 Feedback.txt
 GrokNotes.txt
+
+# Generated documentation
+SpaceSim_Architecture.html

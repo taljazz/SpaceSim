@@ -37,8 +37,9 @@ public static class GameConstants
     public const float PlanetRadius = 10f;
     public const float InteractionDistance = 15f;
 
-    // Fibonacci sequence
-    public const int NFibonacci = 8;
+    // Fibonacci sequence (F(0) through F(NFibonacci-1))
+    // FibSeq is used for celestial/crystal positioning; UpgradeCosts is derived from it (F(1)..F(8))
+    public const int NFibonacci = 9; // 0,1,1,2,3,5,8,13,21
     public static readonly int[] FibSeq;
     public static readonly float ScaleFactor;
 
@@ -79,8 +80,8 @@ public static class GameConstants
     public const int HudTextSizeBase = 24;
     public const float ClickInterval = 0.5f;
 
-    // Upgrades and progression
-    public static readonly int[] UpgradeCosts = { 1, 1, 2, 3, 5, 8, 13, 21 };
+    // Upgrades and progression — derived from FibSeq: F(1) through F(8)
+    public static readonly int[] UpgradeCosts;
     public const int AscensionCrystalThreshold = 21;
 
     // Navigation and tuning
@@ -121,17 +122,17 @@ public static class GameConstants
 
     // Harmonic relationship system
     public const float HarmonicTolerance = 0.02f;
-    public static readonly Dictionary<string, float> HarmonicRatios = new()
+    public static readonly Dictionary<HarmonicType, float> HarmonicRatios = new()
     {
-        ["octave"] = 2f,
-        ["perfect_fifth"] = 1.5f,
-        ["perfect_fourth"] = 1.333f,
-        ["major_third"] = 1.25f,
-        ["minor_third"] = 1.2f,
-        ["major_sixth"] = 1.667f,
-        ["minor_sixth"] = 1.6f,
-        ["tritone"] = 1.414f,
-        ["golden"] = PHI,
+        [HarmonicType.Octave] = 2f,
+        [HarmonicType.PerfectFifth] = 1.5f,
+        [HarmonicType.PerfectFourth] = 4f / 3f,       // 1.333333...
+        [HarmonicType.MajorThird] = 1.25f,
+        [HarmonicType.MinorThird] = 1.2f,
+        [HarmonicType.MajorSixth] = 5f / 3f,         // 1.666667...
+        [HarmonicType.MinorSixth] = 1.6f,
+        [HarmonicType.Tritone] = 1.41421356f,          // √2
+        [HarmonicType.Golden] = PHI,
     };
     public const float HarmonicDetectionInterval = 0.5f;
     public const float HarmonicBonusDuration = 2f;
@@ -144,53 +145,53 @@ public static class GameConstants
     public const float IntermodDepth = 0.08f;
 
     // Stellar types
-    public static readonly Dictionary<string, StellarTypeInfo> StellarTypes = new()
+    public static readonly Dictionary<StellarType, StellarTypeInfo> StellarTypes = new()
     {
-        ["main_sequence"] = new(new Color(255, 255, 200), 1f, "stable hydrogen-burning star", 200f, 400f),
-        ["red_giant"] = new(new Color(255, 100, 50), 0.7f, "ancient bloated star", 30f, 50f),
-        ["white_dwarf"] = new(new Color(200, 220, 255), 1.8f, "dense stellar core", 1200f, 1500f),
-        ["brown_dwarf"] = new(new Color(100, 50, 30), 0.3f, "failed star", 20f, 30f),
+        [StellarType.MainSequence] = new(new Color(255, 255, 200), 1f, "stable hydrogen-burning star", 200f, 400f),
+        [StellarType.RedGiant] = new(new Color(255, 100, 50), 0.7f, "ancient bloated star", 30f, 50f),
+        [StellarType.WhiteDwarf] = new(new Color(200, 220, 255), 1.8f, "dense stellar core", 1200f, 1500f),
+        [StellarType.BrownDwarf] = new(new Color(100, 50, 30), 0.3f, "failed star", 20f, 30f),
     };
-    public static readonly Dictionary<string, float> StellarTypeProbabilities = new()
+    public static readonly Dictionary<StellarType, float> StellarTypeProbabilities = new()
     {
-        ["main_sequence"] = 0.70f,
-        ["red_giant"] = 0.15f,
-        ["white_dwarf"] = 0.10f,
-        ["brown_dwarf"] = 0.05f,
+        [StellarType.MainSequence] = 0.70f,
+        [StellarType.RedGiant] = 0.15f,
+        [StellarType.WhiteDwarf] = 0.10f,
+        [StellarType.BrownDwarf] = 0.05f,
     };
 
     // Nebula types
-    public static readonly Dictionary<string, NebulaTypeInfo> NebulaTypes = new()
+    public static readonly Dictionary<NebulaType, NebulaTypeInfo> NebulaTypes = new()
     {
-        ["emission"] = new(new Color(255, 50, 50), 200f, 300f, 0.5f, "ionized gas cloud"),
-        ["reflection"] = new(new Color(50, 150, 255), 600f, 800f, 0.3f, "dust reflecting starlight"),
-        ["planetary"] = new(new Color(150, 255, 150), 400f, 600f, 0.4f, "dying star shell"),
-        ["supernova_remnant"] = new(new Color(255, 150, 100), 100f, 900f, 0.9f, "expanding blast wave"),
+        [NebulaType.Emission] = new(new Color(255, 50, 50), 200f, 300f, 0.5f, "ionized gas cloud"),
+        [NebulaType.Reflection] = new(new Color(50, 150, 255), 600f, 800f, 0.3f, "dust reflecting starlight"),
+        [NebulaType.Planetary] = new(new Color(150, 255, 150), 400f, 600f, 0.4f, "dying star shell"),
+        [NebulaType.SupernovaRemnant] = new(new Color(255, 150, 100), 100f, 900f, 0.9f, "expanding blast wave"),
     };
-    public static readonly Dictionary<string, float> NebulaTypeProbabilities = new()
+    public static readonly Dictionary<NebulaType, float> NebulaTypeProbabilities = new()
     {
-        ["emission"] = 0.40f,
-        ["reflection"] = 0.30f,
-        ["planetary"] = 0.20f,
-        ["supernova_remnant"] = 0.10f,
+        [NebulaType.Emission] = 0.40f,
+        [NebulaType.Reflection] = 0.30f,
+        [NebulaType.Planetary] = 0.20f,
+        [NebulaType.SupernovaRemnant] = 0.10f,
     };
 
     // Exoplanet types
-    public static readonly Dictionary<string, ExoplanetTypeInfo> ExoplanetTypes = new()
+    public static readonly Dictionary<ExoplanetType, ExoplanetTypeInfo> ExoplanetTypes = new()
     {
-        ["hot_jupiter"] = new(3f, 0.5f, 1.5f, "scorching gas giant"),
-        ["super_earth"] = new(1.5f, 1.2f, 1f, "massive rocky world"),
-        ["ocean_world"] = new(1.2f, 1.5f, 0.8f, "water-covered planet"),
-        ["rogue_planet"] = new(1f, 2f, 2f, "sunless wanderer"),
-        ["ice_giant"] = new(2.5f, 0.8f, 1.3f, "frozen methane world"),
+        [ExoplanetType.HotJupiter] = new(3f, 0.5f, 1.5f, "scorching gas giant"),
+        [ExoplanetType.SuperEarth] = new(1.5f, 1.2f, 1f, "massive rocky world"),
+        [ExoplanetType.OceanWorld] = new(1.2f, 1.5f, 0.8f, "water-covered planet"),
+        [ExoplanetType.RoguePlanet] = new(1f, 2f, 2f, "sunless wanderer"),
+        [ExoplanetType.IceGiant] = new(2.5f, 0.8f, 1.3f, "frozen methane world"),
     };
-    public static readonly Dictionary<string, float> ExoplanetTypeProbabilities = new()
+    public static readonly Dictionary<ExoplanetType, float> ExoplanetTypeProbabilities = new()
     {
-        ["super_earth"] = 0.35f,
-        ["hot_jupiter"] = 0.25f,
-        ["ice_giant"] = 0.20f,
-        ["ocean_world"] = 0.15f,
-        ["rogue_planet"] = 0.05f,
+        [ExoplanetType.SuperEarth] = 0.35f,
+        [ExoplanetType.HotJupiter] = 0.25f,
+        [ExoplanetType.IceGiant] = 0.20f,
+        [ExoplanetType.OceanWorld] = 0.15f,
+        [ExoplanetType.RoguePlanet] = 0.05f,
     };
 
     // Solfeggio Frequencies
@@ -235,16 +236,17 @@ public static class GameConstants
     public const float MerkabaDetectionRange = 2f;
 
     // Tuaoi Crystal Modes
-    public static readonly Dictionary<string, TuaoiModeInfo> TuaoiModes = new()
+    public static readonly Dictionary<TuaoiMode, TuaoiModeInfo> TuaoiModes = new()
     {
-        ["healing"] = new(432f, new Color(0, 255, 128), "integrity_regen", 0.01f, "Atlantean healing frequency"),
-        ["navigation"] = new(PHI * 256f, new Color(100, 150, 255), "enhanced_autopilot", 1.5f, "Golden ratio navigation"),
-        ["communication"] = new(7.83f, new Color(255, 200, 100), "expanded_scan", 2f, "Earth resonance connection"),
-        ["power"] = new(528f, new Color(255, 100, 100), "velocity_boost", 1.25f, "Miracle frequency power"),
-        ["regeneration"] = new(285f, new Color(200, 100, 255), "resonance_recovery", 1.3f, "Cellular regeneration frequency"),
-        ["transcendence"] = new(963f, new Color(255, 255, 200), "higher_dim_sensitivity", 1.4f, "Divine connection frequency"),
+        [TuaoiMode.Healing] = new(432f, new Color(0, 255, 128), "integrity_regen", 0.01f, "Atlantean healing frequency"),
+        [TuaoiMode.Navigation] = new(PHI * 256f, new Color(100, 150, 255), "enhanced_autopilot", 1.5f, "Golden ratio navigation"),
+        [TuaoiMode.Communication] = new(7.83f, new Color(255, 200, 100), "expanded_scan", 2f, "Earth resonance connection"),
+        [TuaoiMode.Power] = new(528f, new Color(255, 100, 100), "velocity_boost", 1.25f, "Miracle frequency power"),
+        [TuaoiMode.Regeneration] = new(285f, new Color(200, 100, 255), "resonance_recovery", 1.3f, "Cellular regeneration frequency"),
+        [TuaoiMode.Transcendence] = new(963f, new Color(255, 255, 200), "higher_dim_sensitivity", 1.4f, "Divine connection frequency"),
     };
-    public static readonly string[] TuaoiModeOrder = { "healing", "navigation", "communication", "power", "regeneration", "transcendence" };
+    public static readonly TuaoiMode[] TuaoiModeOrder = { TuaoiMode.Healing, TuaoiMode.Navigation, TuaoiMode.Communication, TuaoiMode.Power, TuaoiMode.Regeneration, TuaoiMode.Transcendence };
+    public static readonly TuaoiModeInfo[] TuaoiModeInfoByIndex;
     public const float TuaoiModeSwitchCooldown = 2f;
 
     // Halls of Amenti
@@ -265,13 +267,13 @@ public static class GameConstants
     };
 
     // Brainwave States
-    public static readonly Dictionary<string, BrainwaveStateInfo> BrainwaveStates = new()
+    public static readonly Dictionary<BrainwaveState, BrainwaveStateInfo> BrainwaveStates = new()
     {
-        ["delta"] = new(0.5f, 4f, "deep_healing", "auto_repair", 2f),
-        ["theta"] = new(4f, 8f, "meditation", "rift_vision", 1.5f),
-        ["alpha"] = new(8f, 13f, "relaxed_focus", "enhanced_scan", 1.3f),
-        ["beta"] = new(13f, 30f, "active", "fast_tuning", 1.2f),
-        ["gamma"] = new(30f, 100f, "transcendence", "all_bonus", 1.4f),
+        [BrainwaveState.Delta] = new(0.5f, 4f, "deep_healing", "auto_repair", 2f),
+        [BrainwaveState.Theta] = new(4f, 8f, "meditation", "rift_vision", 1.5f),
+        [BrainwaveState.Alpha] = new(8f, 13f, "relaxed_focus", "enhanced_scan", 1.3f),
+        [BrainwaveState.Beta] = new(13f, 30f, "active", "fast_tuning", 1.2f),
+        [BrainwaveState.Gamma] = new(30f, 100f, "transcendence", "all_bonus", 1.4f),
     };
 
     // Atlantean Terminology
@@ -347,16 +349,16 @@ public static class GameConstants
     public const float AtlanteanCrystalChance = 0.15f;
 
     // Consciousness Level System
-    public static readonly Dictionary<string, ConsciousnessLevelInfo> ConsciousnessLevels = new()
+    public static readonly Dictionary<ConsciousnessLevel, ConsciousnessLevelInfo> ConsciousnessLevels = new()
     {
-        ["dormant"] = new(0f, 1f, "Unawakened state"),
-        ["awakening"] = new(0.3f, 1.2f, "Beginning to sense the harmonics"),
-        ["aware"] = new(0.5f, 1.4f, "Consciously navigating frequencies"),
-        ["attuned"] = new(0.7f, 1.6f, "Deeply connected to cosmic vibrations"),
-        ["enlightened"] = new(0.85f, 1.8f, "Mastery of harmonic navigation"),
-        ["ascended"] = new(0.95f, 2f, "One with the universal frequency"),
+        [ConsciousnessLevel.Dormant] = new(0f, 1f, "Unawakened state"),
+        [ConsciousnessLevel.Awakening] = new(0.3f, 1.2f, "Beginning to sense the harmonics"),
+        [ConsciousnessLevel.Aware] = new(0.5f, 1.4f, "Consciously navigating frequencies"),
+        [ConsciousnessLevel.Attuned] = new(0.7f, 1.6f, "Deeply connected to cosmic vibrations"),
+        [ConsciousnessLevel.Enlightened] = new(0.85f, 1.8f, "Mastery of harmonic navigation"),
+        [ConsciousnessLevel.Ascended] = new(0.95f, 2f, "One with the universal frequency"),
     };
-    public static readonly string[] ConsciousnessLevelOrder = { "dormant", "awakening", "aware", "attuned", "enlightened", "ascended" };
+    public static readonly ConsciousnessLevel[] ConsciousnessLevelOrder = { ConsciousnessLevel.Dormant, ConsciousnessLevel.Awakening, ConsciousnessLevel.Aware, ConsciousnessLevel.Attuned, ConsciousnessLevel.Enlightened, ConsciousnessLevel.Ascended };
     public const float ConsciousnessGainRate = 0.001f;
     public const float ConsciousnessDecayRate = 0.0005f;
 
@@ -385,7 +387,7 @@ public static class GameConstants
         ["merkaba"] = new(700f, 800f, 24f),
     };
 
-    // Static constructor to generate Fibonacci sequence
+    // Static constructor to generate Fibonacci sequence and derived arrays
     static GameConstants()
     {
         FibSeq = new int[NFibonacci];
@@ -394,5 +396,15 @@ public static class GameConstants
         for (int i = 2; i < NFibonacci; i++)
             FibSeq[i] = FibSeq[i - 1] + FibSeq[i - 2];
         ScaleFactor = 100f / FibSeq[^1];
+
+        // UpgradeCosts = F(1)..F(8) = {1, 1, 2, 3, 5, 8, 13, 21}
+        UpgradeCosts = new int[NFibonacci - 1];
+        for (int i = 0; i < UpgradeCosts.Length; i++)
+            UpgradeCosts[i] = FibSeq[i + 1];
+
+        // Build TuaoiModeInfoByIndex for fast indexed lookup
+        TuaoiModeInfoByIndex = new TuaoiModeInfo[TuaoiModeOrder.Length];
+        for (int i = 0; i < TuaoiModeOrder.Length; i++)
+            TuaoiModeInfoByIndex[i] = TuaoiModes[TuaoiModeOrder[i]];
     }
 }

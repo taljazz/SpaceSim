@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
-using SpaceSim.Models;
 
 namespace SpaceSim.Rendering;
 
@@ -12,34 +10,27 @@ namespace SpaceSim.Rendering;
 /// Projects 5D positions to 2D screen coordinates using the ship's view rotation,
 /// similar to the original Python pygame rendering.
 /// </summary>
-public class Renderer2D : IGameRenderer
+public class Renderer2D : BaseGameRenderer
 {
-    private GraphicsDevice _device = null!;
-
-    // Logging throttle
-    private int _frameCount;
-    private double _lastLogTime;
-
-    // World data references (set by SpaceSimGame)
-    public List<CelestialBody>? Stars;
-    public List<CelestialBody>? Planets;
-    public List<CelestialBody>? Nebulae;
-    public List<Temple>? Temples;
-    public List<LeyLine>? LeyLines;
-    public List<Pyramid>? Pyramids;
+    // Static color constants to avoid per-frame reconstruction
+    private static readonly Color SpeedLineColor = new(180, 180, 255, 40);
+    private static readonly Color TempleGoldColor = new(255, 215, 0);
+    private static readonly Color PyramidGoldenrodColor = new(218, 165, 32);
+    private static readonly Color LeyLineAmentiColor = new(255, 215, 0, 40);
+    private static readonly Color LeyLineCollectedColor = new(255, 200, 100, 60);
+    private static readonly Color LeyLineDefaultColor = new(200, 180, 100, 30);
 
     /// <summary>
     /// Zoom level for the 2D projection. Set by SpaceSimGame.
     /// </summary>
     public float ZoomLevel = 1f;
 
-    public void Initialize(GraphicsDevice device, ContentManager content)
+    protected override void OnInitialize(ContentManager content)
     {
-        _device = device;
-        DebugLogger.Log("Render", "Renderer2D initialized");
+        // No 2D-specific initialization needed
     }
 
-    public void DrawWorld(SpriteBatch spriteBatch, Ship ship, GameTime gameTime, int screenW, int screenH)
+    public override void DrawWorld(SpriteBatch spriteBatch, Ship ship, GameTime gameTime, int screenW, int screenH)
     {
         try
         {
@@ -63,10 +54,10 @@ public class Renderer2D : IGameRenderer
                     continue;
 
                 Color color = ley.AmentiPath
-                    ? new Color(255, 215, 0, 40)
+                    ? LeyLineAmentiColor
                     : ley.Major
-                        ? new Color(255, 200, 100, 60)
-                        : new Color(200, 180, 100, 30);
+                        ? LeyLineCollectedColor
+                        : LeyLineDefaultColor;
 
                 PrimitiveRenderer2D.DrawLine(spriteBatch,
                     new Vector2(sx, sy), new Vector2(ex, ey), color);
@@ -81,7 +72,7 @@ public class Renderer2D : IGameRenderer
                 var (x, y) = GameUtils.ProjectTo2D(nebula.Position, rotation, screenW, screenH, zoom, center);
                 if (!IsNearScreen(x, y, screenW, screenH, 100)) continue;
 
-                Color color = GetNebulaColor(nebula.NebulaType);
+                Color color = GetNebulaColor(nebula.NebulaClass);
                 color = new Color(color.R, color.G, color.B, (byte)60);
                 float radius = 15f * zoom;
                 PrimitiveRenderer2D.FillCircle(spriteBatch, new Vector2(x, y), radius, color);
@@ -98,8 +89,8 @@ public class Renderer2D : IGameRenderer
                 var (x, y) = GameUtils.ProjectTo2D(star.Position, rotation, screenW, screenH, zoom, center);
                 if (!IsNearScreen(x, y, screenW, screenH, 50)) continue;
 
-                Color color = GetStellarColor(star.StellarType);
-                float radius = GetStellarRadius(star.StellarType) * zoom;
+                Color color = GetStellarColor(star.StellarClass);
+                float radius = GetStellarRadius(star.StellarClass) * zoom;
                 PrimitiveRenderer2D.FillCircle(spriteBatch, new Vector2(x, y), radius, color);
             }
         }
@@ -112,7 +103,7 @@ public class Renderer2D : IGameRenderer
                 var (x, y) = GameUtils.ProjectTo2D(planet.Position, rotation, screenW, screenH, zoom, center);
                 if (!IsNearScreen(x, y, screenW, screenH, 50)) continue;
 
-                Color color = GetPlanetColor(planet.ExoplanetType);
+                Color color = GetPlanetColor(planet.ExoplanetClass);
                 float radius = (2f + planet.SizeMult) * zoom;
                 PrimitiveRenderer2D.FillCircle(spriteBatch, new Vector2(x, y), radius, color);
             }
@@ -126,14 +117,14 @@ public class Renderer2D : IGameRenderer
                 var (x, y) = GameUtils.ProjectTo2D(temple.Position, rotation, screenW, screenH, zoom, center);
                 if (!IsNearScreen(x, y, screenW, screenH, 50)) continue;
 
-                bool isMaster = temple.TempleType == "master";
+                bool isMaster = temple.Kind == TempleType.Master;
                 bool hasKey = ship.TempleKeys.Contains(temple.KeyIndex);
 
                 Color color;
                 float size;
                 if (isMaster)
                 {
-                    color = new Color(255, 215, 0); // Gold
+                    color = TempleGoldColor;
                     size = 12f * zoom;
                 }
                 else if (hasKey)
@@ -143,7 +134,7 @@ public class Renderer2D : IGameRenderer
                 }
                 else
                 {
-                    color = new Color(218, 165, 32); // Goldenrod
+                    color = PyramidGoldenrodColor;
                     size = 8f * zoom;
                 }
 
@@ -168,7 +159,7 @@ public class Renderer2D : IGameRenderer
                 if (!IsNearScreen(x, y, screenW, screenH, 50)) continue;
 
                 float size = 6f * zoom;
-                Color color = new Color(218, 165, 32); // Goldenrod
+                Color color = PyramidGoldenrodColor;
 
                 // Draw as a square
                 if (PrimitiveRenderer2D.Pixel != null)
@@ -208,15 +199,15 @@ public class Renderer2D : IGameRenderer
         spriteBatch.End();
 
         // Throttled stats logging (every 5 seconds)
-        _frameCount++;
+        FrameCount++;
         double elapsed = gameTime.TotalGameTime.TotalSeconds;
-        if (elapsed - _lastLogTime >= 5.0)
+        if (elapsed - LastLogTime >= 5.0)
         {
-            DebugLogger.Log("Render", $"2D stats: {_frameCount} frames/5s, " +
+            DebugLogger.Log("Render", $"2D stats: {FrameCount} frames/5s, " +
                 $"stars={Stars?.Count ?? 0}, planets={Planets?.Count ?? 0}, " +
                 $"nebulae={Nebulae?.Count ?? 0}, temples={Temples?.Count ?? 0}");
-            _frameCount = 0;
-            _lastLogTime = elapsed;
+            FrameCount = 0;
+            LastLogTime = elapsed;
         }
 
         } // end try
@@ -226,7 +217,7 @@ public class Renderer2D : IGameRenderer
         }
     }
 
-    public void DrawHud(SpriteBatch spriteBatch, SpriteFont font, Ship ship, int screenW, int screenH)
+    public override void DrawHud(SpriteBatch spriteBatch, SpriteFont font, Ship ship, int screenW, int screenH)
     {
         // HUD drawing is handled by HudRenderer in SpaceSimGame.Draw
     }
@@ -300,9 +291,9 @@ public class Renderer2D : IGameRenderer
         float cy = screenH / 2f;
         int lineCount = Math.Min((int)(speed * 2), 20);
         float time = (float)gameTime.TotalGameTime.TotalSeconds;
-        Color lineColor = new Color(180, 180, 255, 40);
+        Color lineColor = SpeedLineColor;
 
-        var rng = new Random((int)(time * 10));
+        var rng = Random.Shared;
         for (int i = 0; i < lineCount; i++)
         {
             float angle = (float)(rng.NextDouble() * MathHelper.TwoPi);
@@ -322,7 +313,7 @@ public class Renderer2D : IGameRenderer
     }
 
     // =========================================================================
-    //  HELPERS
+    //  HELPERS (2D-specific)
     // =========================================================================
 
     private static bool IsNearScreen(int x, int y, int screenW, int screenH, int margin)
@@ -331,50 +322,14 @@ public class Renderer2D : IGameRenderer
                y > -margin && y < screenH + margin;
     }
 
-    private static Color GetStellarColor(string? stellarType)
+    private static float GetStellarRadius(StellarType? stellarClass)
     {
-        if (stellarType == null) return Color.Yellow;
-        if (GameConstants.StellarTypes.TryGetValue(stellarType, out var info))
-            return info.Color;
-        return Color.Yellow;
-    }
-
-    private static float GetStellarRadius(string? stellarType)
-    {
-        return stellarType switch
+        return stellarClass switch
         {
-            "red_giant" => 5f,
-            "white_dwarf" => 2f,
-            "brown_dwarf" => 1.5f,
-            _ => 3f, // main_sequence
+            StellarType.RedGiant => 5f,
+            StellarType.WhiteDwarf => 2f,
+            StellarType.BrownDwarf => 1.5f,
+            _ => 3f, // MainSequence
         };
-    }
-
-    private static Color GetPlanetColor(string? exoplanetType)
-    {
-        return exoplanetType switch
-        {
-            "hot_jupiter" => new Color(255, 120, 50),
-            "super_earth" => new Color(100, 180, 100),
-            "ocean_world" => new Color(50, 100, 200),
-            "rogue_planet" => new Color(80, 80, 100),
-            "ice_giant" => new Color(150, 200, 255),
-            _ => Color.Gray,
-        };
-    }
-
-    private static Color GetNebulaColor(string? nebulaType)
-    {
-        if (nebulaType == null) return new Color(100, 50, 150);
-        if (GameConstants.NebulaTypes.TryGetValue(nebulaType, out var info))
-            return info.Color;
-        return new Color(100, 50, 150);
-    }
-
-    private static Color GetTuaoiColor(string tuaoiMode)
-    {
-        if (GameConstants.TuaoiModes.TryGetValue(tuaoiMode, out var info))
-            return info.Color;
-        return Color.Cyan;
     }
 }

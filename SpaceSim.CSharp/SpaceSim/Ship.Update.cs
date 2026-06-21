@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+
 using System.Text.Json;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
@@ -43,20 +43,24 @@ public partial class Ship
         if (LandedMode)
         {
             Array.Clear(Velocity);
-            float shift = (PlanetBiome == "dissonant" ? 10f : 1f) * dt;
+            float shift = (Biome == PlanetBiome.Dissonant ? 10f : 1f) * dt;
             for (int i = 0; i < N; i++)
             {
                 FTarget[i] += MathHelpers.RandomRange(-shift, shift);
                 FTarget[i] = Math.Clamp(FTarget[i], GameConstants.FrequencyMin, GameConstants.FrequencyMax);
                 float df = RDrive[i] - FTarget[i];
-                ResonanceLevels[i] = 1f / (1f + (df / ResonanceWidth) * (df / ResonanceWidth));
+                ResonanceLevels[i] = ResonancePhysics.Resonance(df, ResonanceWidth);
             }
             return;
         }
 
-        // Environmental influence on targets
-        float[] envInfluence = new float[N];
-        foreach (var body in celestialBodies)
+        // Environmental influence on targets (uses spatial grid for O(small) instead of O(810))
+        Array.Clear(_envInfluence);
+        if (SpatialGrid != null)
+            SpatialGrid.GetNearby(Position, GameConstants.InteractionDistance, _nearbyBuffer);
+        else
+        { _nearbyBuffer.Clear(); _nearbyBuffer.AddRange(celestialBodies); }
+        foreach (var body in _nearbyBuffer)
         {
             if (LockedTarget != null)
             {
@@ -68,32 +72,31 @@ public partial class Ship
             }
 
             bool anyClose = false;
-            float[] dists = new float[N];
             for (int d = 0; d < N; d++)
             {
-                dists[d] = MathF.Abs(Position[d] - body.Position[d]);
-                if (dists[d] < GameConstants.InteractionDistance) anyClose = true;
+                _dists[d] = MathF.Abs(Position[d] - body.Position[d]);
+                if (_dists[d] < GameConstants.InteractionDistance) anyClose = true;
             }
             if (anyClose)
             {
                 for (int d = 0; d < N; d++)
                 {
-                    if (dists[d] < GameConstants.InteractionDistance)
-                        envInfluence[d] += (GameConstants.InteractionDistance - dists[d]) / GameConstants.InteractionDistance * body.Frequency * MathF.Pow(PHI, d);
+                    if (_dists[d] < GameConstants.InteractionDistance)
+                        _envInfluence[d] += (GameConstants.InteractionDistance - _dists[d]) / GameConstants.InteractionDistance * body.Frequency * MathF.Pow(PHI, d);
                 }
             }
         }
         for (int i = 0; i < N; i++)
         {
-            FTarget[i] = BaseFTarget[i] + envInfluence[i];
+            FTarget[i] = BaseFTarget[i] + _envInfluence[i];
             FTarget[i] = Math.Clamp(FTarget[i], GameConstants.FrequencyMin, GameConstants.FrequencyMax);
         }
 
         // Autopilot to locked target
         if (LockedTarget != null)
         {
-            float[] dirVec = Vec5.Subtract(LockedTarget, Position);
-            float norm = Vec5.Norm(dirVec);
+            Vec5.SubtractInto(LockedTarget, Position, _dirVecBuffer);
+            float norm = Vec5.Norm(_dirVecBuffer);
             if (norm < 1e-6f) norm = 1e-6f;
 
             float stopDist = LockedIsRift ? GameConstants.RiftAlignmentTolerance : 1f;
@@ -119,27 +122,19 @@ public partial class Ship
                 float slowdownFactor = MathF.Min(1f, norm / GameConstants.SlowdownDist);
                 for (int i = 0; i < N; i++)
                 {
-                    float dirI = dirVec[i];
+                    float dirI = _dirVecBuffer[i];
                     float desiredVelI = (dirI / norm) * MaxVelocity * slowdownFactor;
                     float targetRes = MathF.Abs(desiredVelI) > 0.01f ? MathF.Min(0.999f, MathF.Abs(desiredVelI) / MaxVelocity) : 0;
-                    float targetDrive;
-                    if (targetRes > 0)
-                    {
-                        float dOverW = MathF.Sqrt(1f / targetRes - 1f);
-                        float delta = ResonanceWidth * dOverW;
-                        float deltaF = MathF.Sign(desiredVelI) * delta;
-                        targetDrive = FTarget[i] + deltaF;
-                    }
-                    else
-                        targetDrive = FTarget[i];
+                    float targetDrive = ResonancePhysics.DriveForTargetResonance(
+                        FTarget[i], targetRes, ResonanceWidth, MathF.Sign(desiredVelI));
 
                     if (norm < GameConstants.SlowdownDist / 2f)
                         RDrive[i] = targetDrive;
                     else
                     {
                         float autopilotRate = 0.1f;
-                        if (TuaoiMode == "navigation")
-                            autopilotRate *= GameConstants.TuaoiModes["navigation"].Rate;
+                        if (TuaoiMode == TuaoiMode.Navigation)
+                            autopilotRate *= _cachedTuaoiInfo.Rate;
                         RDrive[i] += (targetDrive - RDrive[i]) * autopilotRate;
                     }
                 }
@@ -158,12 +153,12 @@ public partial class Ship
         // Auto-rotate view toward locked target
         if (LockedTarget != null)
         {
-            float[] dirVec = Vec5.Subtract(LockedTarget, Position);
-            float norm = Vec5.Norm(dirVec);
+            Vec5.SubtractInto(LockedTarget, Position, _dirVecBuffer);
+            float norm = Vec5.Norm(_dirVecBuffer);
             if (norm > 1f)
             {
-                float dx = dirVec[0];
-                float dw = dirVec[3];
+                float dx = _dirVecBuffer[0];
+                float dw = _dirVecBuffer[3];
                 float targetR;
                 if (MathF.Abs(dx) + MathF.Abs(dw) > 1e-6f)
                 {
@@ -186,9 +181,9 @@ public partial class Ship
         {
             float df = RDrive[i] - FTarget[i];
             float effectiveWidth = ResonanceWidth;
-            if (TuaoiMode == "transcendence" && i >= 3)
-                effectiveWidth *= GameConstants.TuaoiModes["transcendence"].Rate;
-            ResonanceLevels[i] = 1f / (1f + (df / effectiveWidth) * (df / effectiveWidth));
+            if (TuaoiMode == TuaoiMode.Transcendence && i >= 3)
+                effectiveWidth *= GameConstants.TuaoiModes[TuaoiMode.Transcendence].Rate;
+            ResonanceLevels[i] = ResonancePhysics.Resonance(df, effectiveWidth);
 
             if (ResonanceLevels[i] > GameConstants.PerfectResonanceThreshold &&
                 _prevResonanceLevels[i] <= GameConstants.PerfectResonanceThreshold)
@@ -212,8 +207,8 @@ public partial class Ship
             Vec5.ScaleInPlace(Velocity, GameConstants.MerkabaVelocityBoost);
 
         // Power mode boost
-        if (TuaoiMode == "power")
-            Vec5.ScaleInPlace(Velocity, GameConstants.TuaoiModes["power"].Rate);
+        if (TuaoiMode == TuaoiMode.Power)
+            Vec5.ScaleInPlace(Velocity, GameConstants.TuaoiModes[TuaoiMode.Power].Rate);
 
         // Pyramid healing
         if (NearPyramid != null)
@@ -249,9 +244,13 @@ public partial class Ship
                     }
                 }
             }
-            // Clean expired
-            var expired = ActiveSolfeggio.Where(kv => kv.Value.Expiry <= SimulationTime).Select(kv => kv.Key).ToList();
-            foreach (var k in expired) ActiveSolfeggio.Remove(k);
+            // Clean expired (no LINQ — reuse pre-allocated list)
+            _expiredKeys.Clear();
+            foreach (var kv in ActiveSolfeggio)
+                if (kv.Value.Expiry <= SimulationTime)
+                    _expiredKeys.Add(kv.Key);
+            foreach (var k in _expiredKeys)
+                ActiveSolfeggio.Remove(k);
             _lastSolfeggioCheck = SimulationTime;
         }
 
@@ -298,9 +297,9 @@ public partial class Ship
         }
 
         // Tuaoi mode effects
-        if (TuaoiMode == "healing")
-            ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + GameConstants.TuaoiModes["healing"].Rate * dt);
-        else if (TuaoiMode == "regeneration" && InTempleResonance)
+        if (TuaoiMode == TuaoiMode.Healing)
+            ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + _cachedTuaoiInfo.Rate * dt);
+        else if (TuaoiMode == TuaoiMode.Regeneration && InTempleResonance)
             ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + GameConstants.TempleHealingRate * dt);
 
         // Extended Atlantean updates
@@ -355,16 +354,16 @@ public partial class Ship
                 riftPos[i] = Position[i] + MathHelpers.RandomRange(-15f, 15f);
             riftPos[3] = riftPos[0] * PHI;
             riftPos[4] = riftPos[1] * PHI;
-            string[] types = { "boost", "crystal", "hazard" };
-            string riftType = types[Random.Shared.Next(types.Length)];
+            RiftType[] riftTypes = { RiftType.Boost, RiftType.Crystal, RiftType.Hazard };
+            RiftType riftType = riftTypes[Random.Shared.Next(riftTypes.Length)];
             var sound = new GameSoundEffect(_audio.RiftHumWaveform, loop: true, volume: 0f);
             _audio.AddSoundEffect(sound);
-            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, Type = riftType, Sound = sound, LastBeepTime = SimulationTime });
+            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, RiftKind = riftType, Sound = sound, LastBeepTime = SimulationTime });
 
             var proj = ProjectRelative(riftPos);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
             string dirStr = angle < 0 ? "left" : "right";
-            Speak($"{Capitalize(riftType)} Harmonic Chamber detected at {MathF.Abs(angle):F1} degrees {dirStr}.");
+            Speak($"{riftType} Harmonic Chamber detected at {MathF.Abs(angle):F1} degrees {dirStr}.");
         }
 
         // Perfect fifth rift
@@ -381,7 +380,7 @@ public partial class Ship
             riftPos[4] = riftPos[1] * PHI;
             var sound = new GameSoundEffect(_audio.RiftHumWaveform, loop: true, volume: 0f);
             _audio.AddSoundEffect(sound);
-            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, Type = "perfect_fifth", Sound = sound, LastBeepTime = SimulationTime });
+            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, RiftKind = RiftType.PerfectFifth, Sound = sound, LastBeepTime = SimulationTime });
 
             var proj = ProjectRelative(riftPos);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
@@ -413,7 +412,7 @@ public partial class Ship
 
             if (avgRes > 0.9f) rift.Timer += dt * PHI;
 
-            float dist = Vec5.Distance(Position, rift.Position);
+            float dist = rift.DistanceTo(Position);
             if (rift.Sound != null)
             {
                 var proj = ProjectRelative(rift.Position);
@@ -485,10 +484,10 @@ public partial class Ship
                     Speak($"Rift status: Distance {dist:F1}, alignment {alignPct:F0}%, resonance {avgResP:F0}%.");
                     if (alignPct < 50f)
                     {
-                        float[] dirVec = Vec5.Subtract(LockedTarget, Position);
+                        Vec5.SubtractInto(LockedTarget, Position, _dirVecBuffer);
                         float targetR;
-                        if (MathF.Abs(dirVec[0]) + MathF.Abs(dirVec[3]) > 1e-6f)
-                            targetR = MathF.Atan2(dirVec[3], dirVec[0]);
+                        if (MathF.Abs(_dirVecBuffer[0]) + MathF.Abs(_dirVecBuffer[3]) > 1e-6f)
+                            targetR = MathF.Atan2(_dirVecBuffer[3], _dirVecBuffer[0]);
                         else
                             targetR = ViewRotation;
                         float deltaR = targetR - ViewRotation;
@@ -502,14 +501,18 @@ public partial class Ship
             }
         }
 
-        // Detect nearby celestial bodies
+        // Detect nearby celestial bodies (spatial grid query)
         float scanRange = GetEffectiveScanRange();
         NearestBody = null;
         float minDist = float.MaxValue;
         bool nearAny = false;
-        foreach (var body in celestialBodies)
+        if (SpatialGrid != null)
+            SpatialGrid.GetNearby(Position, scanRange, _nearbyBuffer);
+        else
+        { _nearbyBuffer.Clear(); _nearbyBuffer.AddRange(celestialBodies); }
+        foreach (var body in _nearbyBuffer)
         {
-            float dist = Vec5.Distance(Position, body.Position);
+            float dist = body.DistanceTo(Position);
             if (dist < scanRange)
             {
                 nearAny = true;
@@ -530,7 +533,7 @@ public partial class Ship
         // Proximity ambient audio
         if (AmbientSoundsEnabled && NearestBody != null)
         {
-            float dist = Vec5.Distance(Position, NearestBody.Position);
+            float dist = NearestBody.DistanceTo(Position);
             var proj = ProjectRelative(NearestBody.Position);
             float angle = MathF.Atan2(proj.Y, proj.X);
             float pan = MathF.Sin(angle);
@@ -550,9 +553,9 @@ public partial class Ship
             StopAllAmbientSounds();
 
         // Nebula dissonance
-        if (NebulaDissonanceEnabled && NearestBody != null && NearestBody.Type == "nebula")
+        if (NebulaDissonanceEnabled && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Nebula)
         {
-            float dist = Vec5.Distance(Position, NearestBody.Position);
+            float dist = NearestBody.DistanceTo(Position);
             if (dist < GameConstants.NebulaDissonanceRadius)
             {
                 float dissonance = NearestBody.Dissonance;
@@ -590,10 +593,14 @@ public partial class Ship
             _nebulaDissonanceAnnounced = false;
         }
 
-        // Landmarks during rotation
+        // Landmarks during rotation (spatial grid query)
         if (RotatingLeft || RotatingRight)
         {
-            foreach (var body in celestialBodies)
+            if (SpatialGrid != null)
+                SpatialGrid.GetNearby(Position, GameConstants.ScannerRange, _nearbyBuffer);
+            else
+            { _nearbyBuffer.Clear(); _nearbyBuffer.AddRange(celestialBodies); }
+            foreach (var body in _nearbyBuffer)
             {
                 var proj = ProjectRelative(body.Position);
                 float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
@@ -613,22 +620,22 @@ public partial class Ship
             if (LandingTimer <= 0)
             {
                 float landingThreshold = GameConstants.LandingThreshold;
-                if (NearestBody != null && NearestBody.Type == "planet")
+                if (NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
                     landingThreshold *= NearestBody.Difficulty;
 
-                if (Vec5.Mean(ResonanceLevels) > landingThreshold && NearestBody != null && NearestBody.Type == "planet")
+                if (Vec5.Mean(ResonanceLevels) > landingThreshold && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
                 {
                     LandedMode = true;
                     LandedPlanet = Vec5.Clone(NearestBody.Position);
                     LandedPlanetBody = NearestBody;
-                    DebugLogger.Log("Ship", $"LANDED on planet: type={NearestBody.ExoplanetType}, pos={Vec5.Format(NearestBody.Position)}");
+                    DebugLogger.Log("Ship", $"LANDED on planet: type={NearestBody.ExoplanetClass}, pos={Vec5.Format(NearestBody.Position)}");
                     GameEvents.RaiseLandingEvent(this, true, NearestBody);
                     GenerateCrystals();
                 }
                 else
                 {
                     ResonanceIntegrity -= 0.1f;
-                    if (NearestBody != null && NearestBody.Type != "planet")
+                    if (NearestBody != null && NearestBody.BodyType != CelestialBodyType.Planet)
                         Speak("Cannot anchor on this celestial body.");
                     else
                     {

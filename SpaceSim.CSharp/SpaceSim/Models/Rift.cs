@@ -1,10 +1,9 @@
 namespace SpaceSim.Models;
 
-public class Rift
+public class Rift : WorldObject
 {
-    public float[] Position = Vec5.Zero();
+    public RiftType RiftKind = RiftType.Normal;
     public float Timer;
-    public string Type = "normal";
     public GameSoundEffect? Sound;
     public float LastBeepTime;
 }

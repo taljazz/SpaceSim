@@ -41,7 +41,7 @@ public sealed class MainMenuScreen : MenuScreen
         if (Pressed(keys, prev, Keys.Escape))
         {
             _confirmingQuit = true;
-            Speak("Exit Space Sim? Press Escape again to exit, or press any other key to cancel.");
+            Speak("Exit Space Sim? Press Enter to exit, or Escape to cancel.");
             return ScreenTransition.None;
         }
 
@@ -61,17 +61,17 @@ public sealed class MainMenuScreen : MenuScreen
     }
 
     /// <summary>
-    /// While the quit prompt is up: a second Escape exits the game; any other key cancels and returns
-    /// to the menu. Stops a stray Escape from quitting by accident.
+    /// While the quit prompt is up: Enter exits the game; Escape (or any other key) cancels and
+    /// returns to the menu. Stops a stray Escape from quitting by accident.
     /// </summary>
     private ScreenTransition HandleQuitConfirmation(KeyboardState keys, KeyboardState prev)
     {
-        if (Pressed(keys, prev, Keys.Escape))
+        if (Pressed(keys, prev, Keys.Enter))
         {
             _confirmingQuit = false;
             return ScreenTransition.Quit;
         }
-        if (AnyKeyPressed(keys, prev))
+        if (AnyKeyPressed(keys, prev))   // Escape (or any other key) cancels and returns to the menu
         {
             _confirmingQuit = false;
             Speak($"Cancelled. {CurrentLabel}.");

@@ -199,12 +199,11 @@ public partial class Ship
         LockedTarget = sel.Position;
         LockedIsRift = sel.Kind == StarmapItemKind.Rift;
         LockedRift = LockedIsRift ? sel.ItemRift : null;
-
-        float[] waveform = LockedIsRift ? _audio.RiftBeepWaveform : _audio.BeepWaveform;
-        StopLockSound();
-        LockSound = new GameSoundEffect(waveform, loop: true, volume: _audio.BeepVolume);
-        _audio.AddSoundEffect(LockSound);
         _approachedRiftAnnounced = false;
+        // Start the homing beacon now so the lock is confirmed audibly even while the menu is still
+        // open (Ship.Update, which then keeps it positioned, is skipped during in-sim menus).
+        UpdateWorldLoop(ref LockSound, LockedIsRift ? _audio.RiftBeepWaveform : _audio.BeepWaveform,
+                        LockedTarget, _audio.BeepVolume);
 
         string name = sel.Label.Contains(" at") ? sel.Label[..sel.Label.IndexOf(" at")] : sel.Label;
         Speak($"Locked on to {name}.");
@@ -265,10 +264,9 @@ public partial class Ship
         LockedRift = sel.Rift;
         LockedTarget = sel.Position;
         LockedIsRift = true;
-        StopLockSound();
-        LockSound = new GameSoundEffect(_audio.RiftBeepWaveform, loop: true, volume: _audio.BeepVolume);
-        _audio.AddSoundEffect(LockSound);
         _approachedRiftAnnounced = false;
+        // Start the homing beacon now (see LockOnStarmapItem) so the lock beeps even inside the menu.
+        UpdateWorldLoop(ref LockSound, _audio.RiftBeepWaveform, LockedTarget, _audio.BeepVolume);
 
         string name = sel.Label.Contains(" at") ? sel.Label[..sel.Label.IndexOf(" at")] : sel.Label;
         Speak($"Locked on to {name} for beeping and navigation.");

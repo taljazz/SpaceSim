@@ -12,8 +12,8 @@ public class Rift : WorldObject
     /// <summary>Seconds of life left before the rift fades away.</summary>
     public float Timer;
 
-    /// <summary>The looping locator sound currently playing for this rift, if any.</summary>
-    public GameSoundEffect? Sound;
+    /// <summary>The looping locator hum currently playing for this rift, if any (a positional world sound).</summary>
+    public WorldSound? Sound;
 
     /// <summary>Simulation time of the last locator beep, used to space them out.</summary>
     public float LastBeepTime;

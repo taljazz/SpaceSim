@@ -147,6 +147,18 @@ public sealed class OpenAlAudio : IDisposable
     #region Playback
 
     /// <summary>
+    /// Generate an OpenAL source, returning 0 if generation failed (e.g. the implementation ran out of
+    /// voices). Clears any stale error first, then checks for one — a clean way to detect exhaustion so
+    /// callers can skip the sound or fall back to NAudio instead of using an invalid handle.
+    /// </summary>
+    private static int GenSourceChecked()
+    {
+        AL.GetError();
+        int source = AL.GenSource();
+        return AL.GetError() == ALError.NoError ? source : 0;
+    }
+
+    /// <summary>
     /// Start a looping positioned sound and return a <see cref="SpatialVoice"/> handle for updating
     /// its position/gain each frame or stopping it. Returns null if spatial audio is unavailable.
     /// </summary>
@@ -154,7 +166,8 @@ public sealed class OpenAlAudio : IDisposable
     {
         if (!IsAvailable) return null;
 
-        int source = AL.GenSource();
+        int source = GenSourceChecked();
+        if (source == 0) return null; // out of sources — caller falls back to NAudio panning
         AL.Source(source, ALSourcei.Buffer, GetBuffer(waveform));
         AL.Source(source, ALSourceb.SourceRelative, true); // position is relative to the listener
         AL.Source(source, ALSourceb.Looping, true);
@@ -172,7 +185,8 @@ public sealed class OpenAlAudio : IDisposable
     {
         if (!IsAvailable) return;
 
-        int source = AL.GenSource();
+        int source = GenSourceChecked();
+        if (source == 0) return; // out of sources — skip this one-shot rather than use an invalid handle
         AL.Source(source, ALSourcei.Buffer, GetBuffer(waveform));
         AL.Source(source, ALSourceb.SourceRelative, true);
         AL.Source(source, ALSourceb.Looping, false);

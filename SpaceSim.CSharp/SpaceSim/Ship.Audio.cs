@@ -162,6 +162,18 @@ public partial class Ship
     }
 
     /// <summary>
+    /// Fire a one-shot positioned sound (a beep) toward a world position — OpenAL + HRTF when available,
+    /// falling back to a stereo-panned NAudio effect. Used for the rift locator and proximity beeps.
+    /// </summary>
+    private void PlayWorldOneShot(float[] waveform, float[] worldPos, float volume)
+    {
+        if (_openAl.IsAvailable)
+            _openAl.PlayOneShot(waveform, SpatialAudioMath.ToListenerSpace(Position, worldPos, ViewRotation), volume);
+        else
+            GameEvents.RaisePlaySound(this, waveform, pan: ComputePan(worldPos), volume: volume);
+    }
+
+    /// <summary>
     /// Loudness for a proximity ambient: a strong, distance-faded level so the universe is actually
     /// audible up close. The normalized ambient waveforms peak very low (~0.1), so we boost them
     /// (gains above 1 amplify the quiet buffers) and clamp per-voice so overlapping ambients don't
@@ -184,8 +196,24 @@ public partial class Ship
         StopWorldLoop(ref _planetSound);
     }
 
-    /// <summary>Silence all proximity ambients — used when leaving the sim for a menu so the world goes quiet.</summary>
-    internal void SilenceAmbients() => StopAllAmbientSounds();
+    /// <summary>Stop the looping hum of every active rift (the voices, not the rift objects themselves).</summary>
+    private void StopAllRiftSounds()
+    {
+        foreach (var rift in Rifts)
+            StopWorldLoop(ref rift.Sound);
+    }
+
+    /// <summary>
+    /// Stop every positional world sound: proximity ambients, rift hums, and the target-lock beacon.
+    /// A clear-all only drains the NAudio mix, so leaving the sim or ascending calls this to make sure
+    /// no OpenAL world voice keeps playing.
+    /// </summary>
+    internal void SilenceAllWorldSounds()
+    {
+        StopAllAmbientSounds();
+        StopWorldLoop(ref LockSound);
+        StopAllRiftSounds();
+    }
 
     #endregion
 }

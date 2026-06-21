@@ -160,17 +160,19 @@ public partial class Ship
                         RDrive[i] += (targetDrive - RDrive[i]) * autopilotRate;
                     }
                 }
-
-                // Update lock sound pan
-                if (LockSound != null)
-                {
-                    var proj = ProjectRelative(LockedTarget);
-                    float angle = MathF.Atan2(proj.Y, proj.X);
-                    LockSound.Pan = MathF.Sin(angle);
-                    LockSound.Volume = _audio.BeepVolume;
-                }
             }
         }
+
+        // Keep the target-lock homing beacon in sync with the lock: positioned at the locked target
+        // (HRTF direction) while one is locked, stopped otherwise. Self-healing — it creates the voice
+        // when a lock starts and restarts it after a clear-all (e.g. returning from the menu).
+        if (LockedTarget != null)
+        {
+            float[] lockWave = LockedIsRift ? _audio.RiftBeepWaveform : _audio.BeepWaveform;
+            UpdateWorldLoop(ref LockSound, lockWave, LockedTarget, _audio.BeepVolume);
+        }
+        else
+            StopWorldLoop(ref LockSound);
 
         // Auto-rotate view toward locked target
         if (LockedTarget != null)
@@ -390,9 +392,9 @@ public partial class Ship
             riftPos[4] = riftPos[1] * PHI;
             RiftType[] riftTypes = { RiftType.Boost, RiftType.Crystal, RiftType.Hazard };
             RiftType riftType = riftTypes[Random.Shared.Next(riftTypes.Length)];
-            var sound = new GameSoundEffect(_audio.RiftHumWaveform, loop: true, volume: 0f);
-            _audio.AddSoundEffect(sound);
-            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, RiftKind = riftType, Sound = sound, LastBeepTime = SimulationTime });
+            // The looping hum is created and positioned by the rift update loop below (it sees
+            // Sound == null and starts the world voice), so it's HRTF-spatialised like the ambients.
+            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, RiftKind = riftType, LastBeepTime = SimulationTime });
 
             var proj = ProjectRelative(riftPos);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
@@ -412,9 +414,8 @@ public partial class Ship
                 riftPos[i] = Position[i] + MathHelpers.RandomRange(-15f, 15f);
             riftPos[3] = riftPos[0] * PHI;
             riftPos[4] = riftPos[1] * PHI;
-            var sound = new GameSoundEffect(_audio.RiftHumWaveform, loop: true, volume: 0f);
-            _audio.AddSoundEffect(sound);
-            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, RiftKind = RiftType.PerfectFifth, Sound = sound, LastBeepTime = SimulationTime });
+            // Hum created/positioned by the rift update loop (as above).
+            Rifts.Add(new Rift { Position = riftPos, Timer = GameConstants.RiftFadeTime, RiftKind = RiftType.PerfectFifth, LastBeepTime = SimulationTime });
 
             var proj = ProjectRelative(riftPos);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
@@ -442,7 +443,7 @@ public partial class Ship
                 }
                 else
                     Speak("Rift faded into the void.");
-                if (rift.Sound != null) { rift.Sound.Loop = false; rift.Sound.Volume = 0; }
+                StopWorldLoop(ref rift.Sound);
                 Rifts.RemoveAt(i);
                 continue;
             }
@@ -454,13 +455,12 @@ public partial class Ship
                 rift.Timer = MathF.Min(rift.Timer + dt * PHI, GameConstants.RiftFadeTime);
 
             float dist = rift.DistanceTo(Position);
-            if (rift.Sound != null)
-            {
-                var proj = ProjectRelative(rift.Position);
-                float angle = MathF.Atan2(proj.Y, proj.X);
-                rift.Sound.Pan = MathF.Sin(angle);
-                rift.Sound.Volume = MathF.Max(0, _audio.EffectVolume * (1f - dist / GameConstants.RiftMaxDist)) * avgRes;
-            }
+            // Keep the rift's positional hum tracking it (HRTF direction), its level fading with
+            // distance and resonance. Boosted to sit with the other world sounds; the update loop also
+            // creates the voice on the first pass (Sound starts null) and restarts it after a silence.
+            float riftVol = MathF.Min(GameConstants.AmbientMaxVoiceGain,
+                MathF.Max(0f, _audio.EffectVolume * (1f - dist / GameConstants.RiftMaxDist)) * avgRes * GameConstants.AmbientGain);
+            UpdateWorldLoop(ref rift.Sound, _audio.RiftHumWaveform, rift.Position, riftVol);
 
             if (rift == LockedRift)
             {
@@ -471,7 +471,7 @@ public partial class Ship
                 float interval = 2f - 1.8f * centeredFactor;
                 if (SimulationTime - rift.LastBeepTime > interval)
                 {
-                    GameEvents.RaisePlaySound(this, _audio.RiftBeepWaveform, pan: pan, volume: _audio.BeepVolume);
+                    PlayWorldOneShot(_audio.RiftBeepWaveform, rift.Position, _audio.BeepVolume);
                     rift.LastBeepTime = SimulationTime;
                 }
             }
@@ -591,9 +591,7 @@ public partial class Ship
         if (AmbientSoundsEnabled && NearestBody != null && NearObject &&
             SimulationTime - _lastBeepTime > 1f)
         {
-            var proj = ProjectRelative(NearestBody.Position);
-            float pan = MathF.Sin(MathF.Atan2(proj.Y, proj.X));
-            GameEvents.RaisePlaySound(this, _audio.BeepWaveform, pan: pan, volume: _audio.BeepVolume);
+            PlayWorldOneShot(_audio.BeepWaveform, NearestBody.Position, _audio.BeepVolume);
             _lastBeepTime = SimulationTime;
         }
 

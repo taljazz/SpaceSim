@@ -578,8 +578,9 @@ public partial class Ship
         ActivateGoldenHarmony();
         NeedsUniverseRegeneration = true;
         GameEvents.RaiseUniverseRegenNeeded(this);
+        SilenceAllWorldSounds();              // stop OpenAL world voices (ambients, rift hums, lock)
         Rifts.Clear();
-        GameEvents.RaiseClearAllSounds(this);
+        GameEvents.RaiseClearAllSounds(this); // and drain the NAudio mix (fallback loops, biome, one-shots)
         GameEvents.RaiseAscension(this);
     }
 
@@ -609,7 +610,7 @@ public partial class Ship
         }
 
         // Stop rift sound
-        if (rift.Sound != null) { rift.Sound.Loop = false; rift.Sound.Volume = 0; }
+        StopWorldLoop(ref rift.Sound);
 
         Rifts.Remove(rift);
         LockedRift = null;
@@ -619,16 +620,8 @@ public partial class Ship
         StopLockSound();
     }
 
-    /// <summary>Silences and releases the active target-lock loop sound, if one is playing.</summary>
-    private void StopLockSound()
-    {
-        if (LockSound != null)
-        {
-            LockSound.Loop = false;
-            LockSound.Volume = 0;
-            LockSound = null;
-        }
-    }
+    /// <summary>Silences and releases the active target-lock beacon, if one is playing.</summary>
+    private void StopLockSound() => StopWorldLoop(ref LockSound);
 
     #endregion
 }

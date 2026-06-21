@@ -161,6 +161,14 @@ public partial class Ship
             AmbientSoundsEnabled = state.AmbientSoundsEnabled;
             NebulaDissonanceEnabled = state.NebulaDissonanceEnabled;
 
+            // Start fresh: stop and clear any rifts, lock, and world sounds from the previous session
+            // so they don't carry stale audio into the loaded universe (mirrors Ascend).
+            SilenceAllWorldSounds();
+            Rifts.Clear();
+            LockedTarget = null;
+            LockedRift = null;
+            LockedIsRift = false;
+
             // Rebuild celestial bodies around the restored position on the next update.
             NeedsUniverseRegeneration = true;
             Speak("Game loaded.");

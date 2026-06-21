@@ -388,7 +388,7 @@ public partial class SpaceSimGame : Game
         {
             case GameScreen.Playing:
                 _audio.EngineEnabled = false;   // stop the drive drone under the menu
-                _ship.SilenceAmbients();        // stop positioned world loops
+                _ship.SilenceAllWorldSounds();  // stop positioned world loops (ambients, rift hums, lock)
                 _audio.ClearAllEffects();       // drop any lingering one-shots / loops
                 break;
             case GameScreen.LearnSounds:

@@ -119,7 +119,7 @@ public partial class Ship
     public int StarmapIndex;
     public List<StarmapItem> StarmapItems = new();
     public float[]? LockedTarget;
-    public GameSoundEffect? LockSound;
+    public WorldSound? LockSound;   // target-lock homing beacon (positional world sound)
     public bool LockedIsRift;
 
     // Rift selection

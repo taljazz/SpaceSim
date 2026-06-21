@@ -79,7 +79,7 @@ public partial class Ship
     {
         StarmapItems.Clear();
         if (LockedTarget != null && !LockedIsRift)
-            StarmapItems.Add(new StarmapItem { Label = "Unlock target", Position = null, ItemType = null, ItemRift = null });
+            StarmapItems.Add(new StarmapItem { Label = "Unlock target", IsUnlockAction = true });
 
         var items = new List<(float Dist, StarmapItem Item)>();
 
@@ -93,7 +93,7 @@ public partial class Ship
                 var sType = stars[i].StellarClass ?? StellarType.MainSequence;
                 string sDesc = GameConstants.StellarTypes[sType].Desc;
                 string label = $"Star {i + 1} ({sDesc}) at dist {dist:F1}, angle {angle:F1} degrees (unlandable)";
-                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(stars[i].Position), ItemType = "star", ItemRift = null }));
+                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(stars[i].Position), Kind = StarmapItemKind.Star }));
             }
         }
 
@@ -107,7 +107,7 @@ public partial class Ship
                 var eType = planets[i].ExoplanetClass ?? ExoplanetType.SuperEarth;
                 string eDesc = GameConstants.ExoplanetTypes[eType].Desc;
                 string label = $"Planet {i + 1} ({eDesc}) at dist {dist:F1}, angle {angle:F1} degrees";
-                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(planets[i].Position), ItemType = "planet", ItemRift = null }));
+                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(planets[i].Position), Kind = StarmapItemKind.Planet }));
             }
         }
 
@@ -121,7 +121,7 @@ public partial class Ship
                 var nType = nebulae[i].NebulaClass ?? NebulaType.Emission;
                 string nDesc = GameConstants.NebulaTypes[nType].Desc;
                 string label = $"Nebula {i + 1} ({nDesc}) at dist {dist:F1}, angle {angle:F1} degrees (unlandable)";
-                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(nebulae[i].Position), ItemType = "nebula", ItemRift = null }));
+                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(nebulae[i].Position), Kind = StarmapItemKind.Nebula }));
             }
         }
 
@@ -133,7 +133,7 @@ public partial class Ship
                 var proj = ProjectRelative(Rifts[i].Position);
                 float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
                 string label = $"Rift {i + 1} ({Rifts[i].RiftKind}) at dist {dist:F1}, angle {angle:F1} degrees";
-                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(Rifts[i].Position), ItemType = "rift", ItemRift = Rifts[i] }));
+                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(Rifts[i].Position), Kind = StarmapItemKind.Rift, ItemRift = Rifts[i] }));
             }
         }
 
@@ -142,7 +142,7 @@ public partial class Ship
             StarmapItems.Add(item);
 
         if (StarmapItems.Count == 0)
-            StarmapItems.Add(new StarmapItem { Label = "No objects in scanner range.", Position = null, ItemType = null, ItemRift = null });
+            StarmapItems.Add(new StarmapItem { Label = "No objects in scanner range." });
     }
 
     private void SpeakStarmapItem()
@@ -154,7 +154,7 @@ public partial class Ship
     private void LockOnStarmapItem()
     {
         var sel = StarmapItems[StarmapIndex];
-        if (sel.Label == "Unlock target")
+        if (sel.IsUnlockAction)
         {
             LockedTarget = null;
             LockedIsRift = false;
@@ -166,7 +166,7 @@ public partial class Ship
         if (sel.Position == null) return;
 
         LockedTarget = sel.Position;
-        LockedIsRift = sel.ItemType == "rift";
+        LockedIsRift = sel.Kind == StarmapItemKind.Rift;
         LockedRift = LockedIsRift ? sel.ItemRift : null;
 
         float[] waveform = LockedIsRift ? _audio.RiftBeepWaveform : _audio.BeepWaveform;
@@ -183,7 +183,7 @@ public partial class Ship
     {
         RiftItems.Clear();
         if (LockedRift != null)
-            RiftItems.Add(new RiftMenuItem { Label = "Unlock rift", Position = null, RiftType = null, Rift = null });
+            RiftItems.Add(new RiftMenuItem { Label = "Unlock rift", IsUnlockAction = true });
 
         var items = new List<(float Dist, RiftMenuItem Item)>();
         for (int i = 0; i < Rifts.Count; i++)
@@ -192,13 +192,13 @@ public partial class Ship
             var proj = ProjectRelative(Rifts[i].Position);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
             string label = $"Rift {i + 1} ({Rifts[i].RiftKind}) at dist {dist:F1}, angle {angle:F1} degrees";
-            items.Add((dist, new RiftMenuItem { Label = label, Position = Vec5.Clone(Rifts[i].Position), RiftType = Rifts[i].RiftKind.ToString(), Rift = Rifts[i] }));
+            items.Add((dist, new RiftMenuItem { Label = label, Position = Vec5.Clone(Rifts[i].Position), Rift = Rifts[i] }));
         }
         items.Sort((a, b) => a.Dist.CompareTo(b.Dist));
         foreach (var (_, item) in items) RiftItems.Add(item);
 
         if (RiftItems.Count == 0)
-            RiftItems.Add(new RiftMenuItem { Label = "No rifts detected.", Position = null, RiftType = null, Rift = null });
+            RiftItems.Add(new RiftMenuItem { Label = "No rifts detected." });
     }
 
     private void SpeakRiftItem()
@@ -210,7 +210,7 @@ public partial class Ship
     private void LockOnRiftItem()
     {
         var sel = RiftItems[RiftSelectionIndex];
-        if (sel.Label == "Unlock rift")
+        if (sel.IsUnlockAction)
         {
             LockedRift = null;
             LockedTarget = null;

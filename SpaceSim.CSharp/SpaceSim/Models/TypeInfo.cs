@@ -9,7 +9,7 @@ public record SolfeggioInfo(string Name, string Effect, string Desc, string Bonu
 public record CrystalSpectrumInfo(float FreqMin, float FreqMax, Color Color, string Chakra, string Bonus, float Mult);
 public record TuaoiModeInfo(float FreqBase, Color Color, string Effect, float Rate, string Desc);
 public record SacredPatternInfo(int Points, string Bonus, float Mult);
-public record BrainwaveStateInfo(float FreqMin, float FreqMax, string State, string Effect, float Mult);
+public record BrainwaveStateInfo(float FreqMin, float FreqMax, string State, BrainwaveEffect Effect, float Mult);
 public record ConsciousnessLevelInfo(float Threshold, float Mult, string Desc);
 public record AtlanteanCrystalTypeInfo(Color Color, float FreqMin, float FreqMax, string Effect, float Mult, string Desc);
 public record CymaticsPatternInfo(float FreqMin, float FreqMax, float Complexity);

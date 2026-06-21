@@ -385,9 +385,9 @@ public partial class Ship
                     {
                         CurrentBrainwave = stateName;
                         Speak($"Brainwave state: {stateName}. {FormatName(stateInfo.State)} mode.");
-                        if (stateInfo.Effect == "auto_repair")
+                        if (stateInfo.Effect == BrainwaveEffect.AutoRepair)
                             ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + 0.05f);
-                        else if (stateInfo.Effect == "rift_vision")
+                        else if (stateInfo.Effect == BrainwaveEffect.RiftVision)
                             Speak("Enhanced rift perception activated.");
                     }
                     return;

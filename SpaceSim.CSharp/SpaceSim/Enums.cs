@@ -100,3 +100,33 @@ public enum HarmonicType
     Tritone,
     Golden
 }
+
+/// <summary>Sacred-geometry crystal layouts that can appear on a landed planet.</summary>
+public enum SacredGeometryPattern
+{
+    VesicaPiscis,
+    SeedOfLife,
+    FlowerOfLife,
+    MetatronsCube,
+    Merkaba,
+    GoldenSpiral
+}
+
+/// <summary>Kind of object shown as a row in the starmap scanner menu.</summary>
+public enum StarmapItemKind
+{
+    Star,
+    Planet,
+    Nebula,
+    Rift
+}
+
+/// <summary>The gameplay effect granted while a given brainwave state is active.</summary>
+public enum BrainwaveEffect
+{
+    AutoRepair,
+    RiftVision,
+    EnhancedScan,
+    FastTuning,
+    AllBonus
+}

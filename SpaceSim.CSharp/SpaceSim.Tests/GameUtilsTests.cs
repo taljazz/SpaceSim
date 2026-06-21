@@ -30,5 +30,19 @@ public class GameUtilsTests
         Assert.Null(GameUtils.SpacePascalCase(null!));
     }
 
+    // Guards the de-stringify refactor: spoken sacred-pattern names must still match what the old
+    // snake_case FormatName produced (e.g. "seed_of_life" -> "Seed Of Life").
+    [Theory]
+    [InlineData(SacredGeometryPattern.VesicaPiscis, "Vesica Piscis")]
+    [InlineData(SacredGeometryPattern.SeedOfLife, "Seed Of Life")]
+    [InlineData(SacredGeometryPattern.FlowerOfLife, "Flower Of Life")]
+    [InlineData(SacredGeometryPattern.MetatronsCube, "Metatrons Cube")]
+    [InlineData(SacredGeometryPattern.Merkaba, "Merkaba")]
+    [InlineData(SacredGeometryPattern.GoldenSpiral, "Golden Spiral")]
+    public void SpacePascalCase_SacredPatternNames_MatchLegacyDisplay(SacredGeometryPattern pattern, string expected)
+    {
+        Assert.Equal(expected, GameUtils.SpacePascalCase(pattern.ToString()));
+    }
+
     #endregion
 }

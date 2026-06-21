@@ -46,60 +46,18 @@ public partial class Ship
 
         string patternMsg = "";
         if (CurrentPattern != null)
-            patternMsg = $" Sacred {FormatName(CurrentPattern)} pattern detected!";
+            patternMsg = $" Sacred {GameUtils.SpacePascalCase(CurrentPattern.Value.ToString())} pattern detected!";
         Speak($"Anchored on {Biome} biome planet. {Capitalize(exoDesc)}. {CrystalCount} Atlantean crystals detected.{patternMsg}");
-        DebugLogger.Log("Ship", $"GenerateCrystals: {CrystalCount} crystals, biome={Biome}, pattern={CurrentPattern ?? "none"}, mult={crystalMult:F1}");
+        DebugLogger.Log("Ship", $"GenerateCrystals: {CrystalCount} crystals, biome={Biome}, pattern={CurrentPattern?.ToString() ?? "none"}, mult={crystalMult:F1}");
 
         float scaleFactor = GameConstants.ScaleFactor;
 
+        // Pick the crystal layout once (polymorphic — see CrystalPattern), then place each crystal.
+        CrystalPattern layout = CrystalPatterns.Select(CurrentPattern, CrystalCount);
+
         for (int i = 0; i < CrystalCount; i++)
         {
-            float px, py;
-
-            if (CurrentPattern == "seed_of_life" && CrystalCount == 7)
-            {
-                if (i == 0) { px = 0; py = 0; }
-                else
-                {
-                    float angle = (i - 1) * (MathF.Tau / 6f);
-                    float r = scaleFactor / 10f;
-                    px = r * MathF.Cos(angle);
-                    py = r * MathF.Sin(angle);
-                }
-            }
-            else if (CurrentPattern == "merkaba" && CrystalCount == 8)
-            {
-                if (i < 4)
-                {
-                    float angle = i * (MathF.Tau / 4f) + MathF.PI / 4f;
-                    float r = scaleFactor / 10f;
-                    px = r * MathF.Cos(angle);
-                    py = r * MathF.Sin(angle);
-                }
-                else
-                {
-                    float angle = (i - 4) * (MathF.Tau / 4f);
-                    float r = scaleFactor / 10f * PHI;
-                    px = r * MathF.Cos(angle);
-                    py = r * MathF.Sin(angle);
-                }
-            }
-            else if (CurrentPattern == "golden_spiral" && CrystalCount == 5)
-            {
-                float theta = i * MathF.Tau * PHI;
-                int fibIdx = i % GameConstants.FibSeq.Length;
-                float r = GameConstants.FibSeq[fibIdx] * (scaleFactor / 10f);
-                px = r * MathF.Cos(theta);
-                py = r * MathF.Sin(theta);
-            }
-            else
-            {
-                float theta = i * MathF.Tau * PHI;
-                int fibIdx = i % GameConstants.FibSeq.Length;
-                float r = GameConstants.FibSeq[fibIdx] * (scaleFactor / 10f);
-                px = r * MathF.Cos(theta);
-                py = r * MathF.Sin(theta);
-            }
+            var (px, py) = layout.PositionFor(i, CrystalCount, scaleFactor);
 
             CrystalPositions.Add(new[] { px, py });
 
@@ -269,13 +227,13 @@ public partial class Ship
             // Sacred geometry pattern completion
             if (LockedCrystals.Count == CrystalCount)
             {
-                if (CurrentPattern != null && GameConstants.SacredPatterns.TryGetValue(CurrentPattern, out var pInfo))
+                if (CurrentPattern != null && GameConstants.SacredPatterns.TryGetValue(CurrentPattern.Value, out var pInfo))
                 {
                     PatternBonusTimer = 30f;
                     int bonusCrystals = (int)(CrystalCount * (pInfo.Mult - 1f));
                     if (bonusCrystals > 0)
                         CrystalsCollected += bonusCrystals;
-                    Speak($"All crystals collected! Sacred {FormatName(CurrentPattern)} pattern completed. {FormatName(pInfo.Bonus)} bonus activated. {bonusCrystals} bonus crystals. Press U for attunement.");
+                    Speak($"All crystals collected! Sacred {GameUtils.SpacePascalCase(CurrentPattern.Value.ToString())} pattern completed. {FormatName(pInfo.Bonus)} bonus activated. {bonusCrystals} bonus crystals. Press U for attunement.");
                 }
                 else
                 {

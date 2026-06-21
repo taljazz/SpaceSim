@@ -256,24 +256,24 @@ public static class GameConstants
     public static readonly float[] HallsOfAmentiPos = Vec5.Zero();
 
     // Sacred Geometry Patterns
-    public static readonly Dictionary<string, SacredPatternInfo> SacredPatterns = new()
+    public static readonly Dictionary<SacredGeometryPattern, SacredPatternInfo> SacredPatterns = new()
     {
-        ["vesica_piscis"] = new(2, "creation", 1.2f),
-        ["seed_of_life"] = new(7, "crystal_regen", 1.5f),
-        ["flower_of_life"] = new(19, "all_harmonics", 2f),
-        ["metatrons_cube"] = new(13, "max_resonance", 1.8f),
-        ["merkaba"] = new(8, "protection", 1.6f),
-        ["golden_spiral"] = new(5, "phi_stacking", PHI),
+        [SacredGeometryPattern.VesicaPiscis] = new(2, "creation", 1.2f),
+        [SacredGeometryPattern.SeedOfLife] = new(7, "crystal_regen", 1.5f),
+        [SacredGeometryPattern.FlowerOfLife] = new(19, "all_harmonics", 2f),
+        [SacredGeometryPattern.MetatronsCube] = new(13, "max_resonance", 1.8f),
+        [SacredGeometryPattern.Merkaba] = new(8, "protection", 1.6f),
+        [SacredGeometryPattern.GoldenSpiral] = new(5, "phi_stacking", PHI),
     };
 
     // Brainwave States
     public static readonly Dictionary<BrainwaveState, BrainwaveStateInfo> BrainwaveStates = new()
     {
-        [BrainwaveState.Delta] = new(0.5f, 4f, "deep_healing", "auto_repair", 2f),
-        [BrainwaveState.Theta] = new(4f, 8f, "meditation", "rift_vision", 1.5f),
-        [BrainwaveState.Alpha] = new(8f, 13f, "relaxed_focus", "enhanced_scan", 1.3f),
-        [BrainwaveState.Beta] = new(13f, 30f, "active", "fast_tuning", 1.2f),
-        [BrainwaveState.Gamma] = new(30f, 100f, "transcendence", "all_bonus", 1.4f),
+        [BrainwaveState.Delta] = new(0.5f, 4f, "deep_healing", BrainwaveEffect.AutoRepair, 2f),
+        [BrainwaveState.Theta] = new(4f, 8f, "meditation", BrainwaveEffect.RiftVision, 1.5f),
+        [BrainwaveState.Alpha] = new(8f, 13f, "relaxed_focus", BrainwaveEffect.EnhancedScan, 1.3f),
+        [BrainwaveState.Beta] = new(13f, 30f, "active", BrainwaveEffect.FastTuning, 1.2f),
+        [BrainwaveState.Gamma] = new(30f, 100f, "transcendence", BrainwaveEffect.AllBonus, 1.4f),
     };
 
     // Atlantean Terminology

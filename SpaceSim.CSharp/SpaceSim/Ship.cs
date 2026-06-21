@@ -184,8 +184,8 @@ public partial class Ship
     public BrainwaveState CurrentBrainwave = BrainwaveState.Beta;
     private bool _consciousnessAnnounced;
 
-    // Sacred geometry
-    public string? CurrentPattern;
+    // Sacred geometry — which pattern (if any) the current planet's crystals form.
+    public SacredGeometryPattern? CurrentPattern;
     public List<int> PatternProgress = new();
     public float PatternBonusTimer;
 
@@ -446,7 +446,10 @@ public partial class Ship
     {
         public string Label = "";
         public float[]? Position;
-        public string? ItemType;
+        /// <summary>What kind of object this row represents (null for non-targetable rows).</summary>
+        public StarmapItemKind? Kind;
+        /// <summary>True for the synthetic "Unlock target" row that clears the current lock.</summary>
+        public bool IsUnlockAction;
         public Rift? ItemRift;
     }
 
@@ -454,7 +457,8 @@ public partial class Ship
     {
         public string Label = "";
         public float[]? Position;
-        public string? RiftType;
+        /// <summary>True for the synthetic "Unlock rift" row that clears the current lock.</summary>
+        public bool IsUnlockAction;
         public Rift? Rift;
     }
 

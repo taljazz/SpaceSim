@@ -77,6 +77,12 @@ public partial class SpaceSimGame : Game
     private MainMenuScreen _mainMenu = null!;
     private LearnSoundsScreen _learnSounds = null!;
 
+    // First-launch only: defer the spoken main-menu intro by ~1s so the screen reader's window-focus
+    // announcement finishes first instead of cutting off our "use up/down, Enter to select" instructions.
+    private bool _menuIntroPending = true;
+    private float _menuIntroTimer;
+    private const float MenuIntroDelay = 1.0f;
+
     #endregion
 
     #region Construction and lifecycle
@@ -179,12 +185,13 @@ public partial class SpaceSimGame : Game
         DebugLogger.Log("Init", "Preferences loaded and applied");
 
         // Build the top-level menus and open on the main menu (the game starts here, not in the sim).
-        // The engine synth stays silent until the player chooses "Start Sim".
+        // The engine synth stays silent until the player chooses "Start Sim". The spoken intro is
+        // deferred to the first second of the game loop (see UpdateMenuIntro) so the screen reader's
+        // window-focus announcement doesn't talk over our menu instructions.
         Action<string> menuSpeak = msg => _tolk.Speak(msg, interrupt: true);
         _mainMenu = new MainMenuScreen(_audio, menuSpeak);
         _learnSounds = new LearnSoundsScreen(_audio, menuSpeak);
         _screen = GameScreen.MainMenu;
-        _mainMenu.OnEnter();
         DebugLogger.Log("Init", "Main menu ready");
 
         // Capture initial input state
@@ -387,6 +394,31 @@ public partial class SpaceSimGame : Game
             case GameScreen.LearnSounds:
                 _learnSounds.OnExit();          // stop any playing demo
                 break;
+        }
+    }
+
+    /// <summary>
+    /// First launch only: speak the main-menu title + instructions after a short delay, so the screen
+    /// reader's window-focus announcement finishes first instead of cutting them off. Cancelled if the
+    /// player navigates earlier — their own input announces the items instead.
+    /// </summary>
+    private void UpdateMenuIntro(float dt, KeyboardState keys)
+    {
+        if (!_menuIntroPending) return;
+
+        // Any menu key means the player is already engaged — let their navigation do the talking.
+        if (IsKeyPressed(keys, Keys.Up) || IsKeyPressed(keys, Keys.Down)
+            || IsKeyPressed(keys, Keys.Enter) || IsKeyPressed(keys, Keys.Space))
+        {
+            _menuIntroPending = false;
+            return;
+        }
+
+        _menuIntroTimer += dt;
+        if (_menuIntroTimer >= MenuIntroDelay)
+        {
+            _menuIntroPending = false;
+            _mainMenu.OnEnter();
         }
     }
 

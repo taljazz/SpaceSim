@@ -39,6 +39,7 @@ public partial class SpaceSimGame
         switch (_screen)
         {
             case GameScreen.MainMenu:
+                UpdateMenuIntro(dt, keys);
                 ApplyTransition(_mainMenu.HandleInput(keys, _prevKeyState));
                 break;
             case GameScreen.LearnSounds:

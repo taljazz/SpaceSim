@@ -46,7 +46,7 @@ public partial class Ship
     private void HandleStarAmbient(CelestialBody body, float dist)
     {
         var sType = body.StellarClass ?? StellarType.MainSequence;
-        float volume = _audio.EffectVolume * (1f - dist / GameConstants.StarHarmonyRadius) * 0.3f;
+        float volume = ComputeAmbientGain(dist, GameConstants.StarHarmonyRadius, 0.9f);
         float[] waveform = sType switch
         {
             StellarType.RedGiant => _audio.RedGiantPulse,
@@ -61,7 +61,7 @@ public partial class Ship
     private void HandleNebulaAmbient(CelestialBody body, float dist)
     {
         var nType = body.NebulaClass ?? NebulaType.Emission;
-        float volume = _audio.EffectVolume * (1f - dist / GameConstants.NebulaDissonanceRadius) * 0.4f;
+        float volume = ComputeAmbientGain(dist, GameConstants.NebulaDissonanceRadius, 1.0f);
         float[] waveform = nType switch
         {
             NebulaType.Emission => _audio.EmissionDrone,
@@ -77,7 +77,7 @@ public partial class Ship
     private void HandlePlanetAmbient(CelestialBody body, float dist)
     {
         var eType = body.ExoplanetClass ?? ExoplanetType.SuperEarth;
-        float volume = _audio.EffectVolume * (1f - dist / GameConstants.InteractionDistance) * 0.3f;
+        float volume = ComputeAmbientGain(dist, GameConstants.InteractionDistance, 0.9f);
         float[] waveform = eType switch
         {
             ExoplanetType.HotJupiter => _audio.HotJupiterRoar,
@@ -161,6 +161,21 @@ public partial class Ship
         return MathF.Sin(angle);
     }
 
+    /// <summary>
+    /// Loudness for a proximity ambient: a strong, distance-faded level so the universe is actually
+    /// audible up close. The normalized ambient waveforms peak very low (~0.1), so we boost them
+    /// (gains above 1 amplify the quiet buffers) and clamp per-voice so overlapping ambients don't
+    /// clip. EffectVolume trims the level (0.55..1.0) but can't crush it to silence; MasterVolume is
+    /// applied downstream (OpenAL listener gain / NAudio master).
+    /// </summary>
+    private float ComputeAmbientGain(float dist, float radius, float typeWeight)
+    {
+        float proximity = MathHelper.Clamp(1f - dist / radius, 0f, 1f);
+        float effectTrim = 0.55f + 0.45f * _audio.EffectVolume;
+        float gain = proximity * typeWeight * GameConstants.AmbientGain * effectTrim;
+        return MathF.Min(gain, GameConstants.AmbientMaxVoiceGain);
+    }
+
     /// <summary>Stop every looping proximity ambient (star, nebula, planet) — e.g. when none are in range.</summary>
     private void StopAllAmbientSounds()
     {
@@ -168,6 +183,9 @@ public partial class Ship
         StopWorldLoop(ref _nebulaSound);
         StopWorldLoop(ref _planetSound);
     }
+
+    /// <summary>Silence all proximity ambients — used when leaving the sim for a menu so the world goes quiet.</summary>
+    internal void SilenceAmbients() => StopAllAmbientSounds();
 
     #endregion
 }

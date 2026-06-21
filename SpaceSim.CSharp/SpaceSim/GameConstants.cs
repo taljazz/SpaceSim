@@ -50,6 +50,21 @@ public static class GameConstants
     public const float SchumannFreq = 7.83f;
     public const float SchumannVolume = 0.01f;
 
+    // --- Proximity ambient loudness ---
+    // The normalized star/planet/nebula ambient waveforms peak very low (~0.1), so on their own they
+    // were nearly inaudible once distance, EffectVolume, and MasterVolume stacked on top. These lift
+    // them to a clearly audible level (gains above 1 amplify the quiet buffers), with a per-voice
+    // ceiling so several overlapping ambients can't clip the mix.
+
+    /// <summary>Overall boost applied to proximity-ambient voices so the universe is audible up close.</summary>
+    public const float AmbientGain = 3.5f;
+
+    /// <summary>Per-voice ceiling for a proximity ambient, keeping overlapping ambients from clipping.</summary>
+    public const float AmbientMaxVoiceGain = 2.8f;
+
+    /// <summary>Playback gain for the "Learn Sounds" sound dictionary, so demos are clearly audible.</summary>
+    public const float LearnSoundGain = 2.5f;
+
     #endregion
 
     #region Celestial body generation

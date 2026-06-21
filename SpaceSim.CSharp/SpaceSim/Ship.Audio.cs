@@ -14,57 +14,99 @@ public partial class Ship
     #region Proximity ambient audio helpers
 
     /// <summary>
-    /// Drive the looping ambient soundscape for a nearby celestial body. Picks a type-specific
-    /// waveform (red giant pulse, nebula drone, ocean-world flow, etc.), fades its volume with
-    /// distance, and positions it in 3D — so flying past objects produces a living, locatable
-    /// soundscape (true HRTF placement when available, stereo panning as the fallback).
+    /// Update the looping ambient soundscape. Each frame we find the nearest star, planet, and
+    /// nebula in range and give EACH its own positioned 3D voice — so a star is heard even when one
+    /// of its planets happens to be closer, and a slot is stopped the moment its type leaves range
+    /// (no more stale, stuck drones). With HRTF the simultaneous sources are individually locatable.
     /// </summary>
-    /// <param name="body">The celestial body being approached.</param>
-    /// <param name="dist">Distance from the ship to the body, in world units.</param>
-    private void HandleProximityAmbient(CelestialBody body, float dist)
+    private void UpdateProximityAmbients(List<CelestialBody> celestialBodies)
     {
-        if (body.BodyType == CelestialBodyType.Star && dist < GameConstants.StarHarmonyRadius)
+        if (!AmbientSoundsEnabled)
         {
-            var sType = body.StellarClass ?? StellarType.MainSequence;
-            float volume = _audio.EffectVolume * (1f - dist / GameConstants.StarHarmonyRadius) * 0.3f;
-            float[]? waveform = sType switch
-            {
-                StellarType.RedGiant => _audio.RedGiantPulse,
-                StellarType.WhiteDwarf => _audio.WhiteDwarfWhine,
-                StellarType.BrownDwarf => _audio.BrownDwarfRumble,
-                _ => null
-            };
-            UpdateWorldLoop(ref _starSound, waveform, body.Position, volume);
+            StopAllAmbientSounds();
+            return;
         }
-        else if (body.BodyType == CelestialBodyType.Nebula && dist < GameConstants.NebulaDissonanceRadius)
+
+        // Gather candidates within the largest ambient radius (planets reach furthest, at 15 units).
+        if (SpatialGrid != null)
+            SpatialGrid.GetNearby(Position, GameConstants.InteractionDistance, _nearbyBuffer);
+        else
         {
-            var nType = body.NebulaClass ?? NebulaType.Emission;
-            float volume = _audio.EffectVolume * (1f - dist / GameConstants.NebulaDissonanceRadius) * 0.4f;
-            float[]? waveform = nType switch
-            {
-                NebulaType.Emission => _audio.EmissionDrone,
-                NebulaType.Reflection => _audio.ReflectionShimmer,
-                NebulaType.Planetary => _audio.PlanetaryLayers,
-                NebulaType.SupernovaRemnant => _audio.SupernovaChaos,
-                _ => null
-            };
-            UpdateWorldLoop(ref _nebulaSound, waveform, body.Position, volume);
+            _nearbyBuffer.Clear();
+            _nearbyBuffer.AddRange(celestialBodies);
         }
-        else if (body.BodyType == CelestialBodyType.Planet && dist < GameConstants.InteractionDistance)
+
+        // Find the nearest body of each type.
+        CelestialBody? star = null, planet = null, nebula = null;
+        float dStar = float.MaxValue, dPlanet = float.MaxValue, dNebula = float.MaxValue;
+        foreach (var body in _nearbyBuffer)
         {
-            var eType = body.ExoplanetClass ?? ExoplanetType.SuperEarth;
-            float volume = _audio.EffectVolume * (1f - dist / GameConstants.InteractionDistance) * 0.3f;
-            float[]? waveform = eType switch
+            float dist = body.DistanceTo(Position);
+            switch (body.BodyType)
             {
-                ExoplanetType.HotJupiter => _audio.HotJupiterRoar,
-                ExoplanetType.SuperEarth => _audio.SuperEarthTone,
-                ExoplanetType.OceanWorld => _audio.OceanWorldFlow,
-                ExoplanetType.RoguePlanet => _audio.RogueOminous,
-                ExoplanetType.IceGiant => _audio.IceChime,
-                _ => null
-            };
-            UpdateWorldLoop(ref _planetSound, waveform, body.Position, volume);
+                case CelestialBodyType.Star when dist < dStar: dStar = dist; star = body; break;
+                case CelestialBodyType.Planet when dist < dPlanet: dPlanet = dist; planet = body; break;
+                case CelestialBodyType.Nebula when dist < dNebula: dNebula = dist; nebula = body; break;
+            }
         }
+
+        // Drive each slot independently, or stop it when nothing of that type is in range.
+        if (star != null && dStar < GameConstants.StarHarmonyRadius) HandleStarAmbient(star, dStar);
+        else StopWorldLoop(ref _starSound);
+
+        if (planet != null && dPlanet < GameConstants.InteractionDistance) HandlePlanetAmbient(planet, dPlanet);
+        else StopWorldLoop(ref _planetSound);
+
+        if (nebula != null && dNebula < GameConstants.NebulaDissonanceRadius) HandleNebulaAmbient(nebula, dNebula);
+        else StopWorldLoop(ref _nebulaSound);
+    }
+
+    /// <summary>Looping ambient for the nearest star — type-specific timbre, including a warm hum for the common main-sequence stars.</summary>
+    private void HandleStarAmbient(CelestialBody body, float dist)
+    {
+        var sType = body.StellarClass ?? StellarType.MainSequence;
+        float volume = _audio.EffectVolume * (1f - dist / GameConstants.StarHarmonyRadius) * 0.3f;
+        float[] waveform = sType switch
+        {
+            StellarType.RedGiant => _audio.RedGiantPulse,
+            StellarType.WhiteDwarf => _audio.WhiteDwarfWhine,
+            StellarType.BrownDwarf => _audio.BrownDwarfRumble,
+            _ => _audio.MainSequenceHum   // main-sequence stars now have an audible warm drone
+        };
+        UpdateWorldLoop(ref _starSound, waveform, body.Position, volume);
+    }
+
+    /// <summary>Looping ambient for the nearest nebula — type-specific drone / shimmer / chaos.</summary>
+    private void HandleNebulaAmbient(CelestialBody body, float dist)
+    {
+        var nType = body.NebulaClass ?? NebulaType.Emission;
+        float volume = _audio.EffectVolume * (1f - dist / GameConstants.NebulaDissonanceRadius) * 0.4f;
+        float[] waveform = nType switch
+        {
+            NebulaType.Emission => _audio.EmissionDrone,
+            NebulaType.Reflection => _audio.ReflectionShimmer,
+            NebulaType.Planetary => _audio.PlanetaryLayers,
+            NebulaType.SupernovaRemnant => _audio.SupernovaChaos,
+            _ => _audio.EmissionDrone
+        };
+        UpdateWorldLoop(ref _nebulaSound, waveform, body.Position, volume);
+    }
+
+    /// <summary>Looping ambient for the nearest planet — type-specific timbre.</summary>
+    private void HandlePlanetAmbient(CelestialBody body, float dist)
+    {
+        var eType = body.ExoplanetClass ?? ExoplanetType.SuperEarth;
+        float volume = _audio.EffectVolume * (1f - dist / GameConstants.InteractionDistance) * 0.3f;
+        float[] waveform = eType switch
+        {
+            ExoplanetType.HotJupiter => _audio.HotJupiterRoar,
+            ExoplanetType.SuperEarth => _audio.SuperEarthTone,
+            ExoplanetType.OceanWorld => _audio.OceanWorldFlow,
+            ExoplanetType.RoguePlanet => _audio.RogueOminous,
+            ExoplanetType.IceGiant => _audio.IceChime,
+            _ => _audio.SuperEarthTone
+        };
+        UpdateWorldLoop(ref _planetSound, waveform, body.Position, volume);
     }
 
     /// <summary>

@@ -143,6 +143,9 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// <summary>Barely-audible 25 Hz rumble for brown-dwarf stars.</summary>
     public float[] BrownDwarfRumble = Array.Empty<float>();
 
+    /// <summary>Warm mid-range drone for ordinary main-sequence stars, so they're actually audible.</summary>
+    public float[] MainSequenceHum = Array.Empty<float>();
+
     // Nebula ambient sounds
 
     /// <summary>Warm drone for emission nebulae.</summary>

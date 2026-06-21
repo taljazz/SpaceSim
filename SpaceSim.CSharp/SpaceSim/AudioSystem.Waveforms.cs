@@ -40,6 +40,7 @@ public partial class AudioSystem
         RedGiantPulse = GenerateRedGiantPulse();
         WhiteDwarfWhine = GenerateTone(1350f, 1f, 0.08f);
         BrownDwarfRumble = GenerateTone(25f, 1.5f, 0.05f);
+        MainSequenceHum = GenerateMainSequenceHum();
 
         // --- Nebula ambient sounds ---
         EmissionDrone = GenerateEmissionDrone();
@@ -188,6 +189,29 @@ public partial class AudioSystem
             float envelope = MathF.Sin(MathF.PI * t / duration);
             envelope *= envelope; // sin^2
             buf[i] = 0.1f * envelope * MathF.Sin(TwoPi * freq * t);
+        }
+        return buf;
+    }
+
+    /// <summary>
+    /// Warm one-second main-sequence star drone: a 220 Hz fundamental with a soft perfect fifth and
+    /// a golden-ratio shimmer, gently undulating — an audible "sunlike" glow. Most stars are
+    /// main-sequence, so this is the star sound the player hears most often.
+    /// </summary>
+    private static float[] GenerateMainSequenceHum()
+    {
+        const float duration = 1f;
+        const float baseFreq = 220f;
+        int samples = (int)(duration * SampleRate);
+        var buf = new float[samples];
+        for (int i = 0; i < samples; i++)
+        {
+            float t = (float)i / SampleRate;
+            float shimmer = 1f + 0.15f * MathF.Sin(TwoPi * 2f * t);          // gentle slow undulation
+            float signal = MathF.Sin(TwoPi * baseFreq * t)
+                         + 0.4f * MathF.Sin(TwoPi * baseFreq * 1.5f * t)     // soft perfect fifth
+                         + 0.2f * MathF.Sin(TwoPi * baseFreq * PHI * t);     // golden shimmer
+            buf[i] = 0.07f * shimmer * signal;
         }
         return buf;
     }

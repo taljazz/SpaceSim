@@ -570,27 +570,20 @@ public partial class Ship
             Speak("Leaving object vicinity. Base targets restored.");
         }
 
-        // Proximity ambient audio
-        if (AmbientSoundsEnabled && NearestBody != null)
+        // Proximity beep toward the single nearest object (directional cue).
+        if (AmbientSoundsEnabled && NearestBody != null && NearObject &&
+            SimulationTime - _lastBeepTime > 1f)
         {
-            float dist = NearestBody.DistanceTo(Position);
             var proj = ProjectRelative(NearestBody.Position);
-            float angle = MathF.Atan2(proj.Y, proj.X);
-            float pan = MathF.Sin(angle);
-
-            if (NearObject && SimulationTime - _lastBeepTime > 1f)
-            {
-                GameEvents.RaisePlaySound(this, _audio.BeepWaveform, pan: pan, volume: _audio.BeepVolume);
-                _lastBeepTime = SimulationTime;
-            }
-
-            // Type-specific ambient
-            HandleProximityAmbient(NearestBody, dist);
+            float pan = MathF.Sin(MathF.Atan2(proj.Y, proj.X));
+            GameEvents.RaisePlaySound(this, _audio.BeepWaveform, pan: pan, volume: _audio.BeepVolume);
+            _lastBeepTime = SimulationTime;
         }
 
-        // Stop ambient when leaving
-        if (!NearObject || NearestBody == null || !AmbientSoundsEnabled)
-            StopAllAmbientSounds();
+        // Per-type positional ambients: the nearest star, planet, and nebula each get their own
+        // independent 3D voice (started/stopped per type), so a star is audible even when one of its
+        // planets is closer — and slots stop cleanly instead of getting stuck looping.
+        UpdateProximityAmbients(celestialBodies);
 
         // Nebula dissonance
         if (NebulaDissonanceEnabled && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Nebula)

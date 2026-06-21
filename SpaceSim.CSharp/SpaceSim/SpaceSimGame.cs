@@ -77,11 +77,11 @@ public partial class SpaceSimGame : Game
     private MainMenuScreen _mainMenu = null!;
     private LearnSoundsScreen _learnSounds = null!;
 
-    // First-launch only: defer the spoken main-menu intro by ~1s so the screen reader's window-focus
+    // First-launch only: defer the spoken main-menu intro briefly so the screen reader's window-focus
     // announcement finishes first instead of cutting off our "use up/down, Enter to select" instructions.
     private bool _menuIntroPending = true;
     private float _menuIntroTimer;
-    private const float MenuIntroDelay = 0.5f;
+    private const float MenuIntroDelay = 0.064f;
 
     #endregion
 
@@ -186,7 +186,7 @@ public partial class SpaceSimGame : Game
 
         // Build the top-level menus and open on the main menu (the game starts here, not in the sim).
         // The engine synth stays silent until the player chooses "Start Sim". The spoken intro is
-        // deferred to the first second of the game loop (see UpdateMenuIntro) so the screen reader's
+        // deferred briefly into the game loop (see UpdateMenuIntro) so the screen reader's
         // window-focus announcement doesn't talk over our menu instructions.
         Action<string> menuSpeak = msg => _tolk.Speak(msg, interrupt: true);
         _mainMenu = new MainMenuScreen(_audio, menuSpeak);

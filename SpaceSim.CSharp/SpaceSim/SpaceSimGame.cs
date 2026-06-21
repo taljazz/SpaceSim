@@ -32,6 +32,7 @@ public partial class SpaceSimGame : Game
     // --- Core systems ---
     private Ship _ship = null!;
     private AudioSystem _audio = null!;
+    private OpenAlAudio _openAl = null!;   // OpenAL Soft spatial engine for positioned world sounds (Round 3)
     private TolkSpeechService _tolk = null!;
 
     // --- Camera ---
@@ -136,6 +137,11 @@ public partial class SpaceSimGame : Game
         {
             DebugLogger.LogError("Audio", "AudioSystem.Start() failed", ex);
         }
+
+        // Initialize the OpenAL spatial-audio engine (Round 3 — positioned world sounds + HRTF).
+        // It self-guards: if OpenAL/HRTF can't initialize, IsAvailable stays false and world sounds
+        // fall back to NAudio panning. Nothing is routed through it yet (that arrives in Round 3B).
+        _openAl = new OpenAlAudio();
 
         // Subscribe to game events
         GameEvents.OnSpeak += HandleSpeak;
@@ -249,6 +255,7 @@ public partial class SpaceSimGame : Game
             _audio?.Stop();
             _audio?.Dispose();
             DebugLogger.Log("Audio", "AudioSystem disposed");
+            _openAl?.Dispose();
             _tolk?.Dispose();
             DebugLogger.Log("Init", "TolkSpeechService disposed");
             DebugLogger.Flush();

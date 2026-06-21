@@ -27,10 +27,12 @@
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
     <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="OpenTK" Version="4.8.2" />
   </ItemGroup>
   <ItemGroup>
     <None Update="Tolk.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TolkDotNet.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Update="nvdaControllerClient64.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="OpenAL32.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

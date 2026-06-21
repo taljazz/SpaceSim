@@ -48,7 +48,7 @@ public sealed class LearnSoundsScreen : MenuScreen
         new("Main sequence star", "A warm, steady hum. The most common star.", a.MainSequenceHum),
         new("Red giant star", "A deep, slow bass pulse.", a.RedGiantPulse),
         new("White dwarf star", "A high, thin whine.", a.WhiteDwarfWhine),
-        new("Brown dwarf star", "A very low, faint rumble.", a.BrownDwarfRumble),
+        new("Brown dwarf star", "A low, faint rumble.", a.BrownDwarfRumble),
         // Nebulae
         new("Emission nebula", "A warm drone.", a.EmissionDrone),
         new("Reflection nebula", "A cool, shimmering tremolo.", a.ReflectionShimmer),

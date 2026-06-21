@@ -141,13 +141,13 @@ public partial class AudioSystem : ISampleProvider, IDisposable
 
     // Stellar ambient sounds
 
-    /// <summary>Deep 40 Hz pulsing bass for red-giant stars.</summary>
+    /// <summary>Deep ~110 Hz pulsing throb for red-giant stars (raised from 40 Hz to be audible).</summary>
     public float[] RedGiantPulse = Array.Empty<float>();
 
     /// <summary>High 1350 Hz whine for white-dwarf stars.</summary>
     public float[] WhiteDwarfWhine = Array.Empty<float>();
 
-    /// <summary>Barely-audible 25 Hz rumble for brown-dwarf stars.</summary>
+    /// <summary>Low ~80 Hz rumble for brown-dwarf stars (raised from 25 Hz so it's actually audible).</summary>
     public float[] BrownDwarfRumble = Array.Empty<float>();
 
     /// <summary>Warm mid-range drone for ordinary main-sequence stars, so they're actually audible.</summary>
@@ -178,7 +178,7 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// <summary>Gently undulating tone for ocean worlds.</summary>
     public float[] OceanWorldFlow = Array.Empty<float>();
 
-    /// <summary>Low, ominous tone for sunless rogue planets.</summary>
+    /// <summary>Low ~95 Hz ominous tone for sunless rogue planets (raised from 50 Hz to be audible).</summary>
     public float[] RogueOminous = Array.Empty<float>();
 
     /// <summary>Bell-like crystalline chime for ice giants.</summary>

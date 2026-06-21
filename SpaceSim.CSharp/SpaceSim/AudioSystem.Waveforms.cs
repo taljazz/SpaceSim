@@ -39,7 +39,7 @@ public partial class AudioSystem
         // --- Stellar ambient sounds ---
         RedGiantPulse = GenerateRedGiantPulse();
         WhiteDwarfWhine = GenerateTone(1350f, 1f, 0.08f);
-        BrownDwarfRumble = GenerateTone(25f, 1.5f, 0.05f);
+        BrownDwarfRumble = GenerateBrownDwarfRumble();
         MainSequenceHum = GenerateMainSequenceHum();
 
         // --- Nebula ambient sounds ---
@@ -52,7 +52,7 @@ public partial class AudioSystem
         HotJupiterRoar = GenerateHotJupiterRoar();
         SuperEarthTone = GenerateSuperEarthTone();
         OceanWorldFlow = GenerateOceanWorldFlow();
-        RogueOminous = GenerateTone(50f, 1f, 0.03f);
+        RogueOminous = GenerateTone(95f, 1f, 0.06f);  // raised from 50 Hz so it's audible, still low/ominous
         IceChime = GenerateIceChime();
     }
 
@@ -175,12 +175,12 @@ public partial class AudioSystem
         return buf;
     }
 
-    /// <summary>Two-second 40 Hz bass throb under a smooth sin^2 swell — the heartbeat of a red giant.</summary>
-    // --- Red Giant Pulse: 2s, 40 Hz deep bass with sin^2 envelope ---
+    /// <summary>Two-second ~110 Hz bass throb under a smooth sin^2 swell — the heartbeat of a red giant.</summary>
+    // --- Red Giant Pulse: 2s, 110 Hz deep bass with sin^2 envelope (raised from 40 Hz to be audible) ---
     private static float[] GenerateRedGiantPulse()
     {
         const float duration = 2f;
-        const float freq = 40f;
+        const float freq = 110f;   // raised from 40 Hz so the deep throb is actually audible/lockable
         int samples = (int)(duration * SampleRate);
         var buf = new float[samples];
         for (int i = 0; i < samples; i++)
@@ -188,7 +188,30 @@ public partial class AudioSystem
             float t = (float)i / SampleRate;
             float envelope = MathF.Sin(MathF.PI * t / duration);
             envelope *= envelope; // sin^2
-            buf[i] = 0.1f * envelope * MathF.Sin(TwoPi * freq * t);
+            float signal = MathF.Sin(TwoPi * freq * t)
+                         + 0.3f * MathF.Sin(TwoPi * freq * 2f * t); // soft octave adds presence
+            buf[i] = 0.1f * envelope * signal;
+        }
+        return buf;
+    }
+
+    /// <summary>
+    /// Low ~80 Hz rumble for brown-dwarf "failed stars": a soft octave on top for presence and a slow
+    /// undulation. Deep but now actually audible — the old 25 Hz fundamental was below most ears/speakers.
+    /// </summary>
+    private static float[] GenerateBrownDwarfRumble()
+    {
+        const float duration = 1.5f;
+        const float baseFreq = 80f;
+        int samples = (int)(duration * SampleRate);
+        var buf = new float[samples];
+        for (int i = 0; i < samples; i++)
+        {
+            float t = (float)i / SampleRate;
+            float undulation = 1f + 0.2f * MathF.Sin(TwoPi * 1.2f * t);   // slow rumble swell
+            float signal = MathF.Sin(TwoPi * baseFreq * t)
+                         + 0.4f * MathF.Sin(TwoPi * baseFreq * 2f * t);   // soft octave for presence
+            buf[i] = 0.08f * undulation * signal;
         }
         return buf;
     }

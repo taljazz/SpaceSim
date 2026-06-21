@@ -65,6 +65,33 @@ public static class GameConstants
     /// <summary>Playback gain for the "Learn Sounds" sound dictionary, so demos are clearly audible.</summary>
     public const float LearnSoundGain = 2.5f;
 
+    // --- Tuning-by-ear beat cue ---
+    // A reference tone at the selected realm's target pitch, tremolo'd at the detuning rate so the
+    // player can tune by ear: it pulses fast when far off, slows as they approach, and goes steady
+    // at perfect resonance.
+
+    /// <summary>Detuning (Hz) within which the beat-frequency tuning cue emerges (it stays silent beyond this).</summary>
+    public const float BeatCueRange = 25f;
+
+    /// <summary>Amplitude of the tuning cue — subtle; further scaled by closeness and the tremolo envelope.</summary>
+    public const float BeatCueVolume = 0.07f;
+
+    /// <summary>Detuning (Hz) within which the tremolo smoothly fills up to a full, steady "locked" tone.</summary>
+    public const float BeatLockZone = 3f;
+
+    // --- Doppler (positional world voices) ---
+    // Approaching a world sound shifts its pitch up, receding shifts it down (a simple radial-speed
+    // approximation). Applied to OpenAL voices only; the NAudio fallback has no pitch control.
+
+    /// <summary>Pitch shift per unit of radial speed toward a source.</summary>
+    public const float DopplerScale = 0.02f;
+
+    /// <summary>Lower clamp on Doppler pitch (receding fast).</summary>
+    public const float DopplerMinPitch = 0.7f;
+
+    /// <summary>Upper clamp on Doppler pitch (approaching fast).</summary>
+    public const float DopplerMaxPitch = 1.4f;
+
     #endregion
 
     #region Celestial body generation

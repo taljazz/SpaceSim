@@ -37,6 +37,10 @@ public partial class AudioSystem
         float chargeProgress = 0f;
         bool hasHarmonicPairs = false;
 
+        // Tuning-by-ear beat cue (selected realm) — computed once per buffer, emitted per sample below.
+        bool beatActive = false;
+        float beatCloseness = 0f, beatCarrierInc = 0f, beatAmInc = 0f, beatPanL = 0f, beatPanR = 0f, beatLockBlend = 0f;
+
         Ship? ship = _ship; // volatile read
 
         // The engine (drive synthesis + harmonics) only runs while the sim is active; at the menus
@@ -57,6 +61,21 @@ public partial class AudioSystem
             chargeProgress = s.RiftChargeProgress;
             DetectHarmonicPairs(_harmonicPairsBuffer, _snapRDrive);
             hasHarmonicPairs = _harmonicPairsBuffer.Count > 0;
+
+            // Beat cue: a reference tone at the selected realm's target pitch, tremolo'd at the
+            // detuning rate so it pulses fast when far, slows as you approach, and goes steady at lock.
+            int beatDim = Math.Clamp(s.SelectedDim, 0, NDimensions - 1);
+            float beatTargetF = _snapFTarget[beatDim];
+            float beatDelta = MathF.Abs(_snapRDrive[beatDim] - beatTargetF);
+            if (beatTargetF > 1f && beatDelta < GameConstants.BeatCueRange)
+            {
+                beatActive = true;
+                beatCloseness = 1f - beatDelta / GameConstants.BeatCueRange;
+                beatLockBlend = Math.Clamp(1f - beatDelta / GameConstants.BeatLockZone, 0f, 1f);
+                beatCarrierInc = TwoPi * (beatTargetF * 0.5f) / SampleRate;
+                beatAmInc = TwoPi * beatDelta / SampleRate;
+                (beatPanL, beatPanR) = DimensionPan[beatDim];
+            }
         }
 
         double audioTimeStart = _audioTime;
@@ -144,6 +163,23 @@ public partial class AudioSystem
                     float chargeTone = chargeAmp * MathF.Sin(TwoPi * chargeFreq * t);
                     left += chargeTone;
                     right += chargeTone;
+                }
+
+                // --- 4b. Tuning-by-ear beat cue for the selected realm ---
+                if (beatActive)
+                {
+                    _beatCarrierPhase += beatCarrierInc;
+                    if (_beatCarrierPhase >= TwoPi) _beatCarrierPhase -= TwoPi;
+                    _beatAmPhase += beatAmInc;
+                    if (_beatAmPhase >= TwoPi) _beatAmPhase -= TwoPi;
+
+                    // Tremolo pulsing at the detuning rate; near lock it smoothly fills up to a full,
+                    // steady tone — a deterministic "locked" payoff instead of whatever phase the beat froze at.
+                    float tremolo = 0.5f + 0.5f * MathF.Cos((float)_beatAmPhase);
+                    float beatEnv = tremolo + (1f - tremolo) * beatLockBlend;
+                    float beatTone = GameConstants.BeatCueVolume * beatCloseness * beatEnv * MathF.Sin((float)_beatCarrierPhase);
+                    left += beatTone * beatPanL;
+                    right += beatTone * beatPanR;
                 }
             }
 

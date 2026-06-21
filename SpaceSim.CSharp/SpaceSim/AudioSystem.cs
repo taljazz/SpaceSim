@@ -60,6 +60,11 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     private readonly float[] _snapFTarget = new float[NDimensions];
     private readonly List<(int DimA, int DimB, HarmonicType HType)> _harmonicPairsBuffer = new();
 
+    // --- Continuous phases for the tuning-by-ear beat cue (audio thread only) ---
+    // Accumulated per sample so the carrier and tremolo stay click-free even as the player tunes.
+    private double _beatCarrierPhase;
+    private double _beatAmPhase;
+
     // --- Logging stats (throttled to once per second) ---
     private double _lastLogTimeSec;
     private int _readCallCount;

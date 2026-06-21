@@ -74,6 +74,42 @@ public class SpatialAudioMathTests
 
     #endregion
 
+    #region DopplerPitch
+
+    // Ship at the origin, source 10 units away on +X; scale 0.1, clamp [0.5, 2.0].
+    private static float Doppler(float[] vel, float[] sourcePos)
+        => SpatialAudioMath.DopplerPitch(Origin, vel, sourcePos, scale: 0.1f, minPitch: 0.5f, maxPitch: 2.0f);
+
+    [Fact]
+    public void Doppler_Stationary_IsUnity()
+        => Assert.Equal(1f, Doppler(new float[5], new float[] { 10, 0, 0, 0, 0 }), 4);
+
+    [Fact]
+    public void Doppler_Approaching_RaisesPitch()
+        => Assert.Equal(1.5f, Doppler(new float[] { 5, 0, 0, 0, 0 }, new float[] { 10, 0, 0, 0, 0 }), 4);
+
+    [Fact]
+    public void Doppler_Receding_LowersPitch()
+        => Assert.Equal(0.7f, Doppler(new float[] { -3, 0, 0, 0, 0 }, new float[] { 10, 0, 0, 0, 0 }), 4);
+
+    [Fact]
+    public void Doppler_PerpendicularMotion_IsUnity()
+        => Assert.Equal(1f, Doppler(new float[] { 0, 5, 0, 0, 0 }, new float[] { 10, 0, 0, 0, 0 }), 4);
+
+    [Fact]
+    public void Doppler_FastApproach_ClampsToMax()
+        => Assert.Equal(2.0f, Doppler(new float[] { 50, 0, 0, 0, 0 }, new float[] { 10, 0, 0, 0, 0 }), 4);
+
+    [Fact]
+    public void Doppler_FastRecede_ClampsToMin()
+        => Assert.Equal(0.5f, Doppler(new float[] { -50, 0, 0, 0, 0 }, new float[] { 10, 0, 0, 0, 0 }), 4);
+
+    [Fact]
+    public void Doppler_ZeroDistance_IsUnity()
+        => Assert.Equal(1f, Doppler(new float[] { 5, 0, 0, 0, 0 }, new float[5]), 4);
+
+    #endregion
+
     #region FloatToPcm16
 
     [Fact]

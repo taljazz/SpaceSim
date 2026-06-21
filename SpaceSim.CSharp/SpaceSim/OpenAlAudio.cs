@@ -181,7 +181,7 @@ public sealed class OpenAlAudio : IDisposable
     }
 
     /// <summary>Fire a one-shot positioned sound; its source is reclaimed automatically by <see cref="Update"/>.</summary>
-    public void PlayOneShot(float[] waveform, (float X, float Y, float Z) pos, float gain)
+    public void PlayOneShot(float[] waveform, (float X, float Y, float Z) pos, float gain, float pitch = 1f)
     {
         if (!IsAvailable) return;
 
@@ -192,6 +192,7 @@ public sealed class OpenAlAudio : IDisposable
         AL.Source(source, ALSourceb.Looping, false);
         AL.Source(source, ALSource3f.Position, pos.X, pos.Y, pos.Z);
         AL.Source(source, ALSourcef.Gain, gain);
+        AL.Source(source, ALSourcef.Pitch, pitch);
         AL.SourcePlay(source);
         _oneShotSources.Add(source);
     }
@@ -291,12 +292,13 @@ public sealed class SpatialVoice
     /// <summary>True once this voice has been stopped (so the engine can drop its reference).</summary>
     public bool IsStopped => _stopped;
 
-    /// <summary>Move the voice to a new listener-space position and set its gain.</summary>
-    public void Update((float X, float Y, float Z) pos, float gain)
+    /// <summary>Move the voice to a new listener-space position, set its gain, and apply a Doppler pitch.</summary>
+    public void Update((float X, float Y, float Z) pos, float gain, float pitch = 1f)
     {
         if (_stopped) return;
         AL.Source(_source, ALSource3f.Position, pos.X, pos.Y, pos.Z);
         AL.Source(_source, ALSourcef.Gain, gain);
+        AL.Source(_source, ALSourcef.Pitch, pitch);
     }
 
     /// <summary>Stop and release this voice's OpenAL source.</summary>

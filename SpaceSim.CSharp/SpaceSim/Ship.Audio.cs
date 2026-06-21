@@ -111,7 +111,7 @@ public partial class Ship
 
         // Same waveform still playing -> just move it and adjust its level.
         if (slot.Voice != null)
-            slot.Voice.Update(SpatialAudioMath.ToListenerSpace(Position, worldPos, ViewRotation), volume);
+            slot.Voice.Update(SpatialAudioMath.ToListenerSpace(Position, worldPos, ViewRotation), volume, DopplerPitch(worldPos));
         else if (slot.Sfx != null)
         {
             slot.Sfx.Pan = ComputePan(worldPos);
@@ -168,10 +168,19 @@ public partial class Ship
     private void PlayWorldOneShot(float[] waveform, float[] worldPos, float volume)
     {
         if (_openAl.IsAvailable)
-            _openAl.PlayOneShot(waveform, SpatialAudioMath.ToListenerSpace(Position, worldPos, ViewRotation), volume);
+            _openAl.PlayOneShot(waveform, SpatialAudioMath.ToListenerSpace(Position, worldPos, ViewRotation), volume, DopplerPitch(worldPos));
         else
             GameEvents.RaisePlaySound(this, waveform, pan: ComputePan(worldPos), volume: volume);
     }
+
+    /// <summary>
+    /// Doppler pitch for a world source: shifts up when the ship moves toward it, down when moving
+    /// away (scaled by the radial component of the ship's velocity, clamped to a sane range). 1.0 when
+    /// stationary or moving across the source. OpenAL-only — the NAudio fallback can't pitch-shift.
+    /// </summary>
+    private float DopplerPitch(float[] worldPos)
+        => SpatialAudioMath.DopplerPitch(Position, Velocity, worldPos,
+               GameConstants.DopplerScale, GameConstants.DopplerMinPitch, GameConstants.DopplerMaxPitch);
 
     /// <summary>
     /// Loudness for a proximity ambient: a strong, distance-faded level so the universe is actually

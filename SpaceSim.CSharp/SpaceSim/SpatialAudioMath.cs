@@ -53,6 +53,36 @@ public static class SpatialAudioMath
 
     #endregion
 
+    #region Doppler
+
+    /// <summary>
+    /// Doppler pitch multiplier for a source, from the listener's radial speed toward it: &gt; 1 when
+    /// approaching, &lt; 1 when receding, exactly 1 when stationary or moving across the source.
+    /// Clamped to [<paramref name="minPitch"/>, <paramref name="maxPitch"/>].
+    /// </summary>
+    /// <param name="shipPos">Listener (ship) 5D position.</param>
+    /// <param name="shipVel">Listener (ship) 5D velocity.</param>
+    /// <param name="sourcePos">Source 5D position.</param>
+    /// <param name="scale">Pitch shift per unit of radial speed.</param>
+    /// <param name="minPitch">Lower clamp.</param>
+    /// <param name="maxPitch">Upper clamp.</param>
+    public static float DopplerPitch(float[] shipPos, float[] shipVel, float[] sourcePos,
+                                     float scale, float minPitch, float maxPitch)
+    {
+        float radial = 0f, distSq = 0f;
+        for (int i = 0; i < Vec5.Dimensions; i++)
+        {
+            float d = sourcePos[i] - shipPos[i];   // ship -> source
+            radial += shipVel[i] * d;
+            distSq += d * d;
+        }
+        if (distSq < 1e-8f) return 1f;
+        radial /= MathF.Sqrt(distSq);              // velocity component along the line to the source
+        return Math.Clamp(1f + radial * scale, minPitch, maxPitch);
+    }
+
+    #endregion
+
     #region PCM conversion
 
     /// <summary>

@@ -152,6 +152,9 @@ public partial class SpaceSimGame
         // Update camera position
         _camera.Update(_ship.Position, dt);
 
+        // Persist any changed preferences (debounced + async, so this never stalls the loop).
+        UpdateSettingsPersistence();
+
         // Save previous input states
         _prevKeyState = keys;
         _prevMouseState = mouse;

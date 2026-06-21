@@ -74,8 +74,10 @@ Content/obj/
 *.nupkg
 packages/
 
-# C# save files
+# C# save / settings files (runtime data, plus their atomic-write temp files)
 savegame.json
+settings.json
+*.json.tmp
 
 # Claude Code metadata
 .claude/

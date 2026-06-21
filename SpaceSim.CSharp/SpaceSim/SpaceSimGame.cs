@@ -65,6 +65,12 @@ public partial class SpaceSimGame : Game
     // --- Audio click timer ---
     private float _nextClickTime;
 
+    // --- Settings persistence (preferences, separate from the run savegame) ---
+    private GameSettings? _settings;
+    private bool _settingsDirty;
+    private float _settingsDirtyTime;
+    private const float SettingsSaveDebounce = 1.5f; // persist 1.5s after the last preference change
+
     #endregion
 
     #region Construction and lifecycle
@@ -160,6 +166,12 @@ public partial class SpaceSimGame : Game
         _activeRenderer = _renderer3D;
         DebugLogger.Log("Init", "Renderers created, active: 3D");
 
+        // Load saved preferences (volumes, accessibility, toggles, render mode) and apply them so
+        // the player's choices carry over from the last session.
+        _settings = SettingsStore.Load();
+        ApplySettings(_settings);
+        DebugLogger.Log("Init", "Preferences loaded and applied");
+
         // Capture initial input state
         _prevKeyState = Keyboard.GetState();
         _prevMouseState = Mouse.GetState();
@@ -237,6 +249,78 @@ public partial class SpaceSimGame : Game
 
     #endregion
 
+    #region Settings persistence
+
+    /// <summary>Apply loaded preferences to the live systems (audio volumes, ship options, renderer).</summary>
+    private void ApplySettings(GameSettings s)
+    {
+        _audio.MasterVolume = s.MasterVolume;
+        _audio.BeepVolume = s.BeepVolume;
+        _audio.EffectVolume = s.EffectVolume;
+        _audio.DriveVolume = s.DriveVolume;
+
+        _ship.VerboseMode = s.VerboseMode;
+        _ship.HudTextSize = s.HudTextSize;
+        _ship.HighContrast = s.HighContrast;
+        _ship.AutosaveEnabled = s.AutosaveEnabled;
+        _ship.AmbientSoundsEnabled = s.AmbientSoundsEnabled;
+        _ship.NebulaDissonanceEnabled = s.NebulaDissonanceEnabled;
+
+        _use3DRenderer = s.Use3DRenderer;
+        _activeRenderer = _use3DRenderer ? _renderer3D : _renderer2D;
+    }
+
+    /// <summary>
+    /// Copy the current live preferences into <see cref="_settings"/>; returns true if anything
+    /// changed since the last capture. Cheap (a handful of comparisons) and allocation-free.
+    /// </summary>
+    private bool CaptureSettings()
+    {
+        var s = _settings;
+        if (s == null) return false;
+
+        bool changed = false;
+        if (s.MasterVolume != _audio.MasterVolume) { s.MasterVolume = _audio.MasterVolume; changed = true; }
+        if (s.BeepVolume != _audio.BeepVolume) { s.BeepVolume = _audio.BeepVolume; changed = true; }
+        if (s.EffectVolume != _audio.EffectVolume) { s.EffectVolume = _audio.EffectVolume; changed = true; }
+        if (s.DriveVolume != _audio.DriveVolume) { s.DriveVolume = _audio.DriveVolume; changed = true; }
+
+        if (s.VerboseMode != _ship.VerboseMode) { s.VerboseMode = _ship.VerboseMode; changed = true; }
+        if (s.HudTextSize != _ship.HudTextSize) { s.HudTextSize = _ship.HudTextSize; changed = true; }
+        if (s.HighContrast != _ship.HighContrast) { s.HighContrast = _ship.HighContrast; changed = true; }
+        if (s.AutosaveEnabled != _ship.AutosaveEnabled) { s.AutosaveEnabled = _ship.AutosaveEnabled; changed = true; }
+        if (s.AmbientSoundsEnabled != _ship.AmbientSoundsEnabled) { s.AmbientSoundsEnabled = _ship.AmbientSoundsEnabled; changed = true; }
+        if (s.NebulaDissonanceEnabled != _ship.NebulaDissonanceEnabled) { s.NebulaDissonanceEnabled = _ship.NebulaDissonanceEnabled; changed = true; }
+
+        if (s.Use3DRenderer != _use3DRenderer) { s.Use3DRenderer = _use3DRenderer; changed = true; }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Once per frame: notice any preference change and persist it — debounced so holding a volume
+    /// key doesn't thrash the disk, and async so the save never stalls the loop.
+    /// </summary>
+    private void UpdateSettingsPersistence()
+    {
+        if (_settings == null) return;
+
+        if (CaptureSettings())
+        {
+            _settingsDirty = true;
+            _settingsDirtyTime = _ship.SimulationTime;
+        }
+
+        if (_settingsDirty && _ship.SimulationTime - _settingsDirtyTime > SettingsSaveDebounce)
+        {
+            SettingsStore.Save(_settings);
+            _settingsDirty = false;
+            DebugLogger.Log("Settings", "Preferences saved.");
+        }
+    }
+
+    #endregion
+
     #region Dispose
 
     protected override void Dispose(bool disposing)
@@ -244,6 +328,18 @@ public partial class SpaceSimGame : Game
         if (disposing)
         {
             DebugLogger.Log("Init", "Dispose() started - cleaning up systems");
+
+            // Persist preferences synchronously before we exit. We re-capture first so this write
+            // carries the very latest state, and (being enqueued last) it gets the highest write
+            // sequence — so even if a debounced async save is still in flight, the sequence guard in
+            // SettingsStore makes this the winner and the newest preferences are guaranteed to land.
+            // Keep the capture immediately before the blocking save: that ordering is the guarantee.
+            if (_settings != null)
+            {
+                CaptureSettings();
+                SettingsStore.SaveBlocking(_settings);
+                DebugLogger.Log("Settings", "Preferences saved on exit");
+            }
 
             // Unsubscribe from game events
             GameEvents.OnSpeak -= HandleSpeak;

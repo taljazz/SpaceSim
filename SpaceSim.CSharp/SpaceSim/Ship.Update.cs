@@ -585,7 +585,7 @@ public partial class Ship
             }
 
             // Type-specific ambient
-            HandleProximityAmbient(NearestBody, dist, pan);
+            HandleProximityAmbient(NearestBody, dist);
         }
 
         // Stop ambient when leaving

@@ -115,12 +115,17 @@ public partial class SpaceSimGame : Game
             throw;
         }
 
+        // Initialize the OpenAL spatial-audio engine (Round 3 — positioned world sounds + HRTF).
+        // Self-guarding: if OpenAL/HRTF can't initialize, IsAvailable stays false and world sounds
+        // fall back to NAudio panning.
+        _openAl = new OpenAlAudio();
+
         // Generate the complete universe
         DebugLogger.Log("Init", "Generating universe...");
         GenerateUniverse();
 
         // Create the ship
-        _ship = new Ship(_audio, _tolk);
+        _ship = new Ship(_audio, _openAl, _tolk);
         _ship.Stars = _stars;
         _ship.Planets = _planets;
         _ship.Nebulae = _nebulae;
@@ -137,11 +142,6 @@ public partial class SpaceSimGame : Game
         {
             DebugLogger.LogError("Audio", "AudioSystem.Start() failed", ex);
         }
-
-        // Initialize the OpenAL spatial-audio engine (Round 3 — positioned world sounds + HRTF).
-        // It self-guards: if OpenAL/HRTF can't initialize, IsAvailable stays false and world sounds
-        // fall back to NAudio panning. Nothing is routed through it yet (that arrives in Round 3B).
-        _openAl = new OpenAlAudio();
 
         // Subscribe to game events
         GameEvents.OnSpeak += HandleSpeak;

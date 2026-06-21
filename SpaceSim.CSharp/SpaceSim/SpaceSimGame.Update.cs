@@ -127,6 +127,12 @@ public partial class SpaceSimGame
                           _stars, _planets, _nebulae);
         _ship.Update(dt, _celestialBodies, keys, _temples, _leyLines, _pyramids);
 
+        // Keep the OpenAL spatial engine in step: match its master level to NAudio's (so loudness
+        // and the volume keys line up) and reclaim finished sources. Game-thread only — the OpenAL
+        // calls must never run on the NAudio audio-callback thread.
+        _openAl.SetMasterGain(_audio.MasterVolume);
+        _openAl.Update();
+
         // Check if universe needs regeneration (after rift transit)
         if (_ship.NeedsUniverseRegeneration)
         {

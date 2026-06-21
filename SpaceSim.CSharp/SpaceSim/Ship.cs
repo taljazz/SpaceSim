@@ -25,9 +25,10 @@ public partial class Ship
     private const float DT = GameConstants.Dt;
 
     // --- External references ---
-    // The two services the ship leans on: the audio engine (for sounds/waveforms) and
-    // the screen reader (reached indirectly via the event bus in Speak()).
+    // The services the ship leans on: the NAudio engine (sounds/waveforms), the OpenAL spatial
+    // engine (positioned world sounds), and the screen reader (reached via the event bus in Speak()).
     private readonly AudioSystem _audio;
+    private readonly OpenAlAudio _openAl;
     private readonly TolkSpeechService _tolk;
 
     #endregion
@@ -142,10 +143,10 @@ public partial class Ship
     private float _prevRiftAlign;
     private float _prevRiftRes;
 
-    // Proximity ambient sounds (references for stopping)
-    private GameSoundEffect? _starSound;
-    private GameSoundEffect? _nebulaSound;
-    private GameSoundEffect? _planetSound;
+    // Proximity ambient sounds — positional world sounds (OpenAL/HRTF when available, NAudio fallback).
+    private WorldSound? _starSound;
+    private WorldSound? _nebulaSound;
+    private WorldSound? _planetSound;
 
     // Idle mode
     private float _lastInputTime;
@@ -311,9 +312,10 @@ public partial class Ship
     /// frequencies to random starting values, builds the upgrade list, and selects the
     /// default Tuaoi mode.
     /// </summary>
-    public Ship(AudioSystem audioSystem, TolkSpeechService tolk)
+    public Ship(AudioSystem audioSystem, OpenAlAudio openAl, TolkSpeechService tolk)
     {
         _audio = audioSystem;
+        _openAl = openAl;
         _tolk = tolk;
 
         // Initialize frequencies

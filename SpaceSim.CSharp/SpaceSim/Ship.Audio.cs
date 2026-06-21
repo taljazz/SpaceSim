@@ -15,13 +15,13 @@ public partial class Ship
 
     /// <summary>
     /// Drive the looping ambient soundscape for a nearby celestial body. Picks a type-specific
-    /// waveform (red giant pulse, nebula drone, ocean-world flow, etc.) and fades its volume with
-    /// distance, so flying past objects produces a living, positional soundscape.
+    /// waveform (red giant pulse, nebula drone, ocean-world flow, etc.), fades its volume with
+    /// distance, and positions it in 3D — so flying past objects produces a living, locatable
+    /// soundscape (true HRTF placement when available, stereo panning as the fallback).
     /// </summary>
     /// <param name="body">The celestial body being approached.</param>
     /// <param name="dist">Distance from the ship to the body, in world units.</param>
-    /// <param name="pan">Stereo pan toward the body (-1 left .. +1 right).</param>
-    private void HandleProximityAmbient(CelestialBody body, float dist, float pan)
+    private void HandleProximityAmbient(CelestialBody body, float dist)
     {
         if (body.BodyType == CelestialBodyType.Star && dist < GameConstants.StarHarmonyRadius)
         {
@@ -34,7 +34,7 @@ public partial class Ship
                 StellarType.BrownDwarf => _audio.BrownDwarfRumble,
                 _ => null
             };
-            UpdateAmbientSound(ref _starSound, waveform, pan, volume);
+            UpdateWorldLoop(ref _starSound, waveform, body.Position, volume);
         }
         else if (body.BodyType == CelestialBodyType.Nebula && dist < GameConstants.NebulaDissonanceRadius)
         {
@@ -48,7 +48,7 @@ public partial class Ship
                 NebulaType.SupernovaRemnant => _audio.SupernovaChaos,
                 _ => null
             };
-            UpdateAmbientSound(ref _nebulaSound, waveform, pan, volume);
+            UpdateWorldLoop(ref _nebulaSound, waveform, body.Position, volume);
         }
         else if (body.BodyType == CelestialBodyType.Planet && dist < GameConstants.InteractionDistance)
         {
@@ -63,53 +63,87 @@ public partial class Ship
                 ExoplanetType.IceGiant => _audio.IceChime,
                 _ => null
             };
-            UpdateAmbientSound(ref _planetSound, waveform, pan, volume);
+            UpdateWorldLoop(ref _planetSound, waveform, body.Position, volume);
         }
     }
 
     /// <summary>
-    /// Reconcile a single looping ambient slot with the desired waveform. If the slot already plays
-    /// that waveform, just refresh its pan/volume; if it plays a different one, stop the old loop and
-    /// start the new one. A null waveform leaves the slot untouched.
+    /// Reconcile a looping world-sound slot with the desired waveform at a world position. If the
+    /// slot already plays that waveform, refresh its position/volume; if it plays a different one,
+    /// stop the old loop and start the new one. A null waveform leaves the slot untouched.
     /// </summary>
-    private void UpdateAmbientSound(ref GameSoundEffect? current, float[]? waveform, float pan, float volume)
+    private void UpdateWorldLoop(ref WorldSound? slot, float[]? waveform, float[] worldPos, float volume)
     {
         if (waveform == null) return;
 
-        if (current != null)
+        // Waveform changed (e.g. flew from one star type to another) -> restart the slot.
+        if (slot != null && !ReferenceEquals(slot.Waveform, waveform))
+            StopWorldLoop(ref slot);
+
+        if (slot == null)
         {
-            // If same waveform, just update properties
-            if (ReferenceEquals(current.Waveform, waveform))
-            {
-                current.Pan = pan;
-                current.Volume = volume;
-                return;
-            }
-            // Different type - stop old
-            current.Loop = false;
-            current.Volume = 0;
-            current = null;
+            slot = StartWorldLoop(waveform, worldPos, volume);
+            return;
         }
 
-        current = new GameSoundEffect(waveform, pan: pan, loop: true, volume: volume);
-        _audio.AddSoundEffect(current);
+        // Same waveform still playing -> just move it and adjust its level.
+        if (slot.Voice != null)
+            slot.Voice.Update(SpatialAudioMath.ToListenerSpace(Position, worldPos, ViewRotation), volume);
+        else if (slot.Sfx != null)
+        {
+            slot.Sfx.Pan = ComputePan(worldPos);
+            slot.Sfx.Volume = volume;
+        }
+    }
+
+    /// <summary>
+    /// Start a looping positioned sound, preferring OpenAL + HRTF and falling back to a panned
+    /// NAudio effect when spatial audio is unavailable.
+    /// </summary>
+    private WorldSound StartWorldLoop(float[] waveform, float[] worldPos, float volume)
+    {
+        var ws = new WorldSound(waveform);
+
+        if (_openAl.IsAvailable)
+        {
+            var pos = SpatialAudioMath.ToListenerSpace(Position, worldPos, ViewRotation);
+            ws.Voice = _openAl.PlayLoop(waveform, pos, volume);
+            if (ws.Voice != null) return ws;
+            // PlayLoop unexpectedly failed (e.g. source exhaustion) -> fall back to NAudio.
+        }
+
+        ws.Sfx = new GameSoundEffect(waveform, pan: ComputePan(worldPos), loop: true, volume: volume);
+        _audio.AddSoundEffect(ws.Sfx);
+        return ws;
+    }
+
+    /// <summary>Stop and clear a looping world-sound slot (whichever backend it used).</summary>
+    private void StopWorldLoop(ref WorldSound? slot)
+    {
+        if (slot == null) return;
+        slot.Voice?.Stop();
+        if (slot.Sfx != null)
+        {
+            slot.Sfx.Loop = false;
+            slot.Sfx.Volume = 0;
+        }
+        slot = null;
+    }
+
+    /// <summary>Stereo pan (-1..+1) toward a world position — the legacy directional cue, used for the NAudio fallback.</summary>
+    private float ComputePan(float[] worldPos)
+    {
+        var proj = ProjectRelative(worldPos);
+        float angle = MathF.Atan2(proj.Y, proj.X);
+        return MathF.Sin(angle);
     }
 
     /// <summary>Stop every looping proximity ambient (star, nebula, planet) — e.g. when none are in range.</summary>
     private void StopAllAmbientSounds()
     {
-        StopAmbient(ref _starSound);
-        StopAmbient(ref _nebulaSound);
-        StopAmbient(ref _planetSound);
-    }
-
-    /// <summary>Stop one ambient slot by ending its loop and silencing it, then clear the reference.</summary>
-    private static void StopAmbient(ref GameSoundEffect? sfx)
-    {
-        if (sfx == null) return;
-        sfx.Loop = false;
-        sfx.Volume = 0;
-        sfx = null;
+        StopWorldLoop(ref _starSound);
+        StopWorldLoop(ref _nebulaSound);
+        StopWorldLoop(ref _planetSound);
     }
 
     #endregion

@@ -201,6 +201,16 @@ public sealed class OpenAlAudio : IDisposable
         _voices.RemoveAll(v => v.IsStopped);
     }
 
+    /// <summary>
+    /// Set the overall output level. We mirror NAudio's master volume here so OpenAL sounds sit at
+    /// the same loudness as the rest of the mix and respond to the player's volume keys.
+    /// </summary>
+    public void SetMasterGain(float gain)
+    {
+        if (!IsAvailable) return;
+        AL.Listener(ALListenerf.Gain, gain);
+    }
+
     #endregion
 
     #region Disposal

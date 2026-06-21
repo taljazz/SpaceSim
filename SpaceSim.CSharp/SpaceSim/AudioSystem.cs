@@ -37,6 +37,13 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     // --- Ship reference (volatile for lock-free audio thread read) ---
     private volatile Ship? _ship;
 
+    /// <summary>
+    /// When false, the continuous resonance-drive synthesis is silenced and only queued sound effects
+    /// play. Set true while the sim runs and false at the menus, so the engine doesn't drone under the
+    /// main menu or sound dictionary. Volatile: written by the game thread, read by the audio thread.
+    /// </summary>
+    public volatile bool EngineEnabled;
+
     // --- Audio state: double-buffer pattern for thread safety ---
     // Game thread writes to _pendingSfx; audio thread drains into _activePlayback.
     // _activePlayback is exclusively owned by the audio thread after draining.

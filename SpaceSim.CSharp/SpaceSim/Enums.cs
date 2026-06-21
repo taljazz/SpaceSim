@@ -191,3 +191,25 @@ public enum CymaticsPattern
 }
 
 #endregion
+
+#region Top-level game screens
+
+/// <summary>Which top-level screen the game is showing: the main menu, the live sim, or the sound dictionary.</summary>
+public enum GameScreen
+{
+    MainMenu,
+    Playing,
+    LearnSounds
+}
+
+/// <summary>A screen change requested by a menu, applied by the game host (SpaceSimGame).</summary>
+public enum ScreenTransition
+{
+    None,
+    StartSim,
+    OpenLearnSounds,
+    BackToMainMenu,
+    Quit
+}
+
+#endregion

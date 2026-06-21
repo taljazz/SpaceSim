@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using SpaceSim.Menus;
 using SpaceSim.Models;
 using SpaceSim.Rendering;
 
@@ -70,6 +71,11 @@ public partial class SpaceSimGame : Game
     private bool _settingsDirty;
     private float _settingsDirtyTime;
     private const float SettingsSaveDebounce = 1.5f; // persist 1.5s after the last preference change
+
+    // --- Top-level screen state (main menu / sim / sound dictionary) ---
+    private GameScreen _screen = GameScreen.MainMenu;
+    private MainMenuScreen _mainMenu = null!;
+    private LearnSoundsScreen _learnSounds = null!;
 
     #endregion
 
@@ -171,6 +177,15 @@ public partial class SpaceSimGame : Game
         _settings = SettingsStore.Load();
         ApplySettings(_settings);
         DebugLogger.Log("Init", "Preferences loaded and applied");
+
+        // Build the top-level menus and open on the main menu (the game starts here, not in the sim).
+        // The engine synth stays silent until the player chooses "Start Sim".
+        Action<string> menuSpeak = msg => _tolk.Speak(msg, interrupt: true);
+        _mainMenu = new MainMenuScreen(_audio, menuSpeak);
+        _learnSounds = new LearnSoundsScreen(_audio, menuSpeak);
+        _screen = GameScreen.MainMenu;
+        _mainMenu.OnEnter();
+        DebugLogger.Log("Init", "Main menu ready");
 
         // Capture initial input state
         _prevKeyState = Keyboard.GetState();
@@ -321,6 +336,62 @@ public partial class SpaceSimGame : Game
 
     #endregion
 
+    #region Screen transitions
+
+    /// <summary>Apply a screen change requested by a menu (or by pressing Escape in the sim).</summary>
+    private void ApplyTransition(ScreenTransition t)
+    {
+        switch (t)
+        {
+            case ScreenTransition.StartSim:
+                _screen = GameScreen.Playing;
+                _audio.EngineEnabled = true;          // resume the live resonance-drive synthesis
+                _tolk.Speak("Simulation started.", interrupt: true);
+                DebugLogger.Log("Event", "Screen -> Playing");
+                break;
+
+            case ScreenTransition.OpenLearnSounds:
+                _screen = GameScreen.LearnSounds;
+                _learnSounds.OnEnter();
+                DebugLogger.Log("Event", "Screen -> LearnSounds");
+                break;
+
+            case ScreenTransition.BackToMainMenu:
+                LeaveCurrentScreen();
+                _screen = GameScreen.MainMenu;
+                _mainMenu.OnEnter();
+                DebugLogger.Log("Event", "Screen -> MainMenu");
+                break;
+
+            case ScreenTransition.Quit:
+                DebugLogger.Log("Event", "Quit requested from main menu");
+                Exit();
+                break;
+
+            case ScreenTransition.None:
+            default:
+                break;
+        }
+    }
+
+    /// <summary>Tidy up the screen we're leaving: silence the sim, or stop a sound demo.</summary>
+    private void LeaveCurrentScreen()
+    {
+        switch (_screen)
+        {
+            case GameScreen.Playing:
+                _audio.EngineEnabled = false;   // stop the drive drone under the menu
+                _ship.SilenceAmbients();        // stop positioned world loops
+                _audio.ClearAllEffects();       // drop any lingering one-shots / loops
+                break;
+            case GameScreen.LearnSounds:
+                _learnSounds.OnExit();          // stop any playing demo
+                break;
+        }
+    }
+
+    #endregion
+
     #region Dispose
 
     protected override void Dispose(bool disposing)
@@ -328,6 +399,10 @@ public partial class SpaceSimGame : Game
         if (disposing)
         {
             DebugLogger.Log("Init", "Dispose() started - cleaning up systems");
+
+            // Tidy up the active screen first, so closing the window mid-sim (or mid-demo) stops world
+            // sounds the same way Escape does, before the audio devices are torn down. No-op at the menu.
+            LeaveCurrentScreen();
 
             // Persist preferences synchronously before we exit. We re-capture first so this write
             // carries the very latest state, and (being enqueued last) it gets the highest write

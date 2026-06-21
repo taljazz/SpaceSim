@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using SpaceSim.Menus;
 using SpaceSim.Models;
 using SpaceSim.Rendering;
 
@@ -13,25 +14,18 @@ public partial class SpaceSimGame
     #region Game loop
 
     /// <summary>
-    /// The per-frame game loop: reads input, handles global keys (exit, fullscreen, renderer
-    /// toggle, zoom, camera orbit), advances celestial mechanics and the ship, regenerates the
-    /// universe after a rift transit, and updates audio and camera.
+    /// The per-frame game loop: reads input, handles the global fullscreen key, then dispatches to the
+    /// active screen — the main menu, the sound dictionary, or the live sim (<see cref="UpdatePlaying"/>) —
+    /// and finally keeps the spatial-audio engine and saved preferences in step.
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        _ship.SimulationTime += dt;
 
         var keys = Keyboard.GetState();
         var mouse = Mouse.GetState();
 
-        // --- Global keys ---
-
-        // ESC -> exit
-        if (keys.IsKeyDown(Keys.Escape))
-            Exit();
-
-        // F11 -> toggle fullscreen
+        // F11 toggles fullscreen on any screen.
         if (IsKeyPressed(keys, Keys.F11))
         {
             _graphics.IsFullScreen = !_graphics.IsFullScreen;
@@ -40,6 +34,54 @@ public partial class SpaceSimGame
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height);
         }
+
+        // Route the frame to the active top-level screen.
+        switch (_screen)
+        {
+            case GameScreen.MainMenu:
+                ApplyTransition(_mainMenu.HandleInput(keys, _prevKeyState));
+                break;
+            case GameScreen.LearnSounds:
+                ApplyTransition(_learnSounds.HandleInput(keys, _prevKeyState));
+                break;
+            case GameScreen.Playing:
+                UpdatePlaying(dt, keys, mouse);
+                break;
+        }
+
+        // Keep the OpenAL spatial engine in step every frame, on any screen: match its master level
+        // to NAudio's (so the volume keys line up) and reclaim finished sources. Game-thread only —
+        // these calls must never run on the NAudio audio-callback thread.
+        _openAl.SetMasterGain(_audio.MasterVolume);
+        _openAl.Update();
+
+        // Persist any changed preferences (debounced + async, so this never stalls the loop).
+        UpdateSettingsPersistence();
+
+        // Save previous input states
+        _prevKeyState = keys;
+        _prevMouseState = mouse;
+        _prevScrollValue = mouse.ScrollWheelValue;
+
+        base.Update(gameTime);
+    }
+
+    /// <summary>
+    /// Per-frame update while the simulation is running: sim/global keys, zoom, camera orbit, ship
+    /// input and update, and universe regeneration. Escape returns to the main menu.
+    /// </summary>
+    private void UpdatePlaying(float dt, KeyboardState keys, MouseState mouse)
+    {
+        // Escape leaves the sim and returns to the main menu (the world goes quiet).
+        if (IsKeyPressed(keys, Keys.Escape))
+        {
+            ApplyTransition(ScreenTransition.BackToMainMenu);
+            return;
+        }
+
+        // Advance the simulation clock only while playing, so menu time is effectively paused —
+        // orbits and cooldowns freeze instead of silently elapsing during a menu visit.
+        _ship.SimulationTime += dt;
 
         // F10 -> toggle 2D/3D renderer
         if (IsKeyPressed(keys, Keys.F10))
@@ -60,7 +102,7 @@ public partial class SpaceSimGame
             _camera.AdjustZoom(-scrollDelta * 0.02f);
         }
 
-        // Bracket keys for zoom (with Shift held)
+        // Bracket keys for zoom
         if (keys.IsKeyDown(Keys.OemCloseBrackets))
         {
             _zoomLevel = MathHelper.Clamp(_zoomLevel + 2f * dt, 0.2f, 5f);
@@ -127,12 +169,6 @@ public partial class SpaceSimGame
                           _stars, _planets, _nebulae);
         _ship.Update(dt, _celestialBodies, keys, _temples, _leyLines, _pyramids);
 
-        // Keep the OpenAL spatial engine in step: match its master level to NAudio's (so loudness
-        // and the volume keys line up) and reclaim finished sources. Game-thread only — the OpenAL
-        // calls must never run on the NAudio audio-callback thread.
-        _openAl.SetMasterGain(_audio.MasterVolume);
-        _openAl.Update();
-
         // Check if universe needs regeneration (after rift transit)
         if (_ship.NeedsUniverseRegeneration)
         {
@@ -151,16 +187,6 @@ public partial class SpaceSimGame
 
         // Update camera position
         _camera.Update(_ship.Position, dt);
-
-        // Persist any changed preferences (debounced + async, so this never stalls the loop).
-        UpdateSettingsPersistence();
-
-        // Save previous input states
-        _prevKeyState = keys;
-        _prevMouseState = mouse;
-        _prevScrollValue = mouse.ScrollWheelValue;
-
-        base.Update(gameTime);
     }
 
     #endregion
@@ -170,21 +196,36 @@ public partial class SpaceSimGame
     /// <summary>Clears the screen, draws the world via the active renderer, then overlays the HUD text.</summary>
     protected override void Draw(GameTime gameTime)
     {
-        // Clear screen
-        GraphicsDevice.Clear(_ship.HighContrast ? Color.White : Color.Black);
-
         int screenW = GraphicsDevice.Viewport.Width;
         int screenH = GraphicsDevice.Viewport.Height;
 
-        // Draw the game world using the active renderer
-        _activeRenderer.DrawWorld(_spriteBatch, _ship, gameTime, screenW, screenH);
+        // High-contrast white background only applies to the live sim; the menus draw on black.
+        bool whiteBg = _screen == GameScreen.Playing && _ship.HighContrast;
+        GraphicsDevice.Clear(whiteBg ? Color.White : Color.Black);
 
-        // Draw HUD overlay
-        if (_font != null)
+        switch (_screen)
         {
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
-            HudRenderer.DrawHud(_spriteBatch, _font, _ship, screenW, screenH);
-            _spriteBatch.End();
+            case GameScreen.Playing:
+                // Draw the game world via the active renderer, then the HUD overlay on top.
+                _activeRenderer.DrawWorld(_spriteBatch, _ship, gameTime, screenW, screenH);
+                if (_font != null)
+                {
+                    _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+                    HudRenderer.DrawHud(_spriteBatch, _font, _ship, screenW, screenH);
+                    _spriteBatch.End();
+                }
+                break;
+
+            case GameScreen.MainMenu:
+            case GameScreen.LearnSounds:
+                if (_font != null)
+                {
+                    MenuScreen menu = _screen == GameScreen.MainMenu ? _mainMenu : _learnSounds;
+                    _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+                    menu.Draw(_spriteBatch, _font, screenW, screenH);
+                    _spriteBatch.End();
+                }
+                break;
         }
 
         base.Draw(gameTime);

@@ -39,17 +39,22 @@ public partial class AudioSystem
 
         Ship? ship = _ship; // volatile read
 
-        if (ship != null)
+        // The engine (drive synthesis + harmonics) only runs while the sim is active; at the menus
+        // EngineEnabled is false and just the queued sound effects (menu ticks, sound demos) play.
+        bool engineOn = ship != null && EngineEnabled;
+
+        if (engineOn)
         {
-            // Copy volatile ship state into pre-allocated buffers
+            // engineOn guarantees the ship is non-null; copy its volatile state into the snapshots.
+            Ship s = ship!;
             for (int i = 0; i < NDimensions; i++)
             {
-                _snapRDrive[i] = ship.RDrive[i];
-                _snapFTarget[i] = ship.FTarget[i];
+                _snapRDrive[i] = s.RDrive[i];
+                _snapFTarget[i] = s.FTarget[i];
             }
-            resonanceWidth = ship.ResonanceWidth;
-            isCharging = ship.IsChargingRift;
-            chargeProgress = ship.RiftChargeProgress;
+            resonanceWidth = s.ResonanceWidth;
+            isCharging = s.IsChargingRift;
+            chargeProgress = s.RiftChargeProgress;
             DetectHarmonicPairs(_harmonicPairsBuffer, _snapRDrive);
             hasHarmonicPairs = _harmonicPairsBuffer.Count > 0;
         }
@@ -68,7 +73,7 @@ public partial class AudioSystem
             right += schumann;
 
             // --- 2. Per-dimension drive synthesis ---
-            if (ship != null)
+            if (engineOn)
             {
                 for (int dim = 0; dim < NDimensions; dim++)
                 {

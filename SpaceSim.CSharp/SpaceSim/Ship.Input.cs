@@ -73,7 +73,7 @@ public partial class Ship
                     if (_pendingPresetOverwrite == slot && (SimulationTime - _pendingPresetTime) < 3f)
                     {
                         FrequencyPresets[slot] = (float[])RDrive.Clone();
-                        Speak($"Preset {slot} overwritten. Frequencies: {FormatFreqs(RDrive)} hertz.");
+                        Speak($"Preset {slot} overwritten. Tones: {FormatFreqs(RDrive)}.");
                         _pendingPresetOverwrite = null;
                     }
                     else
@@ -86,7 +86,7 @@ public partial class Ship
                 else
                 {
                     FrequencyPresets[slot] = (float[])RDrive.Clone();
-                    Speak($"Preset {slot} saved. Frequencies: {FormatFreqs(RDrive)} hertz.");
+                    Speak($"Preset {slot} saved. Tones: {FormatFreqs(RDrive)}.");
                     _pendingPresetOverwrite = null;
                 }
             }
@@ -96,7 +96,7 @@ public partial class Ship
                 if (FrequencyPresets.TryGetValue(slot, out var preset))
                 {
                     Array.Copy(preset, RDrive, N);
-                    Speak($"Preset {slot} recalled. Frequencies set to: {FormatFreqs(RDrive)} hertz.");
+                    Speak($"Preset {slot} recalled. Tones set to: {FormatFreqs(RDrive)}.");
                 }
                 else
                     Speak($"Preset {slot} is empty. Use Control plus {slot} to save current frequencies.");
@@ -137,7 +137,7 @@ public partial class Ship
         {
             TuaoiModeIndex = (TuaoiModeIndex + 1) % GameConstants.TuaoiModeOrder.Length;
             SetTuaoiMode(GameConstants.TuaoiModeOrder[TuaoiModeIndex]);
-            Speak($"Tuaoi Crystal: {TuaoiMode} mode. {_cachedTuaoiInfo.Desc}");
+            Speak($"The Tuaoi turns to its {TuaoiMode} face. {Capitalize(_cachedTuaoiInfo.Desc)}.");
             DebugLogger.Log("Input", $"Tuaoi mode switched to: {TuaoiMode}");
             _lastTuaoiSwitch = SimulationTime;
         }
@@ -146,7 +146,20 @@ public partial class Ship
             OpenMenu(new StarmapMenuMode(this));
 
         if (IsKeyPressed(Keys.Q))
-            Speak($"Target in selected Realm: {FTarget[SelectedDim]:F2} Hz.");
+        {
+            if (ByEarMode)
+                Speak($"Realm {SelectedDim + 1}: {ResonanceWord(ResonanceLevels[SelectedDim])}.");
+            else
+                Speak($"The selected realm's true note: {FTarget[SelectedDim]:F2}.");
+        }
+
+        if (IsKeyPressed(Keys.N))
+        {
+            ByEarMode = !ByEarMode;
+            Speak(ByEarMode
+                ? "By ear mode on. Target tones will not be spoken; tune by the beat and by realm closeness."
+                : "By ear mode off. Target tones will be spoken.");
+        }
 
         #endregion
 

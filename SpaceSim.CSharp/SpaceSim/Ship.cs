@@ -75,6 +75,7 @@ public partial class Ship
 
     // UI settings
     public int VerboseMode = 1;
+    public bool ByEarMode;          // when true, numeric tuning targets aren't spoken — tune by ear
     public bool AutosaveEnabled = true;
     public bool AmbientSoundsEnabled = true;
     public bool NebulaDissonanceEnabled = true;
@@ -225,6 +226,11 @@ public partial class Ship
     // Consciousness value
     public float ConsciousnessValue = 0.3f;
     public ConsciousnessLevel ConsciousnessStage = ConsciousnessLevel.Awakening;
+
+    // Dwelling / regeneration bath — rewards holding resonance while nearly still (the meditative heart).
+    public float DwellTimer;
+    public bool InRegeneration;
+    private float _lastDwellSwell;
 
     // Astral projection
     public bool AstralMode;
@@ -396,6 +402,10 @@ public partial class Ship
 
     #region Utility methods
 
+    /// <summary>A spoken-friendly word for how close a realm's drive is to its target — for by-ear tuning.</summary>
+    private static string ResonanceWord(float resonance) =>
+        resonance > 0.9f ? "locked" : resonance > 0.6f ? "very close" : resonance > 0.3f ? "near" : "far";
+
     /// <summary>Switches the Tuaoi crystal to a new mode and caches its info for fast per-frame lookups.</summary>
     public void SetTuaoiMode(TuaoiMode mode)
     {
@@ -404,16 +414,24 @@ public partial class Ship
     }
 
     /// <summary>
-    /// How far the ship can sense objects. Communication mode widens this (2x), letting the
-    /// player detect temples, pyramids and bodies from further away.
+    /// How far the ship can sense objects. Grows with consciousness (the universe "opens" as the pilot
+    /// awakens) and is widened further by Communication mode (2x), letting the player hear ambients and
+    /// detect temples, pyramids, and bodies from further away.
     /// </summary>
     public float GetEffectiveScanRange()
     {
-        float range = GameConstants.InteractionDistance;
+        float range = GameConstants.InteractionDistance * ConsciousnessHearingMult();
         if (TuaoiMode == TuaoiMode.Communication)
             range *= _cachedTuaoiInfo.Rate; // 2.0x
         return range;
     }
+
+    /// <summary>
+    /// Perception/hearing multiplier that rises with consciousness (1.0 dormant, up to 2.0 fully
+    /// awakened). As the pilot ascends, distant ambient voices and objects become audible — the
+    /// soundscape opens. Drawn from <see cref="ConsciousnessValue"/>, which is clamped to 0..1.
+    /// </summary>
+    public float ConsciousnessHearingMult() => 1f + ConsciousnessValue;
 
     /// <summary>
     /// Maps a frequency to its crystal type (Ruby through Quartz, by chakra band).

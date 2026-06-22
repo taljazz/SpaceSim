@@ -19,6 +19,7 @@ public sealed class HelpScreen : MenuScreen
     private static readonly string[] _lines =
     {
         "Goal. Tune your five realms into resonance to fly. Anchor on planets to gather crystals and spend them on attunements. Raise your consciousness, collect the twelve temple keys, and reach the Halls of Amenti at the universe's center. Open the scanner with M to find temples and pyramids.",
+        "The two ways of Atlantis: the way of accumulation, gathering crystals to renew the universe; and the way of the One, raising consciousness and the twelve keys toward Amenti.",
 
         "Flight. W and S thrust forward and back.",
         "A and D strafe left and right.",
@@ -29,7 +30,8 @@ public sealed class HelpScreen : MenuScreen
         "Tuning. Press 1 to 5 to select a realm.",
         "Up and Down arrows tune the selected realm.",
         "J toggles full tuning of all five realms.",
-        "Q speaks the selected realm's target frequency.",
+        "Q speaks the selected realm's true note.",
+        "N toggles by-ear mode: the game stops speaking target numbers, so you tune by the beat and by realm closeness.",
 
         "Navigation. M opens the scanner to find and lock a destination.",
         "E charges into a nearby Harmonic Chamber, or opens the chamber list.",
@@ -43,13 +45,14 @@ public sealed class HelpScreen : MenuScreen
         "U opens the attunement menu to spend crystals.",
         "T takes off from the planet.",
 
-        "Abilities. G cycles Tuaoi Crystal modes.",
+        "Abilities. G turns the Tuaoi Crystal to its next face.",
         "P drops a portal anchor. Shift plus P travels to it.",
         "B toggles astral projection.",
         "I focuses intention navigation toward your locked target.",
         "Hold Space with all five realms in near-perfect resonance to earn the water blessing: a minute of healing and full protection.",
+        "Hold steady resonance while nearly still to settle into a regeneration bath that heals you and deepens your consciousness.",
 
-        "Presets. Control plus 1 to 9 saves a frequency preset. Shift plus 1 to 9 recalls one.",
+        "Presets. Control plus 1 to 9 saves a tone preset. Shift plus 1 to 9 recalls one.",
 
         "Audio. Plus and minus adjust master volume. Hold Alt, Shift, or Control for drive, beep, or effect volume.",
 

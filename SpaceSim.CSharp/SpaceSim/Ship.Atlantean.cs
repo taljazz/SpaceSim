@@ -259,7 +259,9 @@ public partial class Ship
                     }
                     else if (!_templeNearbyAnnounced)
                     {
-                        Speak($"Temple of {temple.KeyName} nearby. Tune a realm to {temple.Frequency:F0} hertz to receive the key.");
+                        Speak(ByEarMode
+                            ? $"Temple of {temple.KeyName} nearby. Attune a realm to its note by ear to receive the key."
+                            : $"Temple of {temple.KeyName} nearby. Attune a realm to its note, {temple.Frequency:F0}, to receive the key.");
                         _templeNearbyAnnounced = true;
                     }
                 }
@@ -270,7 +272,7 @@ public partial class Ship
                     {
                         if (!VisitedAmenti)
                         {
-                            Speak("The Halls of Amenti open before you. Ancient wisdom floods your consciousness. Your light vehicle is forever blessed: swifter flight and ascended awareness.");
+                            Speak("The Halls of Amenti open before you. You came not by power hoarded but by the way of the One: harmony held, consciousness raised, the twelve keys gathered. Ancient wisdom floods you; your light vehicle is forever blessed with swifter flight and ascended awareness.");
                             VisitedAmenti = true;
                             AmentiBlessingActive = true;
                             ResonanceWidth *= PHI;
@@ -357,7 +359,7 @@ public partial class Ship
 
         if (NearPyramid != null && !wasNear && !_pyramidAnnounced)
         {
-            Speak($"Entering {NearPyramid.Name}. Resonance chamber at 118 Hz activated.");
+            Speak($"Entering {NearPyramid.Name}. The resonance chamber awakens.");
             _pyramidAnnounced = true;
         }
         else if (NearPyramid == null && wasNear)
@@ -414,7 +416,7 @@ public partial class Ship
         if (ConsciousnessStage != oldStage && !_consciousnessAnnounced)
         {
             var info = GameConstants.ConsciousnessLevels[ConsciousnessStage];
-            Speak($"Consciousness level: {ConsciousnessStage}. {info.Desc}.");
+            Speak($"Consciousness level: {ConsciousnessStage}. {info.Desc}. The universe opens wider to your senses.");
             DebugLogger.Log("Ship", $"Consciousness changed: {oldStage} -> {ConsciousnessStage} (value={ConsciousnessValue:F3})");
             GameEvents.RaiseConsciousnessChanged(this, oldStage.ToString(), ConsciousnessStage.ToString(), ConsciousnessValue);
             _consciousnessAnnounced = true;
@@ -422,6 +424,52 @@ public partial class Ship
         else if (ConsciousnessStage == oldStage)
         {
             _consciousnessAnnounced = false;
+        }
+    }
+
+    /// <summary>
+    /// The dwelling / regeneration bath — the meditative heart that rewards <em>holding</em> resonance.
+    /// When the pilot sustains high mean resonance while nearly still (and not anchored on a planet), a
+    /// regeneration bath forms: integrity is steadily restored, consciousness rises along the contemplative
+    /// path, and soft golden-chord swells deepen the soundscape. It disperses the moment resonance breaks.
+    /// </summary>
+    private void UpdateDwelling(float dt)
+    {
+        float avgRes = Vec5.Mean(ResonanceLevels);
+        float speed = Vec5.Norm(Velocity);
+        bool eligible = !LandedMode
+                        && avgRes >= GameConstants.DwellResonanceThreshold
+                        && speed < MaxVelocity * GameConstants.DwellStillFactor;
+
+        if (eligible)
+        {
+            DwellTimer += dt;
+            if (!InRegeneration && DwellTimer >= GameConstants.DwellEnterTime)
+            {
+                InRegeneration = true;
+                _lastDwellSwell = SimulationTime;
+                Speak("You settle into the resonance. A regeneration bath forms around you; rest here and be restored.");
+            }
+            if (InRegeneration)
+            {
+                ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + GameConstants.DwellHealRate * dt);
+                ConsciousnessValue = MathF.Min(1f, ConsciousnessValue + GameConstants.DwellConsciousnessRate * dt);
+                if (SimulationTime - _lastDwellSwell >= GameConstants.DwellSwellInterval)
+                {
+                    _audio.AddSoundEffect(new GameSoundEffect(_audio.GoldenChordWaveform, volume: 0.3f * _audio.EffectVolume));
+                    _lastDwellSwell = SimulationTime;
+                }
+            }
+        }
+        else if (InRegeneration)
+        {
+            InRegeneration = false;
+            Speak("The resonance bath disperses.");
+            DwellTimer = 0f;
+        }
+        else
+        {
+            DwellTimer = 0f;
         }
     }
 
@@ -581,7 +629,7 @@ public partial class Ship
     public void Ascend()
     {
         DebugLogger.Log("Ship", $"RENEWAL triggered with {CrystalsCollected} crystals");
-        Speak("Crystal threshold reached. Your light vehicle renews, warping to a fresh universe to continue the journey toward the Halls of Amenti.");
+        Speak("Crystal threshold reached. This is the way of accumulation: power gathered, the cycle renewed, your light vehicle reborn into a fresh universe. Yet the deeper way, the way of the One, still calls toward the Halls of Amenti.");
         Array.Clear(Position);
         ActivateGoldenHarmony();
         NeedsUniverseRegeneration = true;

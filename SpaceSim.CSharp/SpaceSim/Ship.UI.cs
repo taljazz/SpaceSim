@@ -64,8 +64,11 @@ public partial class Ship
         {
             // Status read-out: a snapshot of the ship's current resonance/navigation state.
             HudItems.Add($"Selected Realm: {SelectedDim + 1}");
-            HudItems.Add($"Drive Freq: {RDrive[SelectedDim]:F2} Hz");
-            HudItems.Add($"Target Freq: {FTarget[SelectedDim]:F2} Hz");
+            HudItems.Add($"Your tone: {RDrive[SelectedDim]:F2}");
+            if (ByEarMode)
+                HudItems.Add($"Realm resonance: {ResonanceWord(ResonanceLevels[SelectedDim])}");
+            else
+                HudItems.Add($"The realm's note: {FTarget[SelectedDim]:F2}");
             HudItems.Add($"Resonance: {ResonanceLevels[SelectedDim] * 100f:F0} percent");
             HudItems.Add($"Speed: {Vec5.Norm(Velocity):F2} u/s");
             HudItems.Add($"Vol: {(int)(_audio.MasterVolume * 100)}%");
@@ -73,7 +76,7 @@ public partial class Ship
             HudItems.Add($"Atlantean Crystals: {CrystalsCollected}");
             HudItems.Add($"Status: {(LandedMode ? "Anchored" : "In Flight")}");
             HudItems.Add($"Power: {ResonancePower.Average() * 100f:F0} percent");
-            HudItems.Add($"Tuaoi Mode: {TuaoiMode}");
+            HudItems.Add($"Tuaoi face: {TuaoiMode}");
             HudItems.Add($"Merkaba: {(MerkabaActive ? "Active" : "Inactive")}");
             HudItems.Add($"Temple Resonance: {(InTempleResonance ? "Active" : "Inactive")}");
             HudItems.Add($"Tuning Mode: {(TuningMode ? "Resonance (all realms)" : "Manual (higher realms only)")}");
@@ -179,7 +182,9 @@ public partial class Ship
             else if (TempleKeys.Contains(temple.KeyIndex))
                 label = $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, key collected";
             else
-                label = $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, tune a realm to {temple.Frequency:F0} hertz for the key";
+                label = ByEarMode
+                    ? $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note by ear for the key"
+                    : $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note, {temple.Frequency:F0}, for the key";
             items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(temple.Position), Kind = StarmapItemKind.Temple }));
         }
 
@@ -188,7 +193,9 @@ public partial class Ship
             float dist = Vec5.Distance(Position, pyramid.Position);
             var proj = ProjectRelative(pyramid.Position);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
-            string label = $"{pyramid.Name} at dist {dist:F1}, angle {angle:F1} degrees, tune a realm to {pyramid.Frequency:F0} hertz to activate";
+            string label = ByEarMode
+                ? $"{pyramid.Name} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note by ear to activate"
+                : $"{pyramid.Name} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note, {pyramid.Frequency:F0}, to activate";
             items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(pyramid.Position), Kind = StarmapItemKind.Pyramid }));
         }
 

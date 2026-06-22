@@ -326,12 +326,12 @@ public static class GameConstants
     /// <summary>The ten sacred Solfeggio tones (keyed by Hz). Tuning a drive within <see cref="SolfeggioTolerance"/> of one grants its effect.</summary>
     public static readonly Dictionary<int, SolfeggioInfo> SolfeggioFrequencies = new()
     {
-        [174] = new("Foundation", SolfeggioEffect.PainRelief, "natural anesthetic", "shield", 1.1f),
-        [285] = new("Quantum", SolfeggioEffect.TissueHealing, "cellular regeneration", "minor_heal", 0.5f),
+        [174] = new("Foundation", SolfeggioEffect.PainRelief, "the easing of all pain", "shield", 1.1f),
+        [285] = new("Quickening", SolfeggioEffect.TissueHealing, "the body made new", "minor_heal", 0.5f),
         [396] = new("Liberation", SolfeggioEffect.ReleaseFear, "liberating guilt and fear", "stability", 1.2f),
         [417] = new("Transmutation", SolfeggioEffect.FacilitateChange, "undoing situations", "rift_assist", 1.15f),
-        [432] = new("Natural Harmony", SolfeggioEffect.UniversalTuning, "cosmic frequency", "base_heal", 1f),
-        [528] = new("Miracle", SolfeggioEffect.Transformation, "DNA repair, love frequency", "major_heal", 2f),
+        [432] = new("Natural Harmony", SolfeggioEffect.UniversalTuning, "the world's own note", "base_heal", 1f),
+        [528] = new("Miracle", SolfeggioEffect.Transformation, "renewal and love", "major_heal", 2f),
         [639] = new("Connection", SolfeggioEffect.Relationships, "harmonizing connections", "comm_boost", 1.3f),
         [741] = new("Awakening", SolfeggioEffect.Expression, "awakening intuition", "rift_detect", 1.4f),
         [852] = new("Intuition", SolfeggioEffect.SpiritualOrder, "returning to spiritual order", "third_eye", 1.25f),
@@ -387,12 +387,12 @@ public static class GameConstants
     /// <summary>The six faces of the Tuaoi Stone, each a selectable drive mode with its own frequency, color, and effect.</summary>
     public static readonly Dictionary<TuaoiMode, TuaoiModeInfo> TuaoiModes = new()
     {
-        [TuaoiMode.Healing] = new(432f, new Color(0, 255, 128), "integrity_regen", 0.01f, "Atlantean healing frequency"),
-        [TuaoiMode.Navigation] = new(PHI * 256f, new Color(100, 150, 255), "enhanced_autopilot", 1.5f, "Golden ratio navigation"),
-        [TuaoiMode.Communication] = new(7.83f, new Color(255, 200, 100), "expanded_scan", 2f, "Earth resonance connection"),
-        [TuaoiMode.Power] = new(528f, new Color(255, 100, 100), "velocity_boost", 1.25f, "Miracle frequency power"),
-        [TuaoiMode.Regeneration] = new(285f, new Color(200, 100, 255), "resonance_recovery", 1.3f, "Cellular regeneration frequency"),
-        [TuaoiMode.Transcendence] = new(963f, new Color(255, 255, 200), "higher_dim_sensitivity", 1.4f, "Divine connection frequency"),
+        [TuaoiMode.Healing] = new(432f, new Color(0, 255, 128), "integrity_regen", 0.01f, "the healing tone"),
+        [TuaoiMode.Navigation] = new(PHI * 256f, new Color(100, 150, 255), "enhanced_autopilot", 1.5f, "the golden path that guides your course"),
+        [TuaoiMode.Communication] = new(7.83f, new Color(255, 200, 100), "expanded_scan", 2f, "the Earth's deep resonance, widening your senses"),
+        [TuaoiMode.Power] = new(528f, new Color(255, 100, 100), "velocity_boost", 1.25f, "the tone of power"),
+        [TuaoiMode.Regeneration] = new(285f, new Color(200, 100, 255), "resonance_recovery", 1.3f, "the tone of renewal"),
+        [TuaoiMode.Transcendence] = new(963f, new Color(255, 255, 200), "higher_dim_sensitivity", 1.4f, "the divine tone"),
     };
     /// <summary>Cycle order for the G key, defining the index that <see cref="TuaoiModeInfoByIndex"/> follows.</summary>
     public static readonly TuaoiMode[] TuaoiModeOrder = { TuaoiMode.Healing, TuaoiMode.Navigation, TuaoiMode.Communication, TuaoiMode.Power, TuaoiMode.Regeneration, TuaoiMode.Transcendence };
@@ -537,6 +537,20 @@ public static class GameConstants
     public static readonly ConsciousnessLevel[] ConsciousnessLevelOrder = { ConsciousnessLevel.Dormant, ConsciousnessLevel.Awakening, ConsciousnessLevel.Aware, ConsciousnessLevel.Attuned, ConsciousnessLevel.Enlightened, ConsciousnessLevel.Ascended };
     public const float ConsciousnessGainRate = 0.001f;
     public const float ConsciousnessDecayRate = 0.0005f;
+
+    // Dwelling / regeneration bath: rewards HOLDING resonance while nearly still — the meditative heart.
+    /// <summary>Mean resonance at/above which sustained, near-still dwelling counts toward the regeneration bath.</summary>
+    public const float DwellResonanceThreshold = 0.7f;
+    /// <summary>Speed (as a fraction of MaxVelocity) below which the ship counts as "still" enough to dwell.</summary>
+    public const float DwellStillFactor = 0.15f;
+    /// <summary>Seconds of sustained still-resonance before the regeneration bath forms.</summary>
+    public const float DwellEnterTime = 6f;
+    /// <summary>Integrity restored per second while resting in the regeneration bath.</summary>
+    public const float DwellHealRate = 0.04f;
+    /// <summary>Consciousness gained per second while dwelling — the contemplative path to ascension.</summary>
+    public const float DwellConsciousnessRate = 0.003f;
+    /// <summary>Interval (seconds) between soft golden-chord swells that deepen the bath while dwelling.</summary>
+    public const float DwellSwellInterval = 6f;
 
     #endregion
 

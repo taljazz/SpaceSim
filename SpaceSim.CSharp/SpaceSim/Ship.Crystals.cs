@@ -89,7 +89,9 @@ public partial class Ship
         }
 
         string freqStr = string.Join(", ", CrystalFreqs.Select(f => $"{f.Freqs[0]:F2}"));
-        Speak($"Crystals detected at frequencies: {freqStr} Hz in the primary Realm.");
+        Speak(ByEarMode
+            ? "Crystals sing in the primary realm. Tune by ear to find their notes."
+            : $"Crystals sing at: {freqStr}, in the primary realm.");
         _approachingLockAnnounced = false;
 
         // Start the looping biome ambience: a golden chord for harmonic worlds, chaos for dissonant ones.
@@ -168,7 +170,9 @@ public partial class Ship
         string specialMsg = "";
         if (crystal.Special && crystal.AtlanteanType != null)
             specialMsg = $" Rare {FormatName(crystal.AtlanteanType)} crystal!";
-        Speak($"Nearest crystal {dists[nearest]:F1} units {dir}. Target frequency in Realm {SelectedDim + 1}: {freq:F2} Hz.{specialMsg}");
+        Speak(ByEarMode
+            ? $"Nearest crystal {dists[nearest]:F1} units {dir}. Tune realm {SelectedDim + 1} by ear to match it.{specialMsg}"
+            : $"Nearest crystal {dists[nearest]:F1} units {dir}. Its note in realm {SelectedDim + 1}: {freq:F2}.{specialMsg}");
 
         float angle = MathF.Atan2(dy, dx);
         float pan = MathF.Cos(angle);

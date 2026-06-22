@@ -24,6 +24,10 @@ public class GameSettings
     /// <summary>Speech verbosity: 0 = low, 1 = medium, 2 = high.</summary>
     public int VerboseMode { get; set; } = 1;
 
+    /// <summary>When true, the game stops speaking numeric tuning targets — the player tunes purely by the
+    /// beat cue and spoken realm-closeness. Off by default (the numbers are a friendlier aid).</summary>
+    public bool ByEarMode { get; set; }
+
     #endregion
 
     #region Toggles

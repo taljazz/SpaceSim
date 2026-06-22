@@ -22,6 +22,7 @@ public class GameSettingsTests
         Assert.Equal(0.2f, s.EffectVolume);
         Assert.Equal(0.05f, s.DriveVolume);
         Assert.Equal(1, s.VerboseMode);
+        Assert.False(s.ByEarMode);
         Assert.True(s.AutosaveEnabled);
         Assert.True(s.AmbientSoundsEnabled);
         Assert.True(s.NebulaDissonanceEnabled);
@@ -37,6 +38,7 @@ public class GameSettingsTests
             EffectVolume = 0.6f,
             DriveVolume = 0.12f,
             VerboseMode = 2,
+            ByEarMode = true,
             AutosaveEnabled = false,
             AmbientSoundsEnabled = false,
             NebulaDissonanceEnabled = false,
@@ -51,6 +53,7 @@ public class GameSettingsTests
         Assert.Equal(original.EffectVolume, restored.EffectVolume);
         Assert.Equal(original.DriveVolume, restored.DriveVolume);
         Assert.Equal(original.VerboseMode, restored.VerboseMode);
+        Assert.Equal(original.ByEarMode, restored.ByEarMode);
         Assert.Equal(original.AutosaveEnabled, restored.AutosaveEnabled);
         Assert.Equal(original.AmbientSoundsEnabled, restored.AmbientSoundsEnabled);
         Assert.Equal(original.NebulaDissonanceEnabled, restored.NebulaDissonanceEnabled);

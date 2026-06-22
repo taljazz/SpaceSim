@@ -222,6 +222,7 @@ public partial class SpaceSimGame : Game
         _audio.DriveVolume = s.DriveVolume;
 
         _ship.VerboseMode = s.VerboseMode;
+        _ship.ByEarMode = s.ByEarMode;
         _ship.AutosaveEnabled = s.AutosaveEnabled;
         _ship.AmbientSoundsEnabled = s.AmbientSoundsEnabled;
         _ship.NebulaDissonanceEnabled = s.NebulaDissonanceEnabled;
@@ -243,6 +244,7 @@ public partial class SpaceSimGame : Game
         if (s.DriveVolume != _audio.DriveVolume) { s.DriveVolume = _audio.DriveVolume; changed = true; }
 
         if (s.VerboseMode != _ship.VerboseMode) { s.VerboseMode = _ship.VerboseMode; changed = true; }
+        if (s.ByEarMode != _ship.ByEarMode) { s.ByEarMode = _ship.ByEarMode; changed = true; }
         if (s.AutosaveEnabled != _ship.AutosaveEnabled) { s.AutosaveEnabled = _ship.AutosaveEnabled; changed = true; }
         if (s.AmbientSoundsEnabled != _ship.AmbientSoundsEnabled) { s.AmbientSoundsEnabled = _ship.AmbientSoundsEnabled; changed = true; }
         if (s.NebulaDissonanceEnabled != _ship.NebulaDissonanceEnabled) { s.NebulaDissonanceEnabled = _ship.NebulaDissonanceEnabled; changed = true; }

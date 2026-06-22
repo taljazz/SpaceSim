@@ -31,22 +31,29 @@ public partial class Ship
             return;
         }
 
-        // Each slot applies its own tighter radius, or stops when nothing of that type is in range.
-        if (star != null && dStar < GameConstants.StarHarmonyRadius) HandleStarAmbient(star, dStar);
+        // Consciousness opens the soundscape: the higher the pilot's awareness, the farther these ambient
+        // voices carry, so more of the universe becomes audible as they rise. Each slot still applies its
+        // own (now consciousness-scaled) radius, or stops when nothing of that type is in range.
+        float hear = ConsciousnessHearingMult();
+        float starR = GameConstants.StarHarmonyRadius * hear;
+        float planetR = GameConstants.InteractionDistance * hear;
+        float nebulaR = GameConstants.NebulaDissonanceRadius * hear;
+
+        if (star != null && dStar < starR) HandleStarAmbient(star, dStar, starR);
         else StopWorldLoop(ref _starSound);
 
-        if (planet != null && dPlanet < GameConstants.InteractionDistance) HandlePlanetAmbient(planet, dPlanet);
+        if (planet != null && dPlanet < planetR) HandlePlanetAmbient(planet, dPlanet, planetR);
         else StopWorldLoop(ref _planetSound);
 
-        if (nebula != null && dNebula < GameConstants.NebulaDissonanceRadius) HandleNebulaAmbient(nebula, dNebula);
+        if (nebula != null && dNebula < nebulaR) HandleNebulaAmbient(nebula, dNebula, nebulaR);
         else StopWorldLoop(ref _nebulaSound);
     }
 
     /// <summary>Looping ambient for the nearest star — type-specific timbre, including a warm hum for the common main-sequence stars.</summary>
-    private void HandleStarAmbient(CelestialBody body, float dist)
+    private void HandleStarAmbient(CelestialBody body, float dist, float radius)
     {
         var sType = body.StellarClass ?? StellarType.MainSequence;
-        float volume = ComputeAmbientGain(dist, GameConstants.StarHarmonyRadius, 0.9f);
+        float volume = ComputeAmbientGain(dist, radius, 0.9f);
         float[] waveform = sType switch
         {
             StellarType.RedGiant => _audio.RedGiantPulse,
@@ -58,10 +65,10 @@ public partial class Ship
     }
 
     /// <summary>Looping ambient for the nearest nebula — type-specific drone / shimmer / chaos.</summary>
-    private void HandleNebulaAmbient(CelestialBody body, float dist)
+    private void HandleNebulaAmbient(CelestialBody body, float dist, float radius)
     {
         var nType = body.NebulaClass ?? NebulaType.Emission;
-        float volume = ComputeAmbientGain(dist, GameConstants.NebulaDissonanceRadius, 1.0f);
+        float volume = ComputeAmbientGain(dist, radius, 1.0f);
         float[] waveform = nType switch
         {
             NebulaType.Emission => _audio.EmissionDrone,
@@ -74,10 +81,10 @@ public partial class Ship
     }
 
     /// <summary>Looping ambient for the nearest planet — type-specific timbre.</summary>
-    private void HandlePlanetAmbient(CelestialBody body, float dist)
+    private void HandlePlanetAmbient(CelestialBody body, float dist, float radius)
     {
         var eType = body.ExoplanetClass ?? ExoplanetType.SuperEarth;
-        float volume = ComputeAmbientGain(dist, GameConstants.InteractionDistance, 0.9f);
+        float volume = ComputeAmbientGain(dist, radius, 0.9f);
         float[] waveform = eType switch
         {
             ExoplanetType.HotJupiter => _audio.HotJupiterRoar,

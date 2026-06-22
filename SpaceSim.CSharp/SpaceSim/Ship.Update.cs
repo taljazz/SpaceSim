@@ -283,7 +283,7 @@ public partial class Ship
                     if (MathF.Abs(RDrive[i] - freq) < GameConstants.SolfeggioTolerance)
                     {
                         if (!ActiveSolfeggio.ContainsKey(freq))
-                            Speak($"Solfeggio {info.Name} frequency detected. {Capitalize(info.Desc)}.");
+                            Speak($"The {info.Name} tone awakens. {Capitalize(info.Desc)}.");
                         ActiveSolfeggio[freq] = (info.Effect, SimulationTime + 2f);
                     }
                 }
@@ -345,7 +345,7 @@ public partial class Ship
             InTempleResonance = true;
             if (!_templeAnnounced)
             {
-                Speak("Temple resonance detected. Ancient healing frequency 110 hertz active.");
+                Speak("Temple resonance. The ancient healing tone fills your light vehicle.");
                 _templeAnnounced = true;
             }
         }
@@ -366,6 +366,7 @@ public partial class Ship
         DetectBrainwaveState();
         UpdateAstralMode(dt);
         UpdateIntentionNavigation(dt);
+        UpdateDwelling(dt);
 
         if (PatternBonusTimer > 0) PatternBonusTimer -= dt;
 

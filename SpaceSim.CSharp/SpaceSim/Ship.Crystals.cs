@@ -214,20 +214,24 @@ public partial class Ship
             LockedCrystals.Add(nearest);
             PatternProgress.Add(nearest);
 
+            // Build the whole collection announcement as ONE utterance — with interrupt-by-default,
+            // separate Speak calls here would each cut off the previous, so the player would only hear
+            // the last line. We assemble base + crystal effect + ancient echo + pattern completion.
             int crystalValue = 1;
+            string msg;
             if (crystal.Special && crystal.AtlanteanType != null &&
                 GameConstants.AtlanteanCrystalTypes.ContainsKey(crystal.AtlanteanType))
             {
                 var cInfo = GameConstants.AtlanteanCrystalTypes[crystal.AtlanteanType];
                 crystalValue = (int)cInfo.Mult;
-                Speak($"Rare {FormatName(crystal.AtlanteanType)} crystal collected! {cInfo.Desc}. Value: {crystalValue} crystals.");
-                ApplyAtlanteanCrystalEffect(crystal.AtlanteanType);
+                msg = $"Rare {FormatName(crystal.AtlanteanType)} crystal collected! {cInfo.Desc}. Value: {crystalValue} crystals.";
+                string effect = ApplyAtlanteanCrystalEffect(crystal.AtlanteanType);
+                if (effect.Length > 0) msg += " " + effect;
             }
             else
             {
-                float avgFreq = cFreqs.Average();
-                var (typeName, typeInfo) = GetCrystalType(avgFreq);
-                Speak($"{Capitalize(typeName)} crystal collected. {Capitalize(typeInfo.Chakra)} chakra resonance. Harmony increases.");
+                var (typeName, typeInfo) = GetCrystalType(cFreqs.Average());
+                msg = $"{Capitalize(typeName)} crystal collected. {Capitalize(typeInfo.Chakra)} chakra resonance. Harmony increases.";
             }
 
             CrystalsCollected += crystalValue;
@@ -241,7 +245,7 @@ public partial class Ship
             }
 
             if (Random.Shared.NextSingle() < 0.2f)
-                Speak("Ancient echo: The spiral binds all realms in golden eternity.");
+                msg += " Ancient echo: the spiral binds all realms in golden eternity.";
 
             // Sacred geometry pattern completion: gathering every crystal of a recognised layout
             // grants a timed bonus plus extra crystals scaled by the pattern's multiplier.
@@ -253,13 +257,15 @@ public partial class Ship
                     int bonusCrystals = (int)(CrystalCount * (pInfo.Mult - 1f));
                     if (bonusCrystals > 0)
                         CrystalsCollected += bonusCrystals;
-                    Speak($"All crystals collected! Sacred {GameUtils.SpacePascalCase(CurrentPattern.Value.ToString())} pattern completed. {FormatName(pInfo.Bonus)} bonus activated. {bonusCrystals} bonus crystals. Press U for attunement.");
+                    msg += $" All this planet's crystals are gathered. Sacred {GameUtils.SpacePascalCase(CurrentPattern.Value.ToString())} pattern completed, {FormatName(pInfo.Bonus)} bonus, {bonusCrystals} bonus crystals. Press U for attunement.";
                 }
                 else
                 {
-                    Speak("All crystals collected. Press U for attunement menu.");
+                    msg += " All this planet's crystals are gathered. Press U for the attunement menu.";
                 }
             }
+
+            Speak(msg);
 
             if (CrystalsCollected >= GameConstants.AscensionCrystalThreshold)
                 Ascend();
@@ -279,37 +285,32 @@ public partial class Ship
     /// Apply the one-off effect of a collected special Atlantean crystal (velocity burst, shield
     /// boost, consciousness gain, dissonance purge, etc.), announcing the corresponding lore line.
     /// </summary>
-    public void ApplyAtlanteanCrystalEffect(string crystalType)
+    public string ApplyAtlanteanCrystalEffect(string crystalType)
     {
-        if (!GameConstants.AtlanteanCrystalTypes.TryGetValue(crystalType, out var info)) return;
+        if (!GameConstants.AtlanteanCrystalTypes.TryGetValue(crystalType, out var info)) return "";
 
         switch (info.Effect)
         {
             case CrystalEffect.VelocityBurst:
                 MaxVelocity *= 1.5f;
-                Speak("Fire crystal energy surges through your light vehicle!");
-                break;
+                return "Fire crystal energy surges through your light vehicle!";
             case CrystalEffect.ShieldBoost:
                 ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + 0.2f);
-                Speak("Aquamarine protective field strengthens your hull.");
-                break;
+                return "Aquamarine protective field strengthens your hull.";
             case CrystalEffect.Communication:
-                Speak("Larimar stone awakens ancient wisdom within you.");
-                break;
+                return "Larimar stone awakens ancient wisdom within you.";
             case CrystalEffect.Transformation:
                 ConsciousnessValue = MathF.Min(1f, ConsciousnessValue + 0.1f);
-                Speak("Moldavite accelerates your spiritual evolution!");
-                break;
+                return "Moldavite accelerates your spiritual evolution!";
             case CrystalEffect.MemoryUnlock:
-                Speak("Lemurian seed crystal shares memories of forgotten ages.");
-                break;
+                return "Lemurian seed crystal shares memories of forgotten ages.";
             case CrystalEffect.Purification:
                 DissonanceTimer = 0f;
-                Speak("Black tourmaline cleanses all dissonance from your field.");
-                break;
+                return "Black tourmaline cleanses all dissonance from your field.";
             case CrystalEffect.AngelicConnection:
-                Speak("Celestite opens channels to higher dimensional beings.");
-                break;
+                return "Celestite opens channels to higher dimensional beings.";
+            default:
+                return "";
         }
     }
 

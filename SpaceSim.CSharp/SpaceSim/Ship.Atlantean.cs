@@ -599,15 +599,16 @@ public partial class Ship
         for (int i = 0; i < N; i++)
             Position[i] += MathHelpers.RandomRange(-20f, 20f) * PHI;
 
-        Speak($"Entering {rift.RiftKind} Harmonic Chamber. Golden warp activated.");
-
+        // Build the warp announcement as one utterance (interrupt-by-default would drop the first line).
+        string warpMsg = $"Entering {rift.RiftKind} Harmonic Chamber. Golden warp activated.";
         if (rift.RiftKind == RiftType.Crystal) CrystalsCollected += 1;
         else if (rift.RiftKind == RiftType.Hazard) ResonanceIntegrity -= 0.1f;
         else if (rift.RiftKind == RiftType.PerfectFifth)
         {
             CrystalBonus += 1;
-            Speak("Perfect fifth Harmonic Chamber grants eternal crystal bounty.");
+            warpMsg += " It grants eternal crystal bounty.";
         }
+        Speak(warpMsg);
 
         // Stop rift sound
         StopWorldLoop(ref rift.Sound);

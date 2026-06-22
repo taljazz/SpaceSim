@@ -35,7 +35,8 @@ public sealed class HelpScreen : MenuScreen
         "Navigation. M opens the scanner to find and lock a destination.",
         "E charges into a nearby Harmonic Chamber, or opens the chamber list.",
         "L anchors on a nearby planet.",
-        "R speaks your full status.",
+        "R speaks your status: resonance, integrity, speed, heading, and crystals.",
+        "Tab repeats the last announcement.",
 
         "On a planet. W, A, S, and D move the crystal cursor.",
         "F scans for the nearest crystal.",

@@ -514,9 +514,13 @@ public partial class Ship
         }
         else
         {
-            // Guidance while locked
-            if (LockedIsRift && LockedTarget != null && SimulationTime - _lastGuidanceTime > 10f)
+            // Guidance while locked onto ANY target (chamber, planet, or star) — not just rifts.
+            // Periodically reports distance, how centered the heading is, resonance, and which way to
+            // rotate. Throttled (10s, and only on a meaningful change) so it orients without nagging,
+            // and emitted as ONE utterance so interrupt-by-default doesn't drop the first half.
+            if (LockedTarget != null && SimulationTime - _lastGuidanceTime > 10f)
             {
+                string what = LockedIsRift ? "Harmonic Chamber" : "Target";
                 float dist = Vec5.Distance(Position, LockedTarget);
                 float avgResP = avgRes * 100f;
                 var proj = ProjectRelative(LockedTarget);
@@ -526,7 +530,7 @@ public partial class Ship
 
                 if (MathF.Abs(dist - _prevRiftDist) > 5f || MathF.Abs(alignPct - _prevRiftAlign) > 10f || MathF.Abs(avgResP - _prevRiftRes) > 10f)
                 {
-                    Speak($"Harmonic Chamber: distance {dist:F1}, {alignPct:F0} percent centered, resonance {avgResP:F0} percent.");
+                    string msg = $"{what}: distance {dist:F1}, {alignPct:F0} percent centered, resonance {avgResP:F0} percent.";
                     if (alignPct < 50f)
                     {
                         Vec5.SubtractInto(LockedTarget, Position, _dirVecBuffer);
@@ -536,8 +540,9 @@ public partial class Ship
                         else
                             targetR = ViewRotation;
                         float deltaR = targetR - ViewRotation;
-                        Speak($"Rotate {(deltaR > 0 ? "right" : "left")} to center.");
+                        msg += $" Rotate {(deltaR > 0 ? "right" : "left")} to center.";
                     }
+                    Speak(msg);
                     _prevRiftDist = dist;
                     _prevRiftAlign = alignPct;
                     _prevRiftRes = avgResP;

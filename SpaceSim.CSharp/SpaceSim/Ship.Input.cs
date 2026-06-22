@@ -199,12 +199,21 @@ public partial class Ship
             Speak("Ascending from planet. Light vehicle disengaged.");
         }
 
-        // Status
+        // Status — a concise, meaningful read-out (no raw 5D vectors or radians to decode by ear).
         if (IsKeyPressed(Keys.R))
         {
-            string status = $"Position: {Vec5.Format(Position)}. Velocity: {Vec5.Format(Velocity)}. Resonance levels: {Vec5.Format(ResonanceLevels)}. View rotation: {ViewRotation:F2} radians. {(LandedMode ? "Anchored on planet." : "In space.")} Integrity: {ResonanceIntegrity:F2}. Crystals: {CrystalsCollected}. Power levels: {Vec5.Format(ResonancePower)}.";
+            float avgResP = Vec5.Mean(ResonanceLevels) * 100f;
+            float bearing = (ViewRotation * 180f / MathF.PI) % 360f;
+            if (bearing < 0f) bearing += 360f;
+            string status = $"Resonance {avgResP:F0} percent. Integrity {ResonanceIntegrity * 100f:F0} percent. " +
+                            $"Speed {Vec5.Norm(Velocity):F1}. Heading {bearing:F0} degrees. " +
+                            $"{(LandedMode ? "Anchored." : "In space.")} {CrystalsCollected} crystals.";
             Speak(status);
         }
+
+        // Replay the last announcement (useful if a line was missed).
+        if (IsKeyPressed(Keys.Tab))
+            RepeatLastAnnouncement();
 
         // HUD / Upgrade menu
         if (IsKeyPressed(Keys.U))

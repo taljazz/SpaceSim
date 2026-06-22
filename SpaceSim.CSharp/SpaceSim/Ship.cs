@@ -348,6 +348,9 @@ public partial class Ship
 
     #region Speech helper
 
+    /// <summary>The most recent in-game announcement, so the player can replay it (Tab key).</summary>
+    private string _lastAnnouncement = "";
+
     /// <summary>
     /// Announces a message through the screen reader, but only if the same message hasn't been
     /// spoken within the cooldown window — this is what keeps per-frame alerts from spamming.
@@ -359,7 +362,15 @@ public partial class Ship
             SimulationTime - last < GameConstants.SpeechCooldown)
             return;
         _lastSpoken[msg] = SimulationTime;
+        _lastAnnouncement = msg;
         GameEvents.RaiseSpeak(this, msg);
+    }
+
+    /// <summary>Replays the most recent announcement, bypassing the cooldown so it always speaks.</summary>
+    public void RepeatLastAnnouncement()
+    {
+        if (!string.IsNullOrEmpty(_lastAnnouncement))
+            GameEvents.RaiseSpeak(this, _lastAnnouncement);
     }
 
     #endregion

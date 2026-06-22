@@ -66,13 +66,13 @@ public partial class Ship
             HudItems.Add($"Selected Realm: {SelectedDim + 1}");
             HudItems.Add($"Drive Freq: {RDrive[SelectedDim]:F2} Hz");
             HudItems.Add($"Target Freq: {FTarget[SelectedDim]:F2} Hz");
-            HudItems.Add($"Resonance: {ResonanceLevels[SelectedDim]:F2}");
+            HudItems.Add($"Resonance: {ResonanceLevels[SelectedDim] * 100f:F0} percent");
             HudItems.Add($"Speed: {Vec5.Norm(Velocity):F2} u/s");
             HudItems.Add($"Vol: {(int)(_audio.MasterVolume * 100)}%");
-            HudItems.Add($"Integrity: {ResonanceIntegrity:F2}");
+            HudItems.Add($"Integrity: {ResonanceIntegrity * 100f:F0} percent");
             HudItems.Add($"Atlantean Crystals: {CrystalsCollected}");
             HudItems.Add($"Status: {(LandedMode ? "Anchored" : "In Flight")}");
-            HudItems.Add($"Power: {ResonancePower.Average():F2}");
+            HudItems.Add($"Power: {ResonancePower.Average() * 100f:F0} percent");
             HudItems.Add($"Tuaoi Mode: {TuaoiMode}");
             HudItems.Add($"Merkaba: {(MerkabaActive ? "Active" : "Inactive")}");
             HudItems.Add($"Temple Resonance: {(InTempleResonance ? "Active" : "Inactive")}");

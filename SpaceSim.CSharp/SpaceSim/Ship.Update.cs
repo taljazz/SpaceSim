@@ -360,11 +360,13 @@ public partial class Ship
         else
             DissonanceTimer = 0f;
 
-        // Verbose resonance alerts
+        // Verbose resonance alerts — high verbosity only. The beat cue and the resonance click already
+        // convey tuning quality by ear at every verbosity, so these spoken per-realm numbers are
+        // opt-in telemetry (V to raise verbosity) rather than constant chatter during flight.
         for (int i = 0; i < N; i++)
         {
             float change = MathF.Abs(ResonanceLevels[i] - _prevResonanceLevels[i]);
-            if (VerboseMode > 0 && change > 0.1f)
+            if (VerboseMode >= 2 && change > 0.1f)
                 Speak($"Resonance in Realm {i + 1} now {ResonanceLevels[i]:F2}.");
         }
         Array.Copy(ResonanceLevels, _prevResonanceLevels, N);

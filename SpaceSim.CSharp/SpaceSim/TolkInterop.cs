@@ -95,16 +95,18 @@ public sealed class TolkSpeechService : IDisposable
     #region Public API (non-blocking — game thread safe)
 
     /// <summary>
-    /// Queue <paramref name="text"/> to be spoken on the background thread. Returns immediately;
-    /// <paramref name="interrupt"/> cuts off any current speech. Dropped silently if the queue is full.
+    /// Speak <paramref name="text"/> on the background thread. Returns immediately. By default this
+    /// <b>interrupts</b>: it cuts off any current utterance and drops anything still queued, so
+    /// announcements never pile up into a laggy backlog of stale state. In an audio-first game the
+    /// latest state is what matters, so interrupting is the right default. Pass
+    /// <paramref name="interrupt"/> = false only to deliberately append (rare).
     /// </summary>
-    public void Speak(string text, bool interrupt = false)
+    public void Speak(string text, bool interrupt = true)
     {
         if (_queue.IsAddingCompleted) return;
 
-        // An interrupting message supersedes anything still waiting, so drop the stale backlog first.
-        // This keeps rapid menu navigation snappy: the worker speaks the latest item right away
-        // instead of grinding through a queue of already-stale announcements.
+        // An interrupting message supersedes anything still waiting, so drop the stale backlog first —
+        // the screen reader jumps straight to the newest announcement instead of grinding through old ones.
         if (interrupt)
             while (_queue.TryTake(out _)) { }
 

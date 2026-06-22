@@ -15,8 +15,12 @@ public sealed class LearnSoundsScreen : MenuScreen
 {
     #region Sound entry
 
-    /// <summary>One learnable sound: a friendly name, a spoken description, and its waveform.</summary>
-    private sealed record SoundEntry(string Name, string Description, float[] Waveform);
+    /// <summary>
+    /// One learnable cue: a friendly name and a spoken description. <see cref="Waveform"/> is the sound
+    /// to audition; when it's null the entry is explanation-only (a dynamic cue with no fixed sample),
+    /// and Enter just re-reads the description.
+    /// </summary>
+    private sealed record SoundEntry(string Name, string Description, float[]? Waveform = null);
 
     #endregion
 
@@ -44,8 +48,8 @@ public sealed class LearnSoundsScreen : MenuScreen
     /// <summary>The catalog of demoable sounds, grouped stars -> nebulae -> planets -> navigation cues.</summary>
     private static List<SoundEntry> BuildCatalog(AudioSystem a) => new()
     {
-        // Stars
-        new("Main sequence star", "A warm, steady hum. The most common star.", a.MainSequenceHum),
+        // Stars (proximity ambients — they come from the object's direction and grow louder up close)
+        new("Main sequence star", "A warm, steady hum, and the most common star. Star, planet, and nebula sounds come from the object's direction and grow louder as you near it.", a.MainSequenceHum),
         new("Red giant star", "A deep, slow bass pulse.", a.RedGiantPulse),
         new("White dwarf star", "A high, thin whine.", a.WhiteDwarfWhine),
         new("Brown dwarf star", "A low, faint rumble.", a.BrownDwarfRumble),
@@ -60,14 +64,18 @@ public sealed class LearnSoundsScreen : MenuScreen
         new("Ocean world", "A gently flowing, watery tone.", a.OceanWorldFlow),
         new("Rogue planet", "A faint, ominous low tone.", a.RogueOminous),
         new("Ice giant", "A bright, crystalline chime.", a.IceChime),
-        // Navigation & feedback
-        new("Harmonic Chamber hum", "The hum of a nearby Harmonic Chamber.", a.RiftHumWaveform),
-        new("Proximity beep", "Plays when something is near.", a.BeepWaveform),
-        new("Harmonic Chamber beep", "Plays when a Harmonic Chamber is near.", a.RiftBeepWaveform),
-        new("Golden chord", "Plays when you reach golden harmony.", a.GoldenChordWaveform),
-        new("Octave chime", "A detected octave, two to one.", a.OctaveChime),
-        new("Perfect fifth chime", "A detected perfect fifth, three to two.", a.FifthChime),
-        new("Golden ratio chime", "A detected golden-ratio harmony.", a.GoldenChime),
+        // Navigation & feedback (what each one means, not just how it sounds)
+        new("Harmonic Chamber hum", "The looping hum of a nearby rift. It comes from the chamber's direction and rises in pitch as you approach.", a.RiftHumWaveform),
+        new("Proximity beep", "Marks a nearby object. The faster it repeats, the closer you are.", a.BeepWaveform),
+        new("Harmonic Chamber beep", "The homing beep of a locked rift, from the chamber's direction.", a.RiftBeepWaveform),
+        new("Golden chord", "Plays when all realms reach golden harmony.", a.GoldenChordWaveform),
+        new("Octave chime", "Plays when two realms align an octave apart, a two-to-one ratio, granting a bonus.", a.OctaveChime),
+        new("Perfect fifth chime", "Plays when two realms align a perfect fifth apart, three to two.", a.FifthChime),
+        new("Golden ratio chime", "Plays when two realms align in the golden ratio.", a.GoldenChime),
+        // Dynamic cues — no fixed sample to play; these explain a sound you hear while flying or tuning
+        new("Tuning beat", "While you tune the selected realm, a tone pulses at how far off you are. It slows as you approach the target and steadies into a clear tone when you lock on. Tune until the pulsing stops."),
+        new("Resonance click", "A click that ticks while your tuning is strong; the better your resonance, the more often it ticks."),
+        new("Doppler shift", "Sounds out in the world rise in pitch as you fly toward them and fall as you fly away, hinting at your motion."),
     };
 
     #endregion
@@ -78,7 +86,7 @@ public sealed class LearnSoundsScreen : MenuScreen
     protected override IReadOnlyList<string> ItemLabels => _labels;
 
     protected override string EntryHint =>
-        "Up and down to browse, Enter to play or stop a sound, Escape to go back.";
+        "Up and down to browse, Enter to play a sound or repeat a description, Escape to go back.";
 
     #endregion
 
@@ -117,9 +125,15 @@ public sealed class LearnSoundsScreen : MenuScreen
     /// <summary>Start the highlighted sound (looping) if it isn't playing; stop it if it is.</summary>
     private void ToggleDemo()
     {
+        var entry = _sounds[SelectedIndex];
+        if (entry.Waveform == null)
+        {
+            // Explanation-only cue (no fixed sample) — just re-read its description.
+            AnnounceSelection();
+            return;
+        }
         if (_playingIndex == SelectedIndex) { StopDemo(); return; }
         StopDemo();
-        var entry = _sounds[SelectedIndex];
         _demo = new GameSoundEffect(entry.Waveform, pan: 0f, loop: true, volume: GameConstants.LearnSoundGain);
         Audio.AddSoundEffect(_demo);
         _playingIndex = SelectedIndex;

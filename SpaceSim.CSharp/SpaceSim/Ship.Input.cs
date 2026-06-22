@@ -14,20 +14,17 @@ public partial class Ship
     #region Input Handling
 
     /// <summary>
-    /// The per-frame keyboard/mouse dispatcher — the single place every player action enters the
-    /// game. Reads the current and previous device state (so it can tell a fresh key-press from a
-    /// held key), then routes to the right behaviour: menu navigation when a menu is open, otherwise
-    /// the full flight/tuning/exploration control set.
+    /// The per-frame keyboard dispatcher — the single place every player action enters the game. Reads
+    /// the current and previous keyboard state (so it can tell a fresh key-press from a held key), then
+    /// routes to the right behaviour: menu navigation when a menu is open, otherwise the full
+    /// flight/tuning/exploration control set. (The game is keyboard-only; there is no mouse input.)
     /// </summary>
     /// <param name="keys">This frame's keyboard snapshot.</param>
     /// <param name="prevKeys">Last frame's keyboard snapshot, used for edge (just-pressed) detection.</param>
-    /// <param name="mouse">This frame's mouse snapshot (used for the zoom wheel).</param>
-    /// <param name="prevMouse">Last frame's mouse snapshot, used to measure scroll-wheel delta.</param>
     /// <param name="stars">Star bodies (passed through for context-sensitive actions).</param>
     /// <param name="planets">Planet bodies (passed through for context-sensitive actions).</param>
     /// <param name="nebulae">Nebula bodies (passed through for context-sensitive actions).</param>
     public void HandleInput(KeyboardState keys, KeyboardState prevKeys,
-                            MouseState mouse, MouseState prevMouse,
                             List<CelestialBody> stars, List<CelestialBody> planets,
                             List<CelestialBody> nebulae)
     {
@@ -147,12 +144,6 @@ public partial class Ship
 
         if (IsKeyPressed(Keys.M))
             OpenMenu(new StarmapMenuMode(this));
-
-        if (IsKeyPressed(Keys.C))
-        {
-            HighContrast = !HighContrast;
-            Speak($"High contrast mode: {(HighContrast ? "on" : "off")}.");
-        }
 
         if (IsKeyPressed(Keys.Q))
             Speak($"Target in selected Realm: {FTarget[SelectedDim]:F2} Hz.");
@@ -457,26 +448,6 @@ public partial class Ship
                     RDrive[i] = FTarget[i];
             }
         }
-
-        #endregion
-
-        #region Zoom
-
-        // Zoom (mouse wheel)
-        int scrollDelta = mouse.ScrollWheelValue - prevMouse.ScrollWheelValue;
-        if (scrollDelta != 0)
-        {
-            ZoomLevel += scrollDelta / 120f * GameConstants.ZoomStep;
-            ZoomLevel = Math.Clamp(ZoomLevel, GameConstants.ZoomMin, GameConstants.ZoomMax);
-        }
-
-        // Zoom keys
-        if (IsKeyPressed(Keys.OemCloseBrackets)) // ]
-            ZoomLevel = MathF.Min(ZoomLevel + GameConstants.ZoomStep, GameConstants.ZoomMax);
-        if (IsKeyPressed(Keys.OemOpenBrackets)) // [
-            ZoomLevel = MathF.Max(ZoomLevel - GameConstants.ZoomStep, GameConstants.ZoomMin);
-        if (IsKeyPressed(Keys.OemPipe) || IsKeyPressed(Keys.OemBackslash)) // backslash
-            ZoomLevel = 1f;
 
         #endregion
     }

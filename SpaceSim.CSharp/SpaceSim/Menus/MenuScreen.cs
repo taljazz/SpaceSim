@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
 namespace SpaceSim.Menus;
@@ -97,38 +95,6 @@ public abstract class MenuScreen
     /// <summary>Edge-trigger: true only on the frame <paramref name="key"/> goes from up to down.</summary>
     protected static bool Pressed(KeyboardState keys, KeyboardState prev, Keys key)
         => keys.IsKeyDown(key) && prev.IsKeyUp(key);
-
-    #endregion
-
-    #region Rendering
-
-    /// <summary>Draw the title and the centered item list, with the selected row highlighted.</summary>
-    public virtual void Draw(SpriteBatch sb, SpriteFont font, int screenW, int screenH)
-    {
-        const float titleScale = 1.7f;
-        Vector2 titleSize = font.MeasureString(Title) * titleScale;
-        sb.DrawString(font, Title, new Vector2((screenW - titleSize.X) / 2f, screenH * 0.16f),
-                      Color.Gold, 0f, Vector2.Zero, titleScale, SpriteEffects.None, 0f);
-
-        var labels = ItemLabels;
-        const float itemScale = 1.2f;
-        float lineH = font.LineSpacing * itemScale + 10f;
-        float startY = screenH * 0.36f;
-        for (int i = 0; i < labels.Count; i++)
-        {
-            bool sel = i == SelectedIndex;
-            string text = (sel ? "> " : "   ") + labels[i];
-            Color color = sel ? Color.LimeGreen : Color.White;
-            Vector2 size = font.MeasureString(text) * itemScale;
-            sb.DrawString(font, text, new Vector2((screenW - size.X) / 2f, startY + i * lineH),
-                          color, 0f, Vector2.Zero, itemScale, SpriteEffects.None, 0f);
-        }
-
-        DrawFooter(sb, font, screenW, screenH);
-    }
-
-    /// <summary>Optional bottom-of-screen text (controls hint, item description). Default: nothing.</summary>
-    protected virtual void DrawFooter(SpriteBatch sb, SpriteFont font, int screenW, int screenH) { }
 
     #endregion
 }

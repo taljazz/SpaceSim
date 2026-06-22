@@ -105,8 +105,6 @@ public partial class Ship
             Name = a.Name
         }).ToList(),
         VerboseMode = VerboseMode,
-        HudTextSize = HudTextSize,
-        HighContrast = HighContrast,
         AutosaveEnabled = AutosaveEnabled,
         AmbientSoundsEnabled = AmbientSoundsEnabled,
         NebulaDissonanceEnabled = NebulaDissonanceEnabled,
@@ -155,8 +153,6 @@ public partial class Ship
                 Name = a.Name
             }).ToList();
             VerboseMode = state.VerboseMode;
-            HudTextSize = state.HudTextSize;
-            HighContrast = state.HighContrast;
             AutosaveEnabled = state.AutosaveEnabled;
             AmbientSoundsEnabled = state.AmbientSoundsEnabled;
             NebulaDissonanceEnabled = state.NebulaDissonanceEnabled;

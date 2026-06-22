@@ -75,8 +75,6 @@ public partial class Ship
 
     // UI settings
     public int VerboseMode = 1;
-    public int HudTextSize = GameConstants.HudTextSizeBase;
-    public bool HighContrast;
     public bool AutosaveEnabled = true;
     public bool AmbientSoundsEnabled = true;
     public bool NebulaDissonanceEnabled = true;
@@ -269,9 +267,6 @@ public partial class Ship
 
     // Spatial grid for fast proximity queries (set by SpaceSimGame each frame)
     public SpatialGrid? SpatialGrid;
-
-    // Zoom (managed externally but stored here for convenience)
-    public float ZoomLevel = 1f;
 
     #endregion
 

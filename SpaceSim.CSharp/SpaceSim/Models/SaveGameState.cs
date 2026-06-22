@@ -76,12 +76,6 @@ public class SaveGameState
     /// <summary>Speech verbosity level (0 low, 1 medium, 2 high).</summary>
     public int VerboseMode { get; set; } = 1;
 
-    /// <summary>On-screen HUD text size.</summary>
-    public int HudTextSize { get; set; } = GameConstants.HudTextSizeBase;
-
-    /// <summary>Whether high-contrast rendering is enabled.</summary>
-    public bool HighContrast { get; set; }
-
     /// <summary>Whether the game autosaves.</summary>
     public bool AutosaveEnabled { get; set; } = true;
 

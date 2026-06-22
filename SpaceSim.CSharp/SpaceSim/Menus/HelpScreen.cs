@@ -23,8 +23,7 @@ public sealed class HelpScreen : MenuScreen
         "Flight. W and S thrust forward and back.",
         "A and D strafe left and right.",
         "Page Up and Page Down move through the third realm.",
-        "Left and Right arrows rotate your view.",
-        "Home and End raise and lower the camera.",
+        "Left and Right arrows rotate your heading, which steers the spatial audio.",
         "Z cycles speed mode: approach, cruise, quantum.",
 
         "Tuning. Press 1 to 5 to select a realm.",
@@ -53,11 +52,9 @@ public sealed class HelpScreen : MenuScreen
         "Presets. Control plus 1 to 9 saves a frequency preset. Shift plus 1 to 9 recalls one.",
 
         "Audio. Plus and minus adjust master volume. Hold Alt, Shift, or Control for drive, beep, or effect volume.",
-        "Brackets zoom out and in. Backslash resets zoom.",
 
-        "System. V cycles speech verbosity. C toggles high contrast.",
+        "System. V cycles speech verbosity.",
         "Control plus S saves your game. Control plus L loads it. Control plus A toggles autosave.",
-        "F10 switches 2D and 3D view. F11 toggles fullscreen.",
         "F1 opens and closes this help. Escape returns to the main menu.",
     };
 

@@ -22,12 +22,9 @@ public class GameSettingsTests
         Assert.Equal(0.2f, s.EffectVolume);
         Assert.Equal(0.05f, s.DriveVolume);
         Assert.Equal(1, s.VerboseMode);
-        Assert.Equal(GameConstants.HudTextSizeBase, s.HudTextSize);
-        Assert.False(s.HighContrast);
         Assert.True(s.AutosaveEnabled);
         Assert.True(s.AmbientSoundsEnabled);
         Assert.True(s.NebulaDissonanceEnabled);
-        Assert.True(s.Use3DRenderer);
     }
 
     [Fact]
@@ -40,12 +37,9 @@ public class GameSettingsTests
             EffectVolume = 0.6f,
             DriveVolume = 0.12f,
             VerboseMode = 2,
-            HudTextSize = 36,
-            HighContrast = true,
             AutosaveEnabled = false,
             AmbientSoundsEnabled = false,
             NebulaDissonanceEnabled = false,
-            Use3DRenderer = false,
         };
 
         string json = JsonSerializer.Serialize(original);
@@ -57,12 +51,9 @@ public class GameSettingsTests
         Assert.Equal(original.EffectVolume, restored.EffectVolume);
         Assert.Equal(original.DriveVolume, restored.DriveVolume);
         Assert.Equal(original.VerboseMode, restored.VerboseMode);
-        Assert.Equal(original.HudTextSize, restored.HudTextSize);
-        Assert.Equal(original.HighContrast, restored.HighContrast);
         Assert.Equal(original.AutosaveEnabled, restored.AutosaveEnabled);
         Assert.Equal(original.AmbientSoundsEnabled, restored.AmbientSoundsEnabled);
         Assert.Equal(original.NebulaDissonanceEnabled, restored.NebulaDissonanceEnabled);
-        Assert.Equal(original.Use3DRenderer, restored.Use3DRenderer);
     }
 
     // A missing/partial file must not throw and must keep code defaults for absent fields — this is
@@ -76,6 +67,6 @@ public class GameSettingsTests
         Assert.Equal(0.9f, restored!.MasterVolume);
         Assert.Equal(0.3f, restored.BeepVolume);          // untouched -> default
         Assert.True(restored.AutosaveEnabled);            // untouched -> default
-        Assert.True(restored.Use3DRenderer);              // untouched -> default
+        Assert.True(restored.AmbientSoundsEnabled);       // untouched -> default
     }
 }

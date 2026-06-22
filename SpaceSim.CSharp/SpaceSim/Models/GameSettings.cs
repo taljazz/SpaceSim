@@ -23,8 +23,6 @@ public class GameSettings
 
     /// <summary>Speech verbosity: 0 = low, 1 = medium, 2 = high.</summary>
     public int VerboseMode { get; set; } = 1;
-    public int HudTextSize { get; set; } = GameConstants.HudTextSizeBase;
-    public bool HighContrast { get; set; }
 
     #endregion
 
@@ -33,13 +31,6 @@ public class GameSettings
     public bool AutosaveEnabled { get; set; } = true;
     public bool AmbientSoundsEnabled { get; set; } = true;
     public bool NebulaDissonanceEnabled { get; set; } = true;
-
-    #endregion
-
-    #region Rendering
-
-    /// <summary>True = 3D renderer, false = 2D fallback (toggled with F10).</summary>
-    public bool Use3DRenderer { get; set; } = true;
 
     #endregion
 

@@ -164,7 +164,6 @@ public static class GameConstants
 
     #region UI and display
 
-    public const int HudTextSizeBase = 24;
     public const float ClickInterval = 0.5f;
 
     #endregion
@@ -223,14 +222,6 @@ public static class GameConstants
     public const float WaterBlessingHealRate = 0.15f;
     public const float SingSilenceThreshold = 4f;
     public const float HeartbeatVolume = 0.1f;
-
-    #endregion
-
-    #region Zoom
-
-    public const float ZoomMin = 0.2f;
-    public const float ZoomMax = 5f;
-    public const float ZoomStep = 0.1f;
 
     #endregion
 

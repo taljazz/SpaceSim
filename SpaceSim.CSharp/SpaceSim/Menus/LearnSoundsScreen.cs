@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
 namespace SpaceSim.Menus;
@@ -147,22 +145,6 @@ public sealed class LearnSoundsScreen : MenuScreen
         _demo.Volume = 0f;
         _demo = null;
         _playingIndex = -1;
-    }
-
-    #endregion
-
-    #region Rendering
-
-    /// <summary>Footer: the selected sound's description plus the controls hint.</summary>
-    protected override void DrawFooter(SpriteBatch sb, SpriteFont font, int screenW, int screenH)
-    {
-        string desc = _sounds[SelectedIndex].Description;
-        string hint = "Enter: play / stop      Escape: back";
-
-        Vector2 dSize = font.MeasureString(desc);
-        sb.DrawString(font, desc, new Vector2((screenW - dSize.X) / 2f, screenH * 0.82f), Color.LightGray);
-        Vector2 hSize = font.MeasureString(hint);
-        sb.DrawString(font, hint, new Vector2((screenW - hSize.X) / 2f, screenH * 0.90f), Color.Gray);
     }
 
     #endregion

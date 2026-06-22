@@ -5,7 +5,6 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using SpaceSim.Menus;
 using SpaceSim.Models;
-using SpaceSim.Rendering;
 
 namespace SpaceSim;
 
@@ -26,24 +25,15 @@ public partial class SpaceSimGame : Game
     #region Fields
 
     // --- Graphics ---
+    // The window/graphics device is kept alive (MonoGame requires it) but nothing is drawn — the game
+    // is entirely audio- and screen-reader-driven. See Draw(), which only clears the window.
     private readonly GraphicsDeviceManager _graphics;
-    private SpriteBatch _spriteBatch = null!;
-    private SpriteFont? _font;
 
     // --- Core systems ---
     private Ship _ship = null!;
     private AudioSystem _audio = null!;
     private OpenAlAudio _openAl = null!;   // OpenAL Soft spatial engine for positioned world sounds (Round 3)
     private TolkSpeechService _tolk = null!;
-
-    // --- Camera ---
-    private Camera3D _camera = null!;
-
-    // --- Renderers ---
-    private IGameRenderer _activeRenderer = null!;
-    private Renderer3D _renderer3D = null!;
-    private Renderer2D _renderer2D = null!;
-    private bool _use3DRenderer = true;
 
     // --- World data ---
     private List<CelestialBody> _stars = new();
@@ -55,13 +45,8 @@ public partial class SpaceSimGame : Game
     private List<Pyramid> _pyramids = new();
     private readonly SpatialGrid _spatialGrid = new();
 
-    // --- Input state ---
+    // --- Input state (keyboard only) ---
     private KeyboardState _prevKeyState;
-    private MouseState _prevMouseState;
-    private int _prevScrollValue;
-
-    // --- Zoom ---
-    private float _zoomLevel = 1f;
 
     // --- Audio click timer ---
     private float _nextClickTime;
@@ -172,18 +157,8 @@ public partial class SpaceSimGame : Game
         GameEvents.OnAscension += HandleAscension;
         DebugLogger.Log("Init", "Subscribed to GameEvents");
 
-        // Initialize camera
-        _camera = new Camera3D();
-        DebugLogger.Log("Init", "Camera3D created");
-
-        // Create both renderers
-        _renderer3D = new Renderer3D();
-        _renderer2D = new Renderer2D();
-        _activeRenderer = _renderer3D;
-        DebugLogger.Log("Init", "Renderers created, active: 3D");
-
-        // Load saved preferences (volumes, accessibility, toggles, render mode) and apply them so
-        // the player's choices carry over from the last session.
+        // Load saved preferences (volumes, accessibility, toggles) and apply them so the player's
+        // choices carry over from the last session.
         _settings = SettingsStore.Load();
         ApplySettings(_settings);
         DebugLogger.Log("Init", "Preferences loaded and applied");
@@ -201,53 +176,13 @@ public partial class SpaceSimGame : Game
 
         // Capture initial input state
         _prevKeyState = Keyboard.GetState();
-        _prevMouseState = Mouse.GetState();
-        _prevScrollValue = _prevMouseState.ScrollWheelValue;
 
         DebugLogger.Log("Init", "Initialize() completed");
         base.Initialize();
     }
 
-    protected override void LoadContent()
-    {
-        DebugLogger.Log("Init", "LoadContent() started");
-        _spriteBatch = new SpriteBatch(GraphicsDevice);
-
-        // Try to load the font; if not available, font stays null and text is skipped
-        try
-        {
-            _font = Content.Load<SpriteFont>("DefaultFont");
-            DebugLogger.Log("Init", "Font 'DefaultFont' loaded successfully");
-        }
-        catch (Exception ex)
-        {
-            _font = null;
-            DebugLogger.LogError("Init", "Font loading failed - HUD text will be disabled", ex);
-        }
-
-        // Initialize primitive renderers
-        PrimitiveRenderer.Initialize(GraphicsDevice);
-        PrimitiveRenderer2D.Initialize(GraphicsDevice);
-        DebugLogger.Log("Init", "PrimitiveRenderers initialized");
-
-        // Initialize both game renderers
-        _renderer3D.Initialize(GraphicsDevice, Content);
-        _renderer2D.Initialize(GraphicsDevice, Content);
-        DebugLogger.Log("Init", "Renderer3D and Renderer2D initialized");
-
-        // Set camera reference on 3D renderer
-        _renderer3D.SetCamera(_camera);
-
-        // Set world data on both renderers
-        UpdateRendererWorldData();
-
-        // Update camera projection
-        int w = GraphicsDevice.Viewport.Width;
-        int h = GraphicsDevice.Viewport.Height;
-        _camera.UpdateProjection(w, h);
-
-        DebugLogger.Log("Init", $"LoadContent() completed. Viewport: {w}x{h}");
-    }
+    // LoadContent intentionally omitted: there are no sprites, fonts, or renderers to load now that
+    // visuals have been removed. MonoGame still creates the window from the GraphicsDeviceManager.
 
     #endregion
 
@@ -287,14 +222,9 @@ public partial class SpaceSimGame : Game
         _audio.DriveVolume = s.DriveVolume;
 
         _ship.VerboseMode = s.VerboseMode;
-        _ship.HudTextSize = s.HudTextSize;
-        _ship.HighContrast = s.HighContrast;
         _ship.AutosaveEnabled = s.AutosaveEnabled;
         _ship.AmbientSoundsEnabled = s.AmbientSoundsEnabled;
         _ship.NebulaDissonanceEnabled = s.NebulaDissonanceEnabled;
-
-        _use3DRenderer = s.Use3DRenderer;
-        _activeRenderer = _use3DRenderer ? _renderer3D : _renderer2D;
     }
 
     /// <summary>
@@ -313,13 +243,9 @@ public partial class SpaceSimGame : Game
         if (s.DriveVolume != _audio.DriveVolume) { s.DriveVolume = _audio.DriveVolume; changed = true; }
 
         if (s.VerboseMode != _ship.VerboseMode) { s.VerboseMode = _ship.VerboseMode; changed = true; }
-        if (s.HudTextSize != _ship.HudTextSize) { s.HudTextSize = _ship.HudTextSize; changed = true; }
-        if (s.HighContrast != _ship.HighContrast) { s.HighContrast = _ship.HighContrast; changed = true; }
         if (s.AutosaveEnabled != _ship.AutosaveEnabled) { s.AutosaveEnabled = _ship.AutosaveEnabled; changed = true; }
         if (s.AmbientSoundsEnabled != _ship.AmbientSoundsEnabled) { s.AmbientSoundsEnabled = _ship.AmbientSoundsEnabled; changed = true; }
         if (s.NebulaDissonanceEnabled != _ship.NebulaDissonanceEnabled) { s.NebulaDissonanceEnabled = _ship.NebulaDissonanceEnabled; changed = true; }
-
-        if (s.Use3DRenderer != _use3DRenderer) { s.Use3DRenderer = _use3DRenderer; changed = true; }
 
         return changed;
     }

@@ -345,6 +345,9 @@ public static class GameConstants
     };
     public const float SolfeggioTolerance = 5f;
 
+    /// <summary>Integrity regenerated per second while a Solfeggio tone is held (scaled by the strongest active tone's multiplier).</summary>
+    public const float SolfeggioHealRate = 0.02f;
+
     #endregion
 
     #region Crystal Color Spectrum
@@ -360,6 +363,9 @@ public static class GameConstants
         ["amethyst"] = new(639f, 741f, new Color(153, 102, 204), "third_eye", "rift_detect", 1.35f),
         ["quartz"] = new(741f, 963f, new Color(255, 255, 255), "crown", "universal", 1.1f),
     };
+
+    /// <summary>Integrity restored when a chakra crystal is collected (scaled by its spectrum multiplier) — "harmony increases".</summary>
+    public const float ChakraHealAmount = 0.02f;
 
     #endregion
 
@@ -424,6 +430,9 @@ public static class GameConstants
         [SacredGeometryPattern.Merkaba] = new(8, "protection", 1.6f),
         [SacredGeometryPattern.GoldenSpiral] = new(5, "phi_stacking", PHI),
     };
+
+    /// <summary>Velocity multiplier applied while a completed sacred-geometry pattern's bonus timer is running.</summary>
+    public const float PatternBonusVelocityMult = 1.25f;
 
     #endregion
 

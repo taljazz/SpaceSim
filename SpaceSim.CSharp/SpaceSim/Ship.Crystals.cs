@@ -232,6 +232,8 @@ public partial class Ship
             {
                 var (typeName, typeInfo) = GetCrystalType(cFreqs.Average());
                 msg = $"{Capitalize(typeName)} crystal collected. {Capitalize(typeInfo.Chakra)} chakra resonance. Harmony increases.";
+                // "Harmony increases" made literal: each chakra crystal restores a little integrity, scaled by its spectrum multiplier.
+                ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + GameConstants.ChakraHealAmount * typeInfo.Mult);
             }
 
             CrystalsCollected += crystalValue;

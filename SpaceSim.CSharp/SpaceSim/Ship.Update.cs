@@ -204,11 +204,14 @@ public partial class Ship
         // This is the core of how the ship moves. For each dimension: how closely the drive matches
         // the target sets the resonance (0..1), and resonance times max speed (in the direction of
         // the frequency offset) sets the velocity.
+        // Higher consciousness widens your tuning tolerance — a felt power curve as you ascend
+        // (Dormant 1x up to Ascended 2x), so growing consciousness makes the whole universe easier to navigate.
+        float consciousnessWidthMult = GameConstants.ConsciousnessLevels[ConsciousnessStage].Mult;
         for (int i = 0; i < N; i++)
         {
             // df is the frequency offset; its sign is the direction of travel in this dimension.
             float df = RDrive[i] - FTarget[i];
-            float effectiveWidth = ResonanceWidth;
+            float effectiveWidth = ResonanceWidth * consciousnessWidthMult;
             // Transcendence mode makes the two higher realms (dims 4 & 5) more forgiving to tune.
             if (TuaoiMode == TuaoiMode.Transcendence && i >= 3)
                 effectiveWidth *= GameConstants.TuaoiModes[TuaoiMode.Transcendence].Rate;
@@ -241,6 +244,10 @@ public partial class Ship
         // Power mode boost
         if (TuaoiMode == TuaoiMode.Power)
             Vec5.ScaleInPlace(Velocity, GameConstants.TuaoiModes[TuaoiMode.Power].Rate);
+
+        // Sacred-geometry pattern bonus: a temporary speed surge after completing a crystal layout.
+        if (PatternBonusTimer > 0f)
+            Vec5.ScaleInPlace(Velocity, GameConstants.PatternBonusVelocityMult);
 
         // Pyramid healing
         if (NearPyramid != null)
@@ -284,6 +291,19 @@ public partial class Ship
             foreach (var k in _expiredKeys)
                 ActiveSolfeggio.Remove(k);
             _lastSolfeggioCheck = SimulationTime;
+        }
+
+        // Sacred frequencies gently restore integrity while held — the strongest active tone sets the
+        // rate, so the most central mechanic (tuning to a sacred frequency) finally has a felt effect.
+        if (ActiveSolfeggio.Count > 0)
+        {
+            float solfMult = 1f;
+            foreach (var kv in ActiveSolfeggio)
+            {
+                float m = GameConstants.SolfeggioFrequencies[kv.Key].Mult;
+                if (m > solfMult) solfMult = m;
+            }
+            ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + GameConstants.SolfeggioHealRate * solfMult * dt);
         }
 
         // Merkaba activation
@@ -692,7 +712,7 @@ public partial class Ship
                 }
                 else
                 {
-                    ResonanceIntegrity -= 0.1f;
+                    ApplyIntegrityDamage(0.1f);
                     if (NearestBody != null && NearestBody.BodyType != CelestialBodyType.Planet)
                         Speak("Cannot anchor on this celestial body.");
                     else

@@ -178,7 +178,7 @@ public partial class Ship
             }
             else
             {
-                ResonanceIntegrity -= 0.01f;
+                ApplyIntegrityDamage(0.01f);
                 if (!NearObject)
                     Speak("No celestial body nearby for anchoring. Minor integrity loss.");
                 else if (avgRes <= landingThreshold)

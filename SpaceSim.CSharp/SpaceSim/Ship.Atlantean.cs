@@ -376,8 +376,10 @@ public partial class Ship
     {
         float avgRes = Vec5.Mean(ResonanceLevels);
 
+        // Meditative brainwave states accelerate consciousness growth (each band's multiplier sets how fast).
+        float brainwaveMult = GameConstants.BrainwaveStates[CurrentBrainwave].Mult;
         if (avgRes > 0.8f)
-            ConsciousnessValue = MathF.Min(1f, ConsciousnessValue + GameConstants.ConsciousnessGainRate * dt);
+            ConsciousnessValue = MathF.Min(1f, ConsciousnessValue + GameConstants.ConsciousnessGainRate * brainwaveMult * dt);
         else if (avgRes < 0.3f)
             ConsciousnessValue = MathF.Max(0f, ConsciousnessValue - GameConstants.ConsciousnessDecayRate * dt);
 
@@ -602,7 +604,7 @@ public partial class Ship
         // Build the warp announcement as one utterance (interrupt-by-default would drop the first line).
         string warpMsg = $"Entering {rift.RiftKind} Harmonic Chamber. Golden warp activated.";
         if (rift.RiftKind == RiftType.Crystal) CrystalsCollected += 1;
-        else if (rift.RiftKind == RiftType.Hazard) ResonanceIntegrity -= 0.1f;
+        else if (rift.RiftKind == RiftType.Hazard) ApplyIntegrityDamage(0.1f);
         else if (rift.RiftKind == RiftType.PerfectFifth)
         {
             CrystalBonus += 1;

@@ -375,6 +375,21 @@ public partial class Ship
 
     #endregion
 
+    #region Damage
+
+    /// <summary>
+    /// Apply a hit to resonance integrity — halved by the Merkaba light-vehicle shield while it's
+    /// active, and clamped at zero. Every integrity loss routes through here so the shield is honoured
+    /// everywhere (this is what makes the Merkaba's protection actually do something).
+    /// </summary>
+    private void ApplyIntegrityDamage(float amount)
+    {
+        if (MerkabaActive) amount *= 1f - GameConstants.MerkabaShieldStrength;
+        ResonanceIntegrity = MathF.Max(0f, ResonanceIntegrity - amount);
+    }
+
+    #endregion
+
     #region Utility methods
 
     /// <summary>Switches the Tuaoi crystal to a new mode and caches its info for fast per-frame lookups.</summary>

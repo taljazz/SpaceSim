@@ -234,14 +234,18 @@ public partial class Ship
 
                 if (keyIdx >= 0 && !TempleKeys.Contains(keyIdx))
                 {
-                    // Check resonance at temple frequency
-                    float resAtFreq = 0;
+                    // The key is claimed by resonating ANY ONE realm with the temple's frequency — this
+                    // matches the spoken "tune a realm to N Hz" instruction and the single-realm test used
+                    // for pyramids and Solfeggio. (Requiring all five would be impossible in the default
+                    // manual mode, where the three spatial realms are pinned to the local target.) The
+                    // tolerance widens with consciousness, mirroring the main flight-resonance loop.
+                    float effectiveWidth = ResonanceWidth * GameConstants.ConsciousnessLevels[ConsciousnessStage].Mult;
+                    float resAtFreq = 0f;
                     for (int i = 0; i < N; i++)
                     {
                         float delta = MathF.Abs(RDrive[i] - temple.Frequency);
-                        resAtFreq += ResonancePhysics.Resonance(delta, ResonanceWidth);
+                        resAtFreq = MathF.Max(resAtFreq, ResonancePhysics.Resonance(delta, effectiveWidth));
                     }
-                    resAtFreq /= N;
 
                     if (resAtFreq > 0.7f)
                     {
@@ -255,7 +259,7 @@ public partial class Ship
                     }
                     else if (!_templeNearbyAnnounced)
                     {
-                        Speak($"Temple of {temple.KeyName} nearby. Tune to {temple.Frequency:F1} Hz to receive the key.");
+                        Speak($"Temple of {temple.KeyName} nearby. Tune a realm to {temple.Frequency:F0} hertz to receive the key.");
                         _templeNearbyAnnounced = true;
                     }
                 }
@@ -266,7 +270,7 @@ public partial class Ship
                     {
                         if (!VisitedAmenti)
                         {
-                            Speak("The Halls of Amenti open before you. Ancient wisdom floods your consciousness.");
+                            Speak("The Halls of Amenti open before you. Ancient wisdom floods your consciousness. Your light vehicle is forever blessed: swifter flight and ascended awareness.");
                             VisitedAmenti = true;
                             AmentiBlessingActive = true;
                             ResonanceWidth *= PHI;
@@ -569,13 +573,15 @@ public partial class Ship
     #region Ascension
 
     /// <summary>
-    /// The endgame transition: resets position to the origin, switches on Golden Harmony, flags the
-    /// universe for regeneration, clears rifts and sounds, and broadcasts the ascension event.
+    /// The crystal-renewal transition (a replayable rebirth, distinct from the one-time Halls of Amenti
+    /// climax): resets position to the origin, switches on Golden Harmony, flags the universe for
+    /// regeneration, clears rifts and sounds, and broadcasts the event so the player can keep growing
+    /// toward the true ascension at the master temple.
     /// </summary>
     public void Ascend()
     {
-        DebugLogger.Log("Ship", $"ASCENSION triggered with {CrystalsCollected} crystals");
-        Speak("Ascension achieved! Warping to harmonious new universe.");
+        DebugLogger.Log("Ship", $"RENEWAL triggered with {CrystalsCollected} crystals");
+        Speak("Crystal threshold reached. Your light vehicle renews, warping to a fresh universe to continue the journey toward the Halls of Amenti.");
         Array.Clear(Position);
         ActivateGoldenHarmony();
         NeedsUniverseRegeneration = true;

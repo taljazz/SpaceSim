@@ -412,7 +412,9 @@ public static class GameConstants
 
     public const float AmentiResonanceThreshold = 0.95f;
     public const float AmentiTimeDilation = 0.5f;
-    public const float AmentiWisdomBonus = 2f;
+    /// <summary>Permanent velocity multiplier granted by the Halls of Amenti blessing. Kept moderate
+    /// (not doubled) so fine, audio-guided positioning stays manageable once the aura is active.</summary>
+    public const float AmentiBlessingVelocityMult = 1.5f;
     /// <summary>World position of the master temple — the universe center (origin).</summary>
     public static readonly float[] HallsOfAmentiPos = Vec5.Zero();
 

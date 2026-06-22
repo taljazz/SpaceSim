@@ -149,6 +149,8 @@ public partial class SpaceSimGame : Game
         _ship.Stars = _stars;
         _ship.Planets = _planets;
         _ship.Nebulae = _nebulae;
+        _ship.Temples = _temples;
+        _ship.Pyramids = _pyramids;
         DebugLogger.Log("Init", "Ship created and world data assigned");
 
         // Start audio

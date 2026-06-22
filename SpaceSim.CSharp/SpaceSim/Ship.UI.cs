@@ -97,8 +97,9 @@ public partial class Ship
 
     /// <summary>
     /// Rebuild the starmap scanner list: every star, planet, nebula, and rift within scanner range,
-    /// each labelled with its type, distance, and bearing, then sorted nearest-first. Prepends an
-    /// "Unlock target" row when a non-rift target is currently locked, and a placeholder when empty.
+    /// plus every temple and pyramid (always listed, as the Atlantean objectives), each labelled with
+    /// its type, distance, and bearing, then sorted nearest-first. Prepends an "Unlock target" row when
+    /// a non-rift target is currently locked, and a placeholder when empty.
     /// </summary>
     public void UpdateStarmapItems(List<CelestialBody> stars, List<CelestialBody> planets, List<CelestialBody> nebulae)
     {
@@ -160,6 +161,35 @@ public partial class Ship
                 string label = $"Harmonic Chamber {i + 1} ({Rifts[i].RiftKind}) at dist {dist:F1}, angle {angle:F1} degrees";
                 items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(Rifts[i].Position), Kind = StarmapItemKind.Rift, ItemRift = Rifts[i] }));
             }
+        }
+
+        // Temples and pyramids are the Atlantean objectives — always listed regardless of distance, so the
+        // player can pick one and autopilot to it from anywhere. Minor temples show the frequency to tune to
+        // (or that their key is already collected); the master temple is the Halls of Amenti.
+        foreach (var temple in Temples)
+        {
+            float dist = Vec5.Distance(Position, temple.Position);
+            var proj = ProjectRelative(temple.Position);
+            float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
+            // Keep the name first and any frequency/status clause LAST, so the lock-confirmation name
+            // parse in LockOnStarmapItem (which trims at " at") reads back a clean object name.
+            string label;
+            if (temple.Kind == TempleType.Master)
+                label = $"Halls of Amenti at dist {dist:F1}, angle {angle:F1} degrees";
+            else if (TempleKeys.Contains(temple.KeyIndex))
+                label = $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, key collected";
+            else
+                label = $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, tune a realm to {temple.Frequency:F0} hertz for the key";
+            items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(temple.Position), Kind = StarmapItemKind.Temple }));
+        }
+
+        foreach (var pyramid in Pyramids)
+        {
+            float dist = Vec5.Distance(Position, pyramid.Position);
+            var proj = ProjectRelative(pyramid.Position);
+            float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
+            string label = $"{pyramid.Name} at dist {dist:F1}, angle {angle:F1} degrees, tune a realm to {pyramid.Frequency:F0} hertz to activate";
+            items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(pyramid.Position), Kind = StarmapItemKind.Pyramid }));
         }
 
         // Present nearest objects first so the most relevant targets are at the top of the list.

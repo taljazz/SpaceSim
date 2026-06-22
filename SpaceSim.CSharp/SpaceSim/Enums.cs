@@ -139,7 +139,9 @@ public enum StarmapItemKind
     Star,
     Planet,
     Nebula,
-    Rift
+    Rift,
+    Temple,
+    Pyramid
 }
 
 /// <summary>The gameplay effect granted while a given brainwave state is active.</summary>

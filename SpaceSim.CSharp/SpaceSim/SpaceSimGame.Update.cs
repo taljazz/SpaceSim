@@ -186,6 +186,8 @@ public partial class SpaceSimGame
             _ship.Stars = _stars;
             _ship.Planets = _planets;
             _ship.Nebulae = _nebulae;
+            _ship.Temples = _temples;
+            _ship.Pyramids = _pyramids;
             UpdateRendererWorldData();
             DebugLogger.Log("Init", "Universe regeneration completed");
         }

@@ -18,7 +18,7 @@ public sealed class HelpScreen : MenuScreen
     // and SpaceSimGame — update both together.
     private static readonly string[] _lines =
     {
-        "Goal. Tune your five realms into resonance to fly. Scan for destinations, anchor on planets to gather crystals, and spend them on attunements. Grow your resonance and consciousness toward ascension.",
+        "Goal. Tune your five realms into resonance to fly. Anchor on planets to gather crystals and spend them on attunements. Raise your consciousness, collect the twelve temple keys, and reach the Halls of Amenti at the universe's center. Open the scanner with M to find temples and pyramids.",
 
         "Flight. W and S thrust forward and back.",
         "A and D strafe left and right.",

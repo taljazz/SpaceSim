@@ -249,6 +249,9 @@ public partial class Ship
     public List<CelestialBody> Stars = new();
     public List<CelestialBody> Planets = new();
     public List<CelestialBody> Nebulae = new();
+    // Atlantean structures — also referenced here so the scanner can list them as objectives.
+    public List<Temple> Temples = new();
+    public List<Pyramid> Pyramids = new();
 
     // Nebula dissonance announcement
     private bool _nebulaDissonanceAnnounced;

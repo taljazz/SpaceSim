@@ -249,6 +249,11 @@ public partial class Ship
         if (PatternBonusTimer > 0f)
             Vec5.ScaleInPlace(Velocity, GameConstants.PatternBonusVelocityMult);
 
+        // Halls of Amenti blessing: a permanent power aura earned by reaching the master temple — the
+        // tangible reward for completing the temple-key arc (persists across save/load).
+        if (AmentiBlessingActive)
+            Vec5.ScaleInPlace(Velocity, GameConstants.AmentiBlessingVelocityMult);
+
         // Pyramid healing
         if (NearPyramid != null)
         {

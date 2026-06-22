@@ -42,4 +42,11 @@ public class GameSettings
     public bool Use3DRenderer { get; set; } = true;
 
     #endregion
+
+    #region Onboarding
+
+    /// <summary>True once the first-run spoken orientation has played, so it isn't repeated every launch.</summary>
+    public bool TutorialSeen { get; set; }
+
+    #endregion
 }

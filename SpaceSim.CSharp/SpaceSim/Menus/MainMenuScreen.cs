@@ -12,7 +12,7 @@ public sealed class MainMenuScreen : MenuScreen
 {
     #region Items
 
-    private static readonly string[] _items = { "Start Sim", "Learn Sounds", "Quit Sim" };
+    private static readonly string[] _items = { "Start Sim", "Learn Sounds", "Help", "Quit Sim" };
 
     // When true, the next Escape confirms quitting and any other key cancels — guards against an
     // accidental exit from a stray Escape.
@@ -53,7 +53,8 @@ public sealed class MainMenuScreen : MenuScreen
             {
                 0 => ScreenTransition.StartSim,
                 1 => ScreenTransition.OpenLearnSounds,
-                2 => ScreenTransition.Quit,
+                2 => ScreenTransition.OpenHelp,
+                3 => ScreenTransition.Quit,
                 _ => ScreenTransition.None,
             };
         }

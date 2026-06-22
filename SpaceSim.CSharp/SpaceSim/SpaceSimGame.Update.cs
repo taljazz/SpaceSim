@@ -35,6 +35,10 @@ public partial class SpaceSimGame
                 GraphicsDevice.Viewport.Height);
         }
 
+        // F1 toggles the help screen from anywhere (it remembers where to return to).
+        if (IsKeyPressed(keys, Keys.F1))
+            ApplyTransition(_screen == GameScreen.Help ? ScreenTransition.CloseHelp : ScreenTransition.OpenHelp);
+
         // Route the frame to the active top-level screen.
         switch (_screen)
         {
@@ -44,6 +48,9 @@ public partial class SpaceSimGame
                 break;
             case GameScreen.LearnSounds:
                 ApplyTransition(_learnSounds.HandleInput(keys, _prevKeyState));
+                break;
+            case GameScreen.Help:
+                ApplyTransition(_help.HandleInput(keys, _prevKeyState));
                 break;
             case GameScreen.Playing:
                 UpdatePlaying(dt, keys, mouse);
@@ -219,9 +226,15 @@ public partial class SpaceSimGame
 
             case GameScreen.MainMenu:
             case GameScreen.LearnSounds:
+            case GameScreen.Help:
                 if (_font != null)
                 {
-                    MenuScreen menu = _screen == GameScreen.MainMenu ? _mainMenu : _learnSounds;
+                    MenuScreen menu = _screen switch
+                    {
+                        GameScreen.MainMenu => _mainMenu,
+                        GameScreen.LearnSounds => _learnSounds,
+                        _ => _help,
+                    };
                     _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
                     menu.Draw(_spriteBatch, _font, screenW, screenH);
                     _spriteBatch.End();

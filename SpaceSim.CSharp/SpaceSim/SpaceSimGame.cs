@@ -72,10 +72,12 @@ public partial class SpaceSimGame : Game
     private float _settingsDirtyTime;
     private const float SettingsSaveDebounce = 1.5f; // persist 1.5s after the last preference change
 
-    // --- Top-level screen state (main menu / sim / sound dictionary) ---
+    // --- Top-level screen state (main menu / sim / sound dictionary / help) ---
     private GameScreen _screen = GameScreen.MainMenu;
     private MainMenuScreen _mainMenu = null!;
     private LearnSoundsScreen _learnSounds = null!;
+    private HelpScreen _help = null!;
+    private GameScreen _returnScreen = GameScreen.MainMenu;   // where Help returns to when closed
 
     // First-launch only: defer the spoken main-menu intro briefly so the screen reader's window-focus
     // announcement finishes first instead of cutting off our "use up/down, Enter to select" instructions.
@@ -191,6 +193,7 @@ public partial class SpaceSimGame : Game
         Action<string> menuSpeak = msg => _tolk.Speak(msg, interrupt: true);
         _mainMenu = new MainMenuScreen(_audio, menuSpeak);
         _learnSounds = new LearnSoundsScreen(_audio, menuSpeak);
+        _help = new HelpScreen(_audio, menuSpeak);
         _screen = GameScreen.MainMenu;
         DebugLogger.Log("Init", "Main menu ready");
 
@@ -353,7 +356,7 @@ public partial class SpaceSimGame : Game
             case ScreenTransition.StartSim:
                 _screen = GameScreen.Playing;
                 _audio.EngineEnabled = true;          // resume the live resonance-drive synthesis
-                _tolk.Speak("Simulation started.", interrupt: true);
+                SpeakStartOrientation();
                 DebugLogger.Log("Event", "Screen -> Playing");
                 break;
 
@@ -361,6 +364,32 @@ public partial class SpaceSimGame : Game
                 _screen = GameScreen.LearnSounds;
                 _learnSounds.OnEnter();
                 DebugLogger.Log("Event", "Screen -> LearnSounds");
+                break;
+
+            case ScreenTransition.OpenHelp:
+                // Pause the sim's audio while reading help (resumes on close); from a menu there's nothing to pause.
+                if (_screen == GameScreen.Playing)
+                {
+                    _audio.EngineEnabled = false;
+                    _ship.SilenceAllWorldSounds();
+                    _audio.ClearAllEffects();
+                }
+                else if (_screen == GameScreen.LearnSounds)
+                {
+                    _learnSounds.OnExit();   // stop any looping sound demo so it doesn't play under Help
+                }
+                _returnScreen = _screen;
+                _screen = GameScreen.Help;
+                _help.OnEnter();
+                DebugLogger.Log("Event", "Screen -> Help");
+                break;
+
+            case ScreenTransition.CloseHelp:
+                _screen = _returnScreen;
+                if (_returnScreen == GameScreen.Playing) _audio.EngineEnabled = true; // resume the sim
+                else if (_returnScreen == GameScreen.MainMenu) _mainMenu.OnEnter();
+                else if (_returnScreen == GameScreen.LearnSounds) _learnSounds.OnEnter();
+                DebugLogger.Log("Event", $"Screen -> {_returnScreen} (closed Help)");
                 break;
 
             case ScreenTransition.BackToMainMenu:
@@ -378,6 +407,29 @@ public partial class SpaceSimGame : Game
             case ScreenTransition.None:
             default:
                 break;
+        }
+    }
+
+    /// <summary>
+    /// On the first ever Start Sim, speak a short spoken orientation (the core loop + the F1 help
+    /// pointer) and remember it so it isn't repeated; on later starts just confirm and point to F1.
+    /// </summary>
+    private void SpeakStartOrientation()
+    {
+        if (_settings is { TutorialSeen: false })
+        {
+            _tolk.Speak(
+                "Welcome to Space Sim. You fly by tuning your five realms into resonance: press 1 to 5 to " +
+                "choose a realm, then up and down to tune it until the pulsing tone steadies. Press M to scan " +
+                "for a destination and Enter to lock on. Press F1 at any time for the full controls and your goal.",
+                interrupt: true);
+            _settings.TutorialSeen = true;
+            _settingsDirty = true;                      // persist that the player has now seen the intro
+            _settingsDirtyTime = _ship.SimulationTime;
+        }
+        else
+        {
+            _tolk.Speak("Simulation started. Press F1 for help.", interrupt: true);
         }
     }
 

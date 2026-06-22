@@ -441,29 +441,6 @@ public static class GameConstants
 
     #endregion
 
-    #region Atlantean Terminology
-
-    /// <summary>Plain-English to Atlantean word substitutions used to flavor screen-reader announcements.</summary>
-    public static readonly Dictionary<string, string> AtlanteanTerms = new()
-    {
-        ["rift"] = "Harmonic Chamber",
-        ["rifts"] = "Harmonic Chambers",
-        ["crystal"] = "Atlantean Crystal",
-        ["crystals"] = "Atlantean Crystals",
-        ["upgrade"] = "Attunement",
-        ["upgrades"] = "Attunements",
-        ["landed"] = "Anchored",
-        ["landing"] = "Anchoring",
-        ["takeoff"] = "Ascension",
-        ["meditation"] = "Atla-Ra Meditation",
-        ["resonance"] = "Harmonic Alignment",
-        ["frequency"] = "Vibrational Tone",
-        ["dimension"] = "Realm",
-        ["ship"] = "Light Vehicle",
-    };
-
-    #endregion
-
     #region Ley Line Highways
 
     public const int LeyLineCount = 12;

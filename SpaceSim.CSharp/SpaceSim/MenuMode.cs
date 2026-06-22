@@ -162,7 +162,7 @@ public sealed class RiftMenuMode : MenuMode
     public override IReadOnlyList<string> ItemLabels => Ship.RiftItems.Select(r => r.Label).ToList();
     public override int SelectedIndex { get => Ship.RiftSelectionIndex; set => Ship.RiftSelectionIndex = value; }
     public override Keys ExitKey => Keys.E;
-    public override string ExitMessage => "Exiting rift selection.";
+    public override string ExitMessage => "Exiting Harmonic Chamber selection.";
 
     public override void Populate() => Ship.UpdateRiftItems();
     public override void SpeakCurrent() => Ship.SpeakRiftItem();

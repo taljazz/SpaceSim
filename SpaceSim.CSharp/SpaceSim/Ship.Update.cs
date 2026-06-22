@@ -123,7 +123,7 @@ public partial class Ship
                 Array.Clear(Velocity);
                 if (LockedIsRift && !_approachedRiftAnnounced)
                 {
-                    Speak("Approached rift - ready for entry.");
+                    Speak("Approached Harmonic Chamber. Ready for entry.");
                     _approachedRiftAnnounced = true;
                 }
                 else if (!LockedIsRift)
@@ -353,7 +353,7 @@ public partial class Ship
             {
                 for (int i = 0; i < N; i++)
                     Velocity[i] += MathHelpers.RandomRange(-0.5f, 0.5f);
-                Speak("Dissonance detected-retune!");
+                Speak("Dissonance detected. Retune!");
                 DissonanceTimer = 0f;
             }
         }
@@ -365,7 +365,7 @@ public partial class Ship
         {
             float change = MathF.Abs(ResonanceLevels[i] - _prevResonanceLevels[i]);
             if (VerboseMode > 0 && change > 0.1f)
-                Speak($"Alert: Resonance in dim {i + 1} now {ResonanceLevels[i]:F2}.");
+                Speak($"Resonance in Realm {i + 1} now {ResonanceLevels[i]:F2}.");
         }
         Array.Copy(ResonanceLevels, _prevResonanceLevels, N);
 
@@ -439,10 +439,10 @@ public partial class Ship
                     LockedTarget = null;
                     LockedIsRift = false;
                     StopLockSound();
-                    Speak("Locked rift faded into the void.");
+                    Speak("Locked Harmonic Chamber faded into the void.");
                 }
                 else
-                    Speak("Rift faded into the void.");
+                    Speak("Harmonic Chamber faded into the void.");
                 StopWorldLoop(ref rift.Sound);
                 Rifts.RemoveAt(i);
                 continue;
@@ -480,7 +480,7 @@ public partial class Ship
             {
                 for (int d = 0; d < N; d++)
                     Velocity[d] += MathHelpers.RandomRange(-0.5f, 0.5f);
-                Speak("Dissonance prevents rift entry.");
+                Speak("Dissonance prevents Harmonic Chamber entry.");
             }
         }
 
@@ -502,7 +502,7 @@ public partial class Ship
                 if (avgRes < GameConstants.RiftEntryResThreshold)
                 {
                     RiftChargeTimer = 0;
-                    Speak("Charge aborted-resonance too low. Retune.");
+                    Speak("Charge aborted. Resonance too low. Retune.");
                 }
                 else if (RiftChargeTimer <= 0)
                 {
@@ -524,7 +524,7 @@ public partial class Ship
 
                 if (MathF.Abs(dist - _prevRiftDist) > 5f || MathF.Abs(alignPct - _prevRiftAlign) > 10f || MathF.Abs(avgResP - _prevRiftRes) > 10f)
                 {
-                    Speak($"Rift status: Distance {dist:F1}, alignment {alignPct:F0}%, resonance {avgResP:F0}%.");
+                    Speak($"Harmonic Chamber: distance {dist:F1}, {alignPct:F0} percent centered, resonance {avgResP:F0} percent.");
                     if (alignPct < 50f)
                     {
                         Vec5.SubtractInto(LockedTarget, Position, _dirVecBuffer);
@@ -692,11 +692,11 @@ public partial class Ship
                     {
                         float difficulty = NearestBody?.Difficulty ?? 1f;
                         Speak(difficulty > 1f
-                            ? "Anchoring failed. This world requires exceptionally high harmonic alignment. Integrity reduced."
+                            ? "Anchoring failed. This world requires exceptionally high resonance. Integrity reduced."
                             : "Anchoring failed due to dissonance. Integrity reduced.");
                     }
                     if (ResonanceIntegrity < 0.5f)
-                        Speak("Warning: Low integrity-repair needed.");
+                        Speak("Warning: Low integrity. Repair needed.");
                 }
             }
         }

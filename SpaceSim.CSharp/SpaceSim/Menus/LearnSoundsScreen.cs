@@ -61,9 +61,9 @@ public sealed class LearnSoundsScreen : MenuScreen
         new("Rogue planet", "A faint, ominous low tone.", a.RogueOminous),
         new("Ice giant", "A bright, crystalline chime.", a.IceChime),
         // Navigation & feedback
-        new("Harmonic chamber hum", "The hum of a nearby rift.", a.RiftHumWaveform),
+        new("Harmonic Chamber hum", "The hum of a nearby Harmonic Chamber.", a.RiftHumWaveform),
         new("Proximity beep", "Plays when something is near.", a.BeepWaveform),
-        new("Rift beep", "Plays when a harmonic chamber is near.", a.RiftBeepWaveform),
+        new("Harmonic Chamber beep", "Plays when a Harmonic Chamber is near.", a.RiftBeepWaveform),
         new("Golden chord", "Plays when you reach golden harmony.", a.GoldenChordWaveform),
         new("Octave chime", "A detected octave, two to one.", a.OctaveChime),
         new("Perfect fifth chime", "A detected perfect fifth, three to two.", a.FifthChime),

@@ -444,7 +444,7 @@ public partial class Ship
                         if (stateInfo.Effect == BrainwaveEffect.AutoRepair)
                             ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + 0.05f);
                         else if (stateInfo.Effect == BrainwaveEffect.RiftVision)
-                            Speak("Enhanced rift perception activated.");
+                            Speak("Enhanced Harmonic Chamber perception activated.");
                     }
                     return;
                 }
@@ -509,7 +509,7 @@ public partial class Ship
         // Announce & play chimes
         foreach (var (hType, dims) in _newHarmonics)
         {
-            string dimNames = string.Join(" and ", dims.Select(d => $"dimension {d + 1}"));
+            string dimNames = string.Join(" and ", dims.Select(d => $"Realm {d + 1}"));
             // Space the PascalCase interval name so the screen reader says "Perfect Fifth", not "PerfectFifth".
             Speak($"{GameUtils.SpacePascalCase(hType.ToString())} harmonic detected between {dimNames}.");
 
@@ -599,14 +599,14 @@ public partial class Ship
         for (int i = 0; i < N; i++)
             Position[i] += MathHelpers.RandomRange(-20f, 20f) * PHI;
 
-        Speak($"Entering {rift.RiftKind} rift-golden warp activated.");
+        Speak($"Entering {rift.RiftKind} Harmonic Chamber. Golden warp activated.");
 
         if (rift.RiftKind == RiftType.Crystal) CrystalsCollected += 1;
         else if (rift.RiftKind == RiftType.Hazard) ResonanceIntegrity -= 0.1f;
         else if (rift.RiftKind == RiftType.PerfectFifth)
         {
             CrystalBonus += 1;
-            Speak("Perfect fifth rift grants eternal crystal bounty.");
+            Speak("Perfect fifth Harmonic Chamber grants eternal crystal bounty.");
         }
 
         // Stop rift sound

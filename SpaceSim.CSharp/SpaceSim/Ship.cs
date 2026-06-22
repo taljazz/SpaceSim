@@ -399,12 +399,6 @@ public partial class Ship
         return ("quartz", GameConstants.CrystalSpectrum["quartz"]);
     }
 
-    /// <summary>Looks up the Atlantean-flavoured name for a plain term (e.g. "rift" -> "Harmonic Chamber").</summary>
-    public string GetAtlanteanTerm(string term)
-    {
-        return GameConstants.AtlanteanTerms.TryGetValue(term.ToLower(), out var at) ? at : term;
-    }
-
     #endregion
 
     #region Upgrade functions

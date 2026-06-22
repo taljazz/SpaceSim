@@ -24,7 +24,7 @@ public partial class Ship
         {
             upgrade.Effect();
             CrystalsCollected -= upgrade.Cost;
-            Speak($"{upgrade.Name} upgraded. Cost: {upgrade.Cost} crystals.");
+            Speak($"{upgrade.Name} attuned. Cost: {upgrade.Cost} crystals.");
         }
         else
         {
@@ -66,7 +66,7 @@ public partial class Ship
             HudItems.Add($"Selected Realm: {SelectedDim + 1}");
             HudItems.Add($"Drive Freq: {RDrive[SelectedDim]:F2} Hz");
             HudItems.Add($"Target Freq: {FTarget[SelectedDim]:F2} Hz");
-            HudItems.Add($"Harmonic Alignment: {ResonanceLevels[SelectedDim]:F2}");
+            HudItems.Add($"Resonance: {ResonanceLevels[SelectedDim]:F2}");
             HudItems.Add($"Speed: {Vec5.Norm(Velocity):F2} u/s");
             HudItems.Add($"Vol: {(int)(_audio.MasterVolume * 100)}%");
             HudItems.Add($"Integrity: {ResonanceIntegrity:F2}");
@@ -117,7 +117,7 @@ public partial class Ship
                 float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
                 var sType = stars[i].StellarClass ?? StellarType.MainSequence;
                 string sDesc = GameConstants.StellarTypes[sType].Desc;
-                string label = $"Star {i + 1} ({sDesc}) at dist {dist:F1}, angle {angle:F1} degrees (unlandable)";
+                string label = $"Star {i + 1} ({sDesc}) at dist {dist:F1}, angle {angle:F1} degrees (cannot anchor)";
                 items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(stars[i].Position), Kind = StarmapItemKind.Star }));
             }
         }
@@ -145,7 +145,7 @@ public partial class Ship
                 float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
                 var nType = nebulae[i].NebulaClass ?? NebulaType.Emission;
                 string nDesc = GameConstants.NebulaTypes[nType].Desc;
-                string label = $"Nebula {i + 1} ({nDesc}) at dist {dist:F1}, angle {angle:F1} degrees (unlandable)";
+                string label = $"Nebula {i + 1} ({nDesc}) at dist {dist:F1}, angle {angle:F1} degrees (cannot anchor)";
                 items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(nebulae[i].Position), Kind = StarmapItemKind.Nebula }));
             }
         }
@@ -157,7 +157,7 @@ public partial class Ship
             {
                 var proj = ProjectRelative(Rifts[i].Position);
                 float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
-                string label = $"Rift {i + 1} ({Rifts[i].RiftKind}) at dist {dist:F1}, angle {angle:F1} degrees";
+                string label = $"Harmonic Chamber {i + 1} ({Rifts[i].RiftKind}) at dist {dist:F1}, angle {angle:F1} degrees";
                 items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(Rifts[i].Position), Kind = StarmapItemKind.Rift, ItemRift = Rifts[i] }));
             }
         }
@@ -217,7 +217,7 @@ public partial class Ship
     {
         RiftItems.Clear();
         if (LockedRift != null)
-            RiftItems.Add(new RiftMenuItem { Label = "Unlock rift", IsUnlockAction = true });
+            RiftItems.Add(new RiftMenuItem { Label = "Unlock Harmonic Chamber", IsUnlockAction = true });
 
         var items = new List<(float Dist, RiftMenuItem Item)>();
         for (int i = 0; i < Rifts.Count; i++)
@@ -225,14 +225,14 @@ public partial class Ship
             float dist = Vec5.Distance(Position, Rifts[i].Position);
             var proj = ProjectRelative(Rifts[i].Position);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
-            string label = $"Rift {i + 1} ({Rifts[i].RiftKind}) at dist {dist:F1}, angle {angle:F1} degrees";
+            string label = $"Harmonic Chamber {i + 1} ({Rifts[i].RiftKind}) at dist {dist:F1}, angle {angle:F1} degrees";
             items.Add((dist, new RiftMenuItem { Label = label, Position = Vec5.Clone(Rifts[i].Position), Rift = Rifts[i] }));
         }
         items.Sort((a, b) => a.Dist.CompareTo(b.Dist));
         foreach (var (_, item) in items) RiftItems.Add(item);
 
         if (RiftItems.Count == 0)
-            RiftItems.Add(new RiftMenuItem { Label = "No rifts detected." });
+            RiftItems.Add(new RiftMenuItem { Label = "No Harmonic Chambers detected." });
     }
 
     /// <summary>Announce the currently highlighted rift row via the screen reader.</summary>
@@ -256,7 +256,7 @@ public partial class Ship
             LockedIsRift = false;
             _approachedRiftAnnounced = false;
             StopLockSound();
-            Speak("Rift unlocked.");
+            Speak("Harmonic Chamber unlocked.");
             return;
         }
         if (sel.Position == null) return;

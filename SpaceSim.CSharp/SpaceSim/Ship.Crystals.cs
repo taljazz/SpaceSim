@@ -89,7 +89,7 @@ public partial class Ship
         }
 
         string freqStr = string.Join(", ", CrystalFreqs.Select(f => $"{f.Freqs[0]:F2}"));
-        Speak($"Crystals detected at frequencies: {freqStr} Hz in primary dim.");
+        Speak($"Crystals detected at frequencies: {freqStr} Hz in the primary Realm.");
         _approachingLockAnnounced = false;
 
         // Start the looping biome ambience: a golden chord for harmonic worlds, chaos for dissonant ones.
@@ -167,8 +167,8 @@ public partial class Ship
 
         string specialMsg = "";
         if (crystal.Special && crystal.AtlanteanType != null)
-            specialMsg = $" Special {FormatName(crystal.AtlanteanType)} crystal!";
-        Speak($"Nearest crystal {dists[nearest]:F1} units {dir}. Target freq in dim {SelectedDim + 1}: {freq:F2} Hz.{specialMsg}");
+            specialMsg = $" Rare {FormatName(crystal.AtlanteanType)} crystal!";
+        Speak($"Nearest crystal {dists[nearest]:F1} units {dir}. Target frequency in Realm {SelectedDim + 1}: {freq:F2} Hz.{specialMsg}");
 
         float angle = MathF.Atan2(dy, dx);
         float pan = MathF.Cos(angle);
@@ -220,14 +220,14 @@ public partial class Ship
             {
                 var cInfo = GameConstants.AtlanteanCrystalTypes[crystal.AtlanteanType];
                 crystalValue = (int)cInfo.Mult;
-                Speak($"Ancient {FormatName(crystal.AtlanteanType)} crystal collected! {cInfo.Desc}. Value: {crystalValue} crystals.");
+                Speak($"Rare {FormatName(crystal.AtlanteanType)} crystal collected! {cInfo.Desc}. Value: {crystalValue} crystals.");
                 ApplyAtlanteanCrystalEffect(crystal.AtlanteanType);
             }
             else
             {
                 float avgFreq = cFreqs.Average();
                 var (typeName, typeInfo) = GetCrystalType(avgFreq);
-                Speak($"Atlantean {Capitalize(typeName)} crystal collected. {Capitalize(typeInfo.Chakra)} chakra resonance. Harmony increases.");
+                Speak($"{Capitalize(typeName)} crystal collected. {Capitalize(typeInfo.Chakra)} chakra resonance. Harmony increases.");
             }
 
             CrystalsCollected += crystalValue;

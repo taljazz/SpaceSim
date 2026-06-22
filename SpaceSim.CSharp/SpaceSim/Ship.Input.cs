@@ -109,9 +109,8 @@ public partial class Ship
                 // Dimension selection (1-5 only)
                 if (slot <= 5)
                 {
-                    string[] dimNames = { "x", "y", "z", "higher dimension one", "higher dimension two" };
                     SelectedDim = slot - 1;
-                    Speak($"Tuning {dimNames[slot - 1]} dimension.");
+                    Speak($"Tuning Realm {slot}.");
                     _approachingLockAnnounced = false;
                 }
             }
@@ -156,7 +155,7 @@ public partial class Ship
         }
 
         if (IsKeyPressed(Keys.Q))
-            Speak($"Target in selected dim: {FTarget[SelectedDim]:F2} Hz.");
+            Speak($"Target in selected Realm: {FTarget[SelectedDim]:F2} Hz.");
 
         #endregion
 
@@ -183,7 +182,7 @@ public partial class Ship
                 if (!NearObject)
                     Speak("No celestial body nearby for anchoring. Minor integrity loss.");
                 else if (avgRes <= landingThreshold)
-                    Speak("Harmonic alignment too low for anchoring. Minor integrity loss.");
+                    Speak("Resonance too low for anchoring. Minor integrity loss.");
                 else
                     Speak("Cannot anchor on this object. Minor integrity loss.");
             }
@@ -203,7 +202,7 @@ public partial class Ship
         // Status
         if (IsKeyPressed(Keys.R))
         {
-            string status = $"Position: {Vec5.Format(Position)}. Velocity: {Vec5.Format(Velocity)}. Resonance levels: {Vec5.Format(ResonanceLevels)}. View rotation: {ViewRotation:F2} radians. {(LandedMode ? "Landed on planet." : "In space.")} Integrity: {ResonanceIntegrity:F2}. Crystals: {CrystalsCollected}. Power levels: {Vec5.Format(ResonancePower)}.";
+            string status = $"Position: {Vec5.Format(Position)}. Velocity: {Vec5.Format(Velocity)}. Resonance levels: {Vec5.Format(ResonanceLevels)}. View rotation: {ViewRotation:F2} radians. {(LandedMode ? "Anchored on planet." : "In space.")} Integrity: {ResonanceIntegrity:F2}. Crystals: {CrystalsCollected}. Power levels: {Vec5.Format(ResonancePower)}.";
             Speak(status);
         }
 
@@ -237,7 +236,7 @@ public partial class Ship
                 else if (dist < GameConstants.RiftAlignmentTolerance && avgRes > GameConstants.RiftEntryResThreshold / 2f)
                 {
                     RiftChargeTimer = GameConstants.RiftChargeTime;
-                    Speak("Initiating rift charge sequence.");
+                    Speak("Initiating Harmonic Chamber charge sequence.");
                 }
                 else
                     Speak("Approach closer or increase resonance to charge.");

@@ -215,10 +215,12 @@ public partial class Ship
         if (IsKeyPressed(Keys.Tab))
             RepeatLastAnnouncement();
 
-        // HUD / Upgrade menu
+        // HUD / Upgrade menu. While anchored on a planet, U opens the attunement menu so crystals are
+        // always spendable (no need to clear every crystal on the planet first — that gate was a
+        // soft-lock); while flying it opens the HUD readout.
         if (IsKeyPressed(Keys.U))
         {
-            if (LandedMode && LockedCrystals.Count == CrystalCount)
+            if (LandedMode)
             {
                 Speak($"Attunement menu. {CrystalsCollected} crystals available.");
                 OpenMenu(new UpgradeMenuMode(this));
@@ -348,8 +350,9 @@ public partial class Ship
             if (_spacebarHoldTimer >= GameConstants.WaterBlessingHoldTime &&
                 Vec5.All(ResonanceLevels, r => r > GameConstants.WaterBlessingResThreshold))
             {
-                // Water blessing triggered (no-op in C# version, no wav generation)
-                Speak("Water blessing activated.");
+                // Reward the demanding perfect-resonance ritual with a timed protective + healing aura.
+                WaterBlessingTimer = GameConstants.WaterBlessingDuration;
+                Speak("Water blessing activated. Your light vehicle is bathed in healing light, shielded and restored for one minute.");
                 _spacebarPressed = false;
                 _spacebarHoldTimer = 0f;
             }

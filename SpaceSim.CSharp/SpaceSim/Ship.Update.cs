@@ -369,6 +369,19 @@ public partial class Ship
 
         if (PatternBonusTimer > 0) PatternBonusTimer -= dt;
 
+        // Water blessing: heal steadily while the aura lasts, then announce when it fades. (Damage
+        // immunity for the duration is honoured in ApplyIntegrityDamage.)
+        if (WaterBlessingTimer > 0f)
+        {
+            ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + GameConstants.WaterBlessingHealRate * dt);
+            WaterBlessingTimer -= dt;
+            if (WaterBlessingTimer <= 0f)
+            {
+                WaterBlessingTimer = 0f;
+                Speak("Water blessing fades.");
+            }
+        }
+
         // Dissonance
         float avgRes = Vec5.Mean(ResonanceLevels);
         if (avgRes < GameConstants.DissonanceThreshold)

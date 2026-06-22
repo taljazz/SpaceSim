@@ -218,6 +218,9 @@ public static class GameConstants
     public const float WaterBlessingResThreshold = 0.999f;
     public const float WaterBlessingFreq = 432f;
     public const float WaterBlessingDuration = 60f;
+    /// <summary>Integrity restored per second while the water blessing aura is active (fully heals within
+    /// a few seconds, then immunity holds you there for the rest of the duration).</summary>
+    public const float WaterBlessingHealRate = 0.15f;
     public const float SingSilenceThreshold = 4f;
     public const float HeartbeatVolume = 0.1f;
 

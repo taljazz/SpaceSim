@@ -200,6 +200,10 @@ public partial class Ship
     public List<int> PatternProgress = new();
     public float PatternBonusTimer;
 
+    // Water blessing — a timed protective + healing aura earned by holding perfect five-realm resonance
+    // for the full ritual. Counts down in UpdatePlaying; grants damage immunity while active.
+    public float WaterBlessingTimer;
+
     // Temple keys
     public HashSet<int> TempleKeys = new();
     private float _lastTempleCheck;
@@ -387,6 +391,8 @@ public partial class Ship
     /// </summary>
     private void ApplyIntegrityDamage(float amount)
     {
+        // The water blessing fully shields the light vehicle for its duration.
+        if (WaterBlessingTimer > 0f) return;
         if (MerkabaActive) amount *= 1f - GameConstants.MerkabaShieldStrength;
         ResonanceIntegrity = MathF.Max(0f, ResonanceIntegrity - amount);
     }

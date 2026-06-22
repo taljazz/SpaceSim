@@ -48,6 +48,7 @@ public sealed class HelpScreen : MenuScreen
         "P drops a portal anchor. Shift plus P travels to it.",
         "B toggles astral projection.",
         "I focuses intention navigation toward your locked target.",
+        "Hold Space with all five realms in near-perfect resonance to earn the water blessing: a minute of healing and full protection.",
 
         "Presets. Control plus 1 to 9 saves a frequency preset. Shift plus 1 to 9 recalls one.",
 

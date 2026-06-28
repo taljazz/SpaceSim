@@ -100,7 +100,7 @@ public partial class SpaceSimGame : Game
         try
         {
             _tolk = new TolkSpeechService();
-            DebugLogger.Log("Init", $"TolkSpeechService created, screen reader active: {_tolk.IsScreenReaderActive}");
+            DebugLogger.Log("Init", $"TolkSpeechService created, active: {_tolk.IsScreenReaderActive}, reader: {_tolk.DetectedReader}, baseDir: {AppContext.BaseDirectory}");
         }
         catch (Exception ex)
         {

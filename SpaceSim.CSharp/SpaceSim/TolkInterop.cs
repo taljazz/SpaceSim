@@ -70,6 +70,7 @@ public sealed class TolkSpeechService : IDisposable
 
     // Written by the worker thread (after Tolk loads), read by the game thread — hence volatile.
     private volatile bool _isActive;
+    private volatile string _detectedReader = "none";
     private bool _disposed;
 
     #endregion
@@ -89,6 +90,9 @@ public sealed class TolkSpeechService : IDisposable
 
     /// <summary>True if a real screen reader is driving output (false means console fallback).</summary>
     public bool IsScreenReaderActive => _isActive;
+
+    /// <summary>Name of the screen reader Tolk detected ("NVDA", "JAWS", "SAPI", ...) or "none". Diagnostic only.</summary>
+    public string DetectedReader => _detectedReader;
 
     #endregion
 
@@ -136,6 +140,14 @@ public sealed class TolkSpeechService : IDisposable
             TolkNative.Tolk_TrySAPI(true);
             TolkNative.Tolk_Load();
             _isActive = TolkNative.Tolk_IsLoaded() && TolkNative.Tolk_HasSpeech();
+            try
+            {
+                IntPtr namePtr = TolkNative.Tolk_DetectScreenReader();
+                _detectedReader = namePtr != IntPtr.Zero
+                    ? (Marshal.PtrToStringUni(namePtr) ?? "unknown")
+                    : (_isActive ? "SAPI" : "none");
+            }
+            catch { /* detection is best-effort diagnostics only */ }
         }
         catch
         {

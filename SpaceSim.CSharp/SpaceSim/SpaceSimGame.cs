@@ -63,6 +63,7 @@ public partial class SpaceSimGame : Game
     private LearnSoundsScreen _learnSounds = null!;
     private HelpScreen _help = null!;
     private GameScreen _returnScreen = GameScreen.MainMenu;   // where Help returns to when closed
+    private Tutorial? _tutorial;                              // the interactive tutorial, when active (null otherwise)
 
     // First-launch only: defer the spoken main-menu intro briefly so the screen reader's window-focus
     // announcement finishes first instead of cutting off our "use up/down, Enter to select" instructions.
@@ -190,7 +191,7 @@ public partial class SpaceSimGame : Game
 
     private void HandleSpeak(object? sender, SpeakEventArgs e)
     {
-        _tolk.Speak(e.Message);
+        _tolk.Speak(e.Message, e.Interrupt);
     }
 
     private void HandleUniverseRegenNeeded(object? sender, EventArgs e)
@@ -226,6 +227,18 @@ public partial class SpaceSimGame : Game
         _ship.AutosaveEnabled = s.AutosaveEnabled;
         _ship.AmbientSoundsEnabled = s.AmbientSoundsEnabled;
         _ship.NebulaDissonanceEnabled = s.NebulaDissonanceEnabled;
+
+        // Restore the chosen output device (matched by name; silently stays on default if it's gone).
+        if (!string.IsNullOrEmpty(s.OutputDeviceName))
+        {
+            int dev = AudioSystem.FindDeviceByName(s.OutputDeviceName);
+            if (dev >= 0)
+            {
+                _audio.SetOutputDevice(dev);
+                _openAl.TryReopen(s.OutputDeviceName);
+                _openAl.SetMasterGain(_audio.MasterVolume);
+            }
+        }
     }
 
     /// <summary>
@@ -276,6 +289,58 @@ public partial class SpaceSimGame : Game
 
     #endregion
 
+    #region Audio device chooser (F3)
+
+    /// <summary>
+    /// F3: open a modal chooser of the system's output devices and route the sim's audio to the picked
+    /// one. The NAudio mix (drive, cue, beeps, menus) moves for certain; the OpenAL spatial layer follows
+    /// best-effort by name. The choice is persisted by name. Runs on the game thread (STA), so the modal
+    /// dialog is safe and the audio threads keep playing while it is open.
+    /// </summary>
+    private void OpenAudioDeviceDialog()
+    {
+        try
+        {
+            var devices = AudioSystem.GetOutputDevices();
+            using var form = new AudioDeviceForm(devices, _audio.CurrentDeviceNumber);
+            if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+            // Re-selecting the already-active device would needlessly rebuild the OpenAL context and briefly
+            // silence the world loops, so treat it as a no-op.
+            if (form.SelectedDeviceNumber == _audio.CurrentDeviceNumber)
+            {
+                _tolk.Speak($"Already using {form.SelectedDeviceName}.", interrupt: true);
+                return;
+            }
+
+            _audio.SetOutputDevice(form.SelectedDeviceNumber);
+
+            // Move the spatial engine to a name-matched device too; silence live world loops first so no
+            // stale OpenAL sources survive the context swap (the ship recreates them next frame).
+            _ship.SilenceAllWorldSounds();
+            _openAl.TryReopen(form.SelectedDeviceNumber < 0 ? null : form.SelectedDeviceName);
+            _openAl.SetMasterGain(_audio.MasterVolume);   // restore listener gain now (reopen resets it to 1)
+
+            if (_settings != null)
+            {
+                _settings.OutputDeviceName = form.SelectedDeviceNumber < 0 ? "" : form.SelectedDeviceName;
+                // Persist immediately: a discrete choice needs no debounce, and the debounce clock
+                // (SimulationTime) is frozen off the Playing screen, so it might otherwise never save.
+                SettingsStore.Save(_settings);
+                _settingsDirty = false;
+            }
+
+            _tolk.Speak($"Audio output set to {form.SelectedDeviceName}.", interrupt: true);
+            DebugLogger.Log("Audio", $"Output device chosen: {form.SelectedDeviceName} (#{form.SelectedDeviceNumber}).");
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.LogError("Audio", "Audio device dialog failed", ex);
+        }
+    }
+
+    #endregion
+
     #region Screen transitions
 
     /// <summary>Apply a screen change requested by a menu (or by pressing Escape in the sim).</summary>
@@ -285,9 +350,19 @@ public partial class SpaceSimGame : Game
         {
             case ScreenTransition.StartSim:
                 _screen = GameScreen.Playing;
+                _tutorial = null;
                 _audio.EngineEnabled = true;          // resume the live resonance-drive synthesis
                 SpeakStartOrientation();
                 DebugLogger.Log("Event", "Screen -> Playing");
+                break;
+
+            case ScreenTransition.StartTutorial:
+                _screen = GameScreen.Playing;
+                _audio.EngineEnabled = true;
+                _ship.PrepareForTutorial();           // clean, known state regardless of any prior play session
+                _tutorial = new Tutorial();
+                _tutorial.Begin(_ship);               // then detune the higher realms so the tuning steps are hands-on
+                DebugLogger.Log("Event", "Screen -> Playing (tutorial)");
                 break;
 
             case ScreenTransition.OpenLearnSounds:
@@ -372,6 +447,8 @@ public partial class SpaceSimGame : Game
                 _audio.EngineEnabled = false;   // stop the drive drone under the menu
                 _ship.SilenceAllWorldSounds();  // stop positioned world loops (ambients, rift hums, lock)
                 _audio.ClearAllEffects();       // drop any lingering one-shots / loops
+                _ship.ActiveMenu = null;        // close any open in-sim menu so re-entry isn't frozen inside it
+                _tutorial = null;               // leaving the sim ends any active tutorial
                 break;
             case GameScreen.LearnSounds:
                 _learnSounds.OnExit();          // stop any playing demo

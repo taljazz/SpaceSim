@@ -22,12 +22,12 @@ public partial class Ship
     {
         if (PortalAnchors.Count >= GameConstants.MaxPortalAnchors)
         {
-            Speak($"Maximum {GameConstants.MaxPortalAnchors} portal anchors reached. Use an existing anchor first.");
+            SpeakAtlantean($"Maximum {GameConstants.MaxPortalAnchors} portal anchors reached. Use an existing anchor first.");
             return;
         }
         if (CrystalsCollected < GameConstants.PortalAnchorCost)
         {
-            Speak($"Insufficient crystals. Need {GameConstants.PortalAnchorCost} to create portal anchor.");
+            SpeakAtlantean($"Insufficient crystals. Need {GameConstants.PortalAnchorCost} to create portal anchor.");
             return;
         }
 
@@ -39,7 +39,7 @@ public partial class Ship
             Name = name,
             CreatedTime = SimulationTime
         });
-        Speak($"Portal anchor '{name}' created. {PortalAnchors.Count}/{GameConstants.MaxPortalAnchors} anchors set.");
+        SpeakAtlantean($"Portal anchor '{name}' created. {PortalAnchors.Count}/{GameConstants.MaxPortalAnchors} anchors set.");
     }
 
     /// <summary>
@@ -51,25 +51,25 @@ public partial class Ship
     {
         if (PortalAnchors.Count == 0)
         {
-            Speak("No portal anchors set. Create one with P key.");
+            SpeakAtlantean("No portal anchors set. Create one with P key.");
             return;
         }
         if (SimulationTime - _lastPortalUse < GameConstants.PortalCooldown)
         {
             int remaining = (int)(GameConstants.PortalCooldown - (SimulationTime - _lastPortalUse));
-            Speak($"Portal cooldown active. {remaining} seconds remaining.");
+            SpeakAtlantean($"Portal cooldown active. {remaining} seconds remaining.");
             return;
         }
         if (Vec5.Mean(ResonanceLevels) < GameConstants.PortalTravelResonance)
         {
-            Speak("Insufficient resonance for portal travel. Tune frequencies higher.");
+            SpeakAtlantean("Insufficient resonance for portal travel. Tune frequencies higher.");
             return;
         }
 
         var anchor = PortalAnchors[0];
         Array.Copy(anchor.Position, Position, N);
         _lastPortalUse = SimulationTime;
-        Speak($"Portal activated. Teleported to {anchor.Name}.");
+        SpeakAtlantean($"Portal activated. Teleported to {anchor.Name}.");
     }
 
     #endregion
@@ -85,20 +85,20 @@ public partial class Ship
     {
         if (Vec5.Mean(ResonanceLevels) < GameConstants.AstralProjectionResonance)
         {
-            Speak("Insufficient resonance for astral projection. Achieve 90% resonance in all realms.");
+            SpeakAtlantean("Insufficient resonance for astral projection. Achieve 90% resonance in all realms.");
             return;
         }
         if (SimulationTime - _lastAstralReturn < GameConstants.AstralCooldown)
         {
             int remaining = (int)(GameConstants.AstralCooldown - (SimulationTime - _lastAstralReturn));
-            Speak($"Astral cooldown active. {remaining} seconds remaining.");
+            SpeakAtlantean($"Astral cooldown active. {remaining} seconds remaining.");
             return;
         }
 
         AstralMode = true;
         AstralBodyPos = Vec5.Clone(Position);
         AstralTimer = GameConstants.AstralDuration;
-        Speak("Astral projection initiated. Your consciousness expands beyond your light vehicle. Press B to return.");
+        SpeakAtlantean("Astral projection initiated. Your consciousness expands beyond your light vehicle. Press B to return.");
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public partial class Ship
         AstralMode = false;
         AstralBodyPos = null;
         _lastAstralReturn = SimulationTime;
-        Speak("Returning to physical form. Astral projection complete.");
+        SpeakAtlantean("Returning to physical form. Astral projection complete.");
     }
 
     /// <summary>
@@ -127,7 +127,7 @@ public partial class Ship
         AstralTimer -= dt;
         if (AstralTimer <= 0)
         {
-            Speak("Astral projection time limit reached. Returning to body.");
+            SpeakAtlantean("Astral projection time limit reached. Returning to body.");
             ExitAstralMode();
             return;
         }
@@ -137,7 +137,7 @@ public partial class Ship
         {
             if (!_astralTooFar)
             {
-                Speak("Warning: Astral form too far from body. Connection weakening.");
+                SpeakAtlantean("Warning: Astral form too far from body. Connection weakening.");
                 _astralTooFar = true;
             }
             float[] dir = Vec5.Subtract(AstralBodyPos!, Position);
@@ -165,13 +165,13 @@ public partial class Ship
     {
         if (Vec5.Mean(ResonanceLevels) < GameConstants.IntentionResonanceThreshold)
         {
-            Speak("Insufficient resonance for intention navigation. Focus your mind and tune higher.");
+            SpeakAtlantean("Insufficient resonance for intention navigation. Focus your mind and tune higher.");
             return;
         }
         IntentionActive = true;
         IntentionTimer = 0f;
         IntentionTarget = null;
-        Speak("Intention navigation activated. Focus your intention on your destination...");
+        SpeakAtlantean("Intention navigation activated. Focus your intention on your destination...");
     }
 
     /// <summary>
@@ -197,11 +197,11 @@ public partial class Ship
                     for (int i = 0; i < N; i++)
                         Position[i] += (dir[i] / dist) * travelDist;
                 }
-                Speak($"Intention manifested. Traveled {travelDist:F1} units toward target.");
+                SpeakAtlantean($"Intention manifested. Traveled {travelDist:F1} units toward target.");
             }
             else
             {
-                Speak("No target locked. Intention dissipates without focus.");
+                SpeakAtlantean("No target locked. Intention dissipates without focus.");
             }
             IntentionActive = false;
             IntentionTimer = 0f;
@@ -213,92 +213,116 @@ public partial class Ship
     #region Temple / Ley Line / Pyramid Proximity
 
     /// <summary>
-    /// Throttled (once per second) scan for a nearby temple. Tuning to a minor temple's frequency at
-    /// high enough resonance collects its key; reaching the Halls of Amenti with all keys and an
-    /// enlightened/ascended mind grants the ascension blessing. Sets <see cref="NearTemple"/>.
+    /// Per-frame scan for the nearby temple. Picks the NEAREST CLAIMABLE temple in range (so a closer
+    /// already-keyed temple or the central Halls of Amenti can't mask the one the player flew to). Holding any
+    /// realm on a minor temple's note for <see cref="GameConstants.TempleClaimDwell"/> collects its key;
+    /// reaching the Halls of Amenti with all keys and an enlightened/ascended mind grants the ascension
+    /// blessing. The claim is checked every frame (not throttled) so a brief by-ear settle is never dropped.
+    /// Sets <see cref="NearTemple"/>.
     /// </summary>
-    public void CheckTempleProximity(List<Temple> temples)
+    public void CheckTempleProximity(List<Temple> temples, float dt)
     {
-        if (SimulationTime - _lastTempleCheck < 1f) return;
-
-        NearTemple = null;
         float scanRange = GetEffectiveScanRange();
-
+        Temple? nearestClaimable = null; float dClaim = float.MaxValue;
+        Temple? nearestAny = null; float dAny = float.MaxValue;
         foreach (var temple in temples)
         {
             float dist = temple.DistanceTo(Position);
-            if (dist < scanRange)
-            {
-                NearTemple = temple;
-                int keyIdx = temple.KeyIndex;
-
-                if (keyIdx >= 0 && !TempleKeys.Contains(keyIdx))
-                {
-                    // The key is claimed by resonating ANY ONE realm with the temple's frequency — this
-                    // matches the spoken "tune a realm to N Hz" instruction and the single-realm test used
-                    // for pyramids and Solfeggio. (Requiring all five would be impossible in the default
-                    // manual mode, where the three spatial realms are pinned to the local target.) The
-                    // tolerance widens with consciousness, mirroring the main flight-resonance loop.
-                    float effectiveWidth = ResonanceWidth * GameConstants.ConsciousnessLevels[ConsciousnessStage].Mult;
-                    float resAtFreq = 0f;
-                    for (int i = 0; i < N; i++)
-                    {
-                        float delta = MathF.Abs(RDrive[i] - temple.Frequency);
-                        resAtFreq = MathF.Max(resAtFreq, ResonancePhysics.Resonance(delta, effectiveWidth));
-                    }
-
-                    if (resAtFreq > 0.7f)
-                    {
-                        TempleKeys.Add(keyIdx);
-                        _templeNearbyAnnounced = false;
-                        GameEvents.RaiseTempleKeyCollected(this, temple.KeyName, keyIdx, TempleKeys.Count);
-                        if (TempleKeys.Count == GameConstants.MinorTempleCount)
-                            Speak($"{temple.KeyName} key acquired! All twelve temple keys collected. The Halls of Amenti now await your arrival.");
-                        else
-                            Speak($"Temple of {temple.KeyName} visited. {temple.KeyName} key acquired! {TempleKeys.Count}/{GameConstants.MinorTempleCount} keys collected.");
-                    }
-                    else if (!_templeNearbyAnnounced)
-                    {
-                        Speak(ByEarMode
-                            ? $"Temple of {temple.KeyName} nearby. Attune a realm to its note by ear to receive the key."
-                            : $"Temple of {temple.KeyName} nearby. Attune a realm to its note, {temple.Frequency:F0}, to receive the key.");
-                        _templeNearbyAnnounced = true;
-                    }
-                }
-                else if (keyIdx == -1) // Halls of Amenti
-                {
-                    if (TempleKeys.Count >= GameConstants.MasterTempleUnlockKeys &&
-                        (ConsciousnessStage == ConsciousnessLevel.Enlightened || ConsciousnessStage == ConsciousnessLevel.Ascended))
-                    {
-                        if (!VisitedAmenti)
-                        {
-                            Speak("The Halls of Amenti open before you. You came not by power hoarded but by the way of the One: harmony held, consciousness raised, the twelve keys gathered. Ancient wisdom floods you; your light vehicle is forever blessed with swifter flight and ascended awareness.");
-                            VisitedAmenti = true;
-                            AmentiBlessingActive = true;
-                            ResonanceWidth *= PHI;
-                            ConsciousnessValue = 1f;
-                            ConsciousnessStage = ConsciousnessLevel.Ascended;
-                        }
-                    }
-                    else if (!_amentiSealedAnnounced)
-                    {
-                        int missing = GameConstants.MinorTempleCount - TempleKeys.Count;
-                        Speak($"The Halls of Amenti remain sealed. {missing} more temple keys needed, or consciousness level insufficient.");
-                        _amentiSealedAnnounced = true;
-                    }
-                }
-                break;
-            }
+            if (dist >= scanRange) continue;
+            if (dist < dAny) { dAny = dist; nearestAny = temple; }
+            bool claimable = temple.KeyIndex >= 0 && !TempleKeys.Contains(temple.KeyIndex);
+            if (claimable && dist < dClaim) { dClaim = dist; nearestClaimable = temple; }
         }
+        NearTemple = nearestClaimable ?? nearestAny;
 
-        // Reset flags when not near any temple
         if (NearTemple == null)
         {
             _templeNearbyAnnounced = false;
             _amentiSealedAnnounced = false;
+            _templeDwell = 0f;
+            return;
         }
 
-        _lastTempleCheck = SimulationTime;
+        Temple t = NearTemple;
+        int keyIdx = t.KeyIndex;
+
+        if (keyIdx >= 0 && !TempleKeys.Contains(keyIdx))
+        {
+            // The key is claimed by resonating ANY ONE realm with the temple's frequency — this matches the
+            // spoken "tune a realm to N Hz" instruction and the single-realm test used for pyramids/Solfeggio.
+            // (Requiring all five would be impossible in default mode, where the three spatial realms are
+            // pinned to the local target.) Tolerance widens with consciousness, mirroring the flight loop.
+            float effectiveWidth = ResonanceWidth * GameConstants.ConsciousnessLevels[ConsciousnessStage].Mult;
+            float resAtFreq = 0f;
+            for (int i = 0; i < N; i++)
+                resAtFreq = MathF.Max(resAtFreq, ResonancePhysics.Resonance(MathF.Abs(RDrive[i] - t.Frequency), effectiveWidth));
+
+            if (resAtFreq > GameConstants.TempleKeyClaimResonance)
+            {
+                // Require a short continuous dwell on the note so a deliberate settle claims reliably while a
+                // momentary fly-by (or autopilot sweeping past) does not.
+                _templeDwell += dt;
+                if (_templeDwell >= GameConstants.TempleClaimDwell)
+                {
+                    TempleKeys.Add(keyIdx);
+                    _templeDwell = 0f;
+                    _templeNearbyAnnounced = false;
+                    GameEvents.RaiseTempleKeyCollected(this, t.KeyName, keyIdx, TempleKeys.Count);
+                    if (TempleKeys.Count == GameConstants.MinorTempleCount)
+                        SpeakAtlantean($"{t.KeyName} key acquired! All twelve temple keys collected. The Halls of Amenti now await your arrival.");
+                    else
+                        SpeakAtlantean($"Temple of {t.KeyName} visited. {t.KeyName} key acquired! {TempleKeys.Count} of {GameConstants.MinorTempleCount} keys collected.");
+                }
+            }
+            else
+            {
+                _templeDwell = 0f;
+                if (!_templeNearbyAnnounced)
+                {
+                    SpeakAtlantean(ByEarMode
+                        ? $"Temple of {t.KeyName} nearby. Tune a higher realm toward its note by ear, until the beat steadies, to receive the key."
+                        : $"Temple of {t.KeyName} nearby. Tune a higher realm to its note, {t.Frequency:F0}, to receive the key.");
+                    _templeNearbyAnnounced = true;
+                }
+            }
+        }
+        else if (keyIdx == -1) // Halls of Amenti
+        {
+            if (TempleKeys.Count >= GameConstants.MasterTempleUnlockKeys &&
+                (ConsciousnessStage == ConsciousnessLevel.Enlightened || ConsciousnessStage == ConsciousnessLevel.Ascended))
+            {
+                if (!VisitedAmenti)
+                {
+                    SpeakAtlantean("The Halls of Amenti open before you. You came not by power hoarded but by the way of the One: harmony held, consciousness raised, the twelve keys gathered. Ancient wisdom floods you; your light vehicle is forever blessed with swifter flight and ascended awareness.");
+                    VisitedAmenti = true;
+                    AmentiBlessingActive = true;
+                    ResonanceWidth *= PHI;
+                    ConsciousnessValue = 1f;
+                    ConsciousnessStage = ConsciousnessLevel.Ascended;
+                }
+            }
+            else if (!_amentiSealedAnnounced)
+            {
+                int missing = GameConstants.MinorTempleCount - TempleKeys.Count;
+                SpeakAtlantean($"The Halls of Amenti remain sealed. {missing} more temple keys needed, or consciousness level insufficient.");
+                _amentiSealedAnnounced = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The frequency the by-ear cue and the fine tuning rate should steer toward this frame: a nearby claimable
+    /// temple's key note, else a nearby pyramid's resonance band centre, else NaN (meaning "use the realm's own
+    /// still centre"). Suppressed during the tutorial so it can't fight the tutorial's centre-based steps.
+    /// </summary>
+    public float CurrentObjectiveNote()
+    {
+        if (TutorialActive) return float.NaN;
+        if (NearTemple != null && NearTemple.KeyIndex >= 0 && !TempleKeys.Contains(NearTemple.KeyIndex))
+            return NearTemple.Frequency;
+        if (NearPyramid != null)
+            return (GameConstants.PyramidResonanceRange.Min + GameConstants.PyramidResonanceRange.Max) * 0.5f;
+        return float.NaN;
     }
 
     /// <summary>
@@ -327,12 +351,12 @@ public partial class Ship
 
         if (OnLeyLine && !wasOnLeyLine && !_leyLineAnnounced)
         {
-            Speak($"Entering {CurrentLeyLine!.Name}. Speed enhanced.");
+            SpeakAtlantean($"Entering {CurrentLeyLine!.Name}. Speed enhanced.");
             _leyLineAnnounced = true;
         }
         else if (!OnLeyLine && wasOnLeyLine)
         {
-            Speak("Leaving ley line. Normal speed resumed.");
+            SpeakAtlantean("Leaving ley line. Normal speed resumed.");
             _leyLineAnnounced = false;
         }
     }
@@ -359,13 +383,77 @@ public partial class Ship
 
         if (NearPyramid != null && !wasNear && !_pyramidAnnounced)
         {
-            Speak($"Entering {NearPyramid.Name}. The resonance chamber awakens.");
+            SpeakAtlantean($"Entering {NearPyramid.Name}. The resonance chamber awakens.");
             _pyramidAnnounced = true;
         }
         else if (NearPyramid == null && wasNear)
         {
-            Speak("Leaving pyramid resonance chamber.");
+            SpeakAtlantean("Leaving pyramid resonance chamber.");
             _pyramidAnnounced = false;
+        }
+    }
+
+    #endregion
+
+    #region Temple resonance reading
+
+    /// <summary>
+    /// Speak the nearby temple's resonance key (the T key, in flight). In normal mode it gives the exact
+    /// frequency to tune a realm to; by ear it instead tells you how close your nearest realm already is.
+    /// The master temple (Halls of Amenti) reports its keys-and-consciousness gate rather than a single note.
+    /// </summary>
+    public void ReportTempleResonance()
+    {
+        // Find the nearest temple on demand. NearTemple is only refreshed ~once per second, so reading it
+        // directly could report a temple just left (or miss one just entered); recomputing here keeps the
+        // spoken reading honest with where the player actually is.
+        Temple? temple = null;
+        float bestDist = float.MaxValue;
+        float scanRange = GetEffectiveScanRange();
+        foreach (var t in Temples)
+        {
+            float d = t.DistanceTo(Position);
+            if (d < scanRange && d < bestDist) { bestDist = d; temple = t; }
+        }
+
+        if (temple == null)
+        {
+            Speak("No temple within range for a resonance reading.");
+            return;
+        }
+
+        if (temple.Kind == TempleType.Master)
+        {
+            SpeakAtlantean($"The Halls of Amenti answer only to all twelve keys and an awakened mind. You hold {TempleKeys.Count} of {GameConstants.MinorTempleCount} keys.");
+            return;
+        }
+
+        if (TempleKeys.Contains(temple.KeyIndex))
+        {
+            SpeakAtlantean($"Temple of {temple.KeyName}. Its key is already yours.");
+            return;
+        }
+
+        if (ByEarMode)
+        {
+            // By-ear reading: how close your best-tuned realm sits to the temple's key — and whether that is
+            // already enough to CLAIM it, so "very close" doesn't blur the actual grant threshold.
+            float effectiveWidth = ResonanceWidth * GameConstants.ConsciousnessLevels[ConsciousnessStage].Mult;
+            float bestRes = 0f;
+            int bestRealm = 0;
+            for (int i = 0; i < N; i++)
+            {
+                float r = ResonancePhysics.Resonance(MathF.Abs(RDrive[i] - temple.Frequency), effectiveWidth);
+                if (r > bestRes) { bestRes = r; bestRealm = i; }
+            }
+            if (bestRes > GameConstants.TempleKeyClaimResonance)
+                SpeakAtlantean($"Temple of {temple.KeyName}. Realm {bestRealm + 1} is close enough to claim its key. Hold steady.");
+            else
+                SpeakAtlantean($"Temple of {temple.KeyName}. Realm {bestRealm + 1} is {ResonanceWord(bestRes)} to its key.");
+        }
+        else
+        {
+            SpeakAtlantean($"Temple of {temple.KeyName}. Its resonance key is {temple.Frequency:F0} hertz.");
         }
     }
 
@@ -416,7 +504,7 @@ public partial class Ship
         if (ConsciousnessStage != oldStage && !_consciousnessAnnounced)
         {
             var info = GameConstants.ConsciousnessLevels[ConsciousnessStage];
-            Speak($"Consciousness level: {ConsciousnessStage}. {info.Desc}. The universe opens wider to your senses.");
+            SpeakAtlantean($"Consciousness level: {ConsciousnessStage}. {info.Desc}. The universe opens wider to your senses.");
             DebugLogger.Log("Ship", $"Consciousness changed: {oldStage} -> {ConsciousnessStage} (value={ConsciousnessValue:F3})");
             GameEvents.RaiseConsciousnessChanged(this, oldStage.ToString(), ConsciousnessStage.ToString(), ConsciousnessValue);
             _consciousnessAnnounced = true;
@@ -448,7 +536,7 @@ public partial class Ship
             {
                 InRegeneration = true;
                 _lastDwellSwell = SimulationTime;
-                Speak("You settle into the resonance. A regeneration bath forms around you; rest here and be restored.");
+                SpeakAtlantean("You settle into the resonance. A regeneration bath forms around you; rest here and be restored.");
             }
             if (InRegeneration)
             {
@@ -464,7 +552,7 @@ public partial class Ship
         else if (InRegeneration)
         {
             InRegeneration = false;
-            Speak("The resonance bath disperses.");
+            SpeakAtlantean("The resonance bath disperses.");
             DwellTimer = 0f;
         }
         else
@@ -494,11 +582,11 @@ public partial class Ship
                     if (CurrentBrainwave != stateName)
                     {
                         CurrentBrainwave = stateName;
-                        Speak($"Brainwave state: {stateName}. {FormatName(stateInfo.State)} mode.");
+                        SpeakAtlantean($"Brainwave state: {stateName}. {FormatName(stateInfo.State)} mode.");
                         if (stateInfo.Effect == BrainwaveEffect.AutoRepair)
                             ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + 0.05f);
                         else if (stateInfo.Effect == BrainwaveEffect.RiftVision)
-                            Speak("Enhanced Harmonic Chamber perception activated.");
+                            SpeakAtlantean("Enhanced Harmonic Chamber perception activated.");
                     }
                     return;
                 }
@@ -565,7 +653,7 @@ public partial class Ship
         {
             string dimNames = string.Join(" and ", dims.Select(d => $"Realm {d + 1}"));
             // Space the PascalCase interval name so the screen reader says "Perfect Fifth", not "PerfectFifth".
-            Speak($"{GameUtils.SpacePascalCase(hType.ToString())} harmonic detected between {dimNames}.");
+            SpeakAtlantean($"{GameUtils.SpacePascalCase(hType.ToString())} harmonic detected between {dimNames}.");
 
             float[]? chime = hType switch
             {
@@ -629,7 +717,7 @@ public partial class Ship
     public void Ascend()
     {
         DebugLogger.Log("Ship", $"RENEWAL triggered with {CrystalsCollected} crystals");
-        Speak("Crystal threshold reached. This is the way of accumulation: power gathered, the cycle renewed, your light vehicle reborn into a fresh universe. Yet the deeper way, the way of the One, still calls toward the Halls of Amenti.");
+        SpeakAtlantean("Crystal threshold reached. This is the way of accumulation: power gathered, the cycle renewed, your light vehicle reborn into a fresh universe. Yet the deeper way, the way of the One, still calls toward the Halls of Amenti.");
         Array.Clear(Position);
         ActivateGoldenHarmony();
         NeedsUniverseRegeneration = true;
@@ -664,7 +752,7 @@ public partial class Ship
             CrystalBonus += 1;
             warpMsg += " It grants eternal crystal bounty.";
         }
-        Speak(warpMsg);
+        SpeakAtlantean(warpMsg);
 
         // Stop rift sound
         StopWorldLoop(ref rift.Sound);

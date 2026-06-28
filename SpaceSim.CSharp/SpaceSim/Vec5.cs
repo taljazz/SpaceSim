@@ -108,6 +108,18 @@ public static class Vec5
             a[i] *= s;
     }
 
+    /// <summary>
+    /// Wraps each component into the universe torus [-half, half] in place — the same fold the ship's
+    /// position uses, so positioned objects stay inside the reachable volume instead of sitting off the
+    /// edge, where the wrapping ship could never catch them.
+    /// </summary>
+    public static void WrapInto(float[] a, float half)
+    {
+        float period = half * 2f;
+        for (int i = 0; i < Dimensions; i++)
+            a[i] = ((a[i] + half) % period + period) % period - half;
+    }
+
     #endregion
 
     #region Reductions

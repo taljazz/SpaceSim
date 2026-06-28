@@ -40,13 +40,13 @@ public partial class Ship
         }
         catch (Exception ex)
         {
-            Speak($"Save failed: {ex.Message}");
+            SpeakSystem($"Save failed: {ex.Message}");
             DebugLogger.LogError("Save", "SaveGame snapshot failed", ex);
             return;
         }
 
         // Speak now (on the game thread) — Speak just enqueues, so it stays non-blocking.
-        Speak("Game saved.");
+        SpeakSystem("Game saved.");
 
         // Off-thread write. WriteSaveFile is static and takes ONLY the frozen snapshot, so it is
         // structurally impossible for the background task to touch live game state (e.g. Speak's
@@ -121,12 +121,12 @@ public partial class Ship
         {
             if (!File.Exists("savegame.json"))
             {
-                Speak("No save file found.");
+                SpeakSystem("No save file found.");
                 return;
             }
             string json = File.ReadAllText("savegame.json");
             var state = JsonSerializer.Deserialize<SaveGameState>(json);
-            if (state == null) { Speak("Save file corrupted."); return; }
+            if (state == null) { SpeakSystem("Save file corrupted."); return; }
 
             // Copy saved values back onto the live ship; Array.Copy fills the existing N-length buffers.
             Array.Copy(state.Position, Position, N);
@@ -167,12 +167,12 @@ public partial class Ship
 
             // Rebuild celestial bodies around the restored position on the next update.
             NeedsUniverseRegeneration = true;
-            Speak("Game loaded.");
+            SpeakSystem("Game loaded.");
             DebugLogger.Log("Save", $"Game loaded: pos={Vec5.Format(Position)}, crystals={CrystalsCollected}, consciousness={ConsciousnessStage}");
         }
         catch (Exception ex)
         {
-            Speak("No save file found.");
+            SpeakSystem("No save file found.");
             DebugLogger.LogError("Save", "LoadGame failed", ex);
         }
     }

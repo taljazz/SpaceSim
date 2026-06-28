@@ -103,12 +103,26 @@ public partial class Ship
             }
             else
             {
-                // Dimension selection (1-5 only)
+                // Dimension selection. In full tuning mode every realm is yours, so any of 1-5 selects. In
+                // normal flight only the two higher realms (4 and 5) are hand-tunable; pressing 1-3 then
+                // explains that those realms fly themselves rather than selecting them.
                 if (slot <= 5)
                 {
-                    SelectedDim = slot - 1;
-                    Speak($"Tuning Realm {slot}.");
-                    _approachingLockAnnounced = false;
+                    if (!TuningMode && !LandedMode && slot <= 3)
+                    {
+                        Speak($"Realm {slot} flies itself as you move. Press 4 or 5 to tune a higher realm by ear.");
+                    }
+                    else
+                    {
+                        SelectedDim = slot - 1;
+                        LastTuneTime = SimulationTime; // selecting a realm wakes the by-ear cue
+                        // Always spoken — tuning is essential and never filtered by a buffer. With tune-by-ear
+                        // off, newcomers also hear the realm's current tone to start from; by ear, just the realm.
+                        Speak(ByEarMode
+                            ? $"Tuning Realm {slot}."
+                            : $"Tuning Realm {slot}. Current tone {RDrive[slot - 1]:F0}.");
+                        _approachingLockAnnounced = false;
+                    }
                 }
             }
         }
@@ -121,6 +135,9 @@ public partial class Ship
         if (IsKeyPressed(Keys.J))
         {
             TuningMode = !TuningMode;
+            // Leaving full tuning with a spatial realm selected would strand Up/Down (in normal flight only
+            // the higher realms are hand-tunable), so snap the selection back to a higher realm.
+            if (!TuningMode && SelectedDim < 3) SelectedDim = 3;
             string modeName = TuningMode ? "Resonance tuning mode" : "Manual mode";
             Speak($"Toggled to {modeName}.");
             DebugLogger.Log("Input", $"Tuning mode toggled: {modeName}");
@@ -130,14 +147,14 @@ public partial class Ship
         {
             VerboseMode = (VerboseMode + 1) % 3;
             string[] modes = { "Low", "Medium", "High" };
-            Speak($"Verbosity mode: {modes[VerboseMode]}.");
+            SpeakSystem($"Verbosity mode: {modes[VerboseMode]}.");
         }
 
         if (IsKeyPressed(Keys.G) && SimulationTime - _lastTuaoiSwitch > GameConstants.TuaoiModeSwitchCooldown)
         {
             TuaoiModeIndex = (TuaoiModeIndex + 1) % GameConstants.TuaoiModeOrder.Length;
             SetTuaoiMode(GameConstants.TuaoiModeOrder[TuaoiModeIndex]);
-            Speak($"The Tuaoi turns to its {TuaoiMode} face. {Capitalize(_cachedTuaoiInfo.Desc)}.");
+            SpeakAtlantean($"The Tuaoi turns to its {TuaoiMode} face. {Capitalize(_cachedTuaoiInfo.Desc)}.");
             DebugLogger.Log("Input", $"Tuaoi mode switched to: {TuaoiMode}");
             _lastTuaoiSwitch = SimulationTime;
         }
@@ -178,7 +195,7 @@ public partial class Ship
                 LandingTimer = GameConstants.LandingTime;
                 var eType = NearestBody.ExoplanetClass ?? ExoplanetType.SuperEarth;
                 string eDesc = GameConstants.ExoplanetTypes[eType].Desc;
-                Speak($"Initiating anchoring sequence on {eDesc}.");
+                SpeakNav($"Initiating anchoring sequence on {eDesc}.");
             }
             else
             {
@@ -192,16 +209,27 @@ public partial class Ship
             }
         }
 
-        // Takeoff
-        if (IsKeyPressed(Keys.T) && LandedMode)
+        // Takeoff. Capture the landed state first so the in-flight temple readout below can't ALSO fire on
+        // the same T press that just took off (the takeoff clears LandedMode in this same frame).
+        bool wasLandedForT = LandedMode;
+        if (IsKeyPressed(Keys.T) && LandedMode && !shiftPressed)
         {
             LandedMode = false;
             LandedPlanet = null;
             LandedPlanetBody = null;
+            LockedTarget = null;       // ascending frees you — don't auto-fly or orbit back to the planet you left
+            LockedBody = null;
+            IsOrbiting = false;
+            StopLockSound();
             StopBiomeSound();
             GameEvents.RaiseLandingEvent(this, false);
-            Speak("Ascending from planet. Light vehicle disengaged.");
+            SpeakNav("Ascending from planet. Light vehicle disengaged.");
         }
+
+        // Temple resonance reading — in flight only (T is takeoff while anchored), near a temple, report its
+        // key. Plain T only: Shift+T is reserved for repeating the tutorial line.
+        if (IsKeyPressed(Keys.T) && !wasLandedForT && !shiftPressed)
+            ReportTempleResonance();
 
         // Status — a concise, meaningful read-out (no raw 5D vectors or radians to decode by ear).
         if (IsKeyPressed(Keys.R))
@@ -218,6 +246,18 @@ public partial class Ship
         // Replay the last announcement (useful if a line was missed).
         if (IsKeyPressed(Keys.Tab))
             RepeatLastAnnouncement();
+
+        // Orbit the locked object, or break a current orbit — a stable way to stay with a moving planet.
+        if (IsKeyPressed(Keys.O) && !LandedMode)
+            ToggleOrbit();
+
+        // Speech buffers: [ and ] cycle which buffer is focused; holding Ctrl with them moves the focused
+        // buffer to reorder the list; , and . browse the focused buffer's history.
+        bool ctrlBuffer = keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl);
+        if (IsKeyPressed(Keys.OemOpenBrackets)) { if (ctrlBuffer) MoveSpeechBuffer(-1); else CycleSpeechBuffer(-1); }
+        if (IsKeyPressed(Keys.OemCloseBrackets)) { if (ctrlBuffer) MoveSpeechBuffer(+1); else CycleSpeechBuffer(+1); }
+        if (IsKeyPressed(Keys.OemComma)) BrowseSpeechBuffer(-1);
+        if (IsKeyPressed(Keys.OemPeriod)) BrowseSpeechBuffer(+1);
 
         // HUD / Upgrade menu. While anchored on a planet, U opens the attunement menu so crystals are
         // always spendable (no need to clear every crystal on the planet first — that gate was a
@@ -251,7 +291,7 @@ public partial class Ship
                 else if (dist < GameConstants.RiftAlignmentTolerance && avgRes > GameConstants.RiftEntryResThreshold / 2f)
                 {
                     RiftChargeTimer = GameConstants.RiftChargeTime;
-                    Speak("Initiating Harmonic Chamber charge sequence.");
+                    SpeakNav("Initiating Harmonic Chamber charge sequence.");
                 }
                 else
                     Speak("Approach closer or increase resonance to charge.");
@@ -273,7 +313,7 @@ public partial class Ship
         if (IsKeyPressed(Keys.Z) && !TuningMode)
         {
             SpeedMode = (SpeedMode + 1) % GameConstants.SpeedFactors.Length;
-            Speak($"Speed mode toggled to {GameConstants.SpeedModeNames[SpeedMode]}.");
+            SpeakSystem($"Speed mode toggled to {GameConstants.SpeedModeNames[SpeedMode]}.");
         }
 
         // Save/Load
@@ -282,7 +322,7 @@ public partial class Ship
         if (IsKeyPressed(Keys.A) && ctrlPressed)
         {
             AutosaveEnabled = !AutosaveEnabled;
-            Speak($"Autosave {(AutosaveEnabled ? "enabled" : "disabled")}.");
+            SpeakSystem($"Autosave {(AutosaveEnabled ? "enabled" : "disabled")}.");
         }
 
         // Portal anchors
@@ -356,7 +396,7 @@ public partial class Ship
             {
                 // Reward the demanding perfect-resonance ritual with a timed protective + healing aura.
                 WaterBlessingTimer = GameConstants.WaterBlessingDuration;
-                Speak("Water blessing activated. Your light vehicle is bathed in healing light, shielded and restored for one minute.");
+                SpeakAtlantean("Water blessing activated. Your light vehicle is bathed in healing light, shielded and restored for one minute.");
                 _spacebarPressed = false;
                 _spacebarHoldTimer = 0f;
             }
@@ -397,9 +437,46 @@ public partial class Ship
             }
         }
 
-        bool allowTuning = TuningMode || SelectedDim >= 3;
+        // Manual flight or tuning input takes control back from a non-rift autopilot lock (rift locks
+        // stay — you charge into a chamber with E). This is why locking a temple or pyramid no longer
+        // "freezes" the drives: touch the controls and you are flying manually again.
+        bool ctrlHeld = keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl);
+        bool manualFlightInput = keys.IsKeyDown(Keys.W) || keys.IsKeyDown(Keys.A) || keys.IsKeyDown(Keys.S) ||
+                                 keys.IsKeyDown(Keys.D) || keys.IsKeyDown(Keys.PageUp) || keys.IsKeyDown(Keys.PageDown);
+        // Once the pilot has actually flown, the first-rest tuning nudge becomes eligible to fire.
+        if (manualFlightInput && !LandedMode) _hasFlownThisSession = true;
+        // Up/Down only count as "taking control" in full tuning mode, where they actually retune; in
+        // manual flight the realms tune themselves, so those keys shouldn't drop your autopilot.
+        bool manualTuneInput = TuningMode && (keys.IsKeyDown(Keys.Up) || keys.IsKeyDown(Keys.Down));
+        if (LockedTarget != null && !LockedIsRift && !LandedMode && !ctrlHeld && (manualFlightInput || manualTuneInput))
+        {
+            DebugLogger.Log("Lock", $"RELEASED by manual input at dist {Vec5.Distance(Position, LockedTarget):F1}");
+            LockedTarget = null;
+            LockedBody = null;
+            IsOrbiting = false;
+            StopLockSound();
+            SpeakNav("Manual control resumed.");
+        }
+
+        // Higher realms are hand-tunable in free flight (keys 4/5 select); full tuning mode (J) tunes any
+        // selected realm; and on a planet Up/Down always tune the selected realm toward the crystal under
+        // your cursor. Tuning is only gated off mid-flight while the ship is flying itself (an autopilot lock).
+        bool allowTuning = TuningMode || LandedMode || (SelectedDim >= 3 && LockedTarget == null);
+
+        // Self-fining: when tending a higher realm in flight, the knob sweeps quickly when far and eases to a
+        // fine crawl near its target, so you can settle gently by ear. The target is the realm's cue target —
+        // a nearby claimable temple/pyramid note when one is in range (so you can settle onto the objective to
+        // claim it), otherwise the realm's own still centre.
+        if (!LandedMode && !TuningMode && SelectedDim >= 3)
+            rate = TuningDynamics.TuningRate(RDrive[SelectedDim] - CueTargetFreqs[SelectedDim]);
+
         if (allowTuning)
         {
+            if (keys.IsKeyDown(Keys.Up) || keys.IsKeyDown(Keys.Down))
+                LastTuneTime = SimulationTime; // keep the by-ear cue present while actively tuning
+            // Engaging higher-realm tuning yourself dismisses the first-rest teaching nudge.
+            if (SelectedDim >= 3 && (keys.IsKeyDown(Keys.Up) || keys.IsKeyDown(Keys.Down)))
+                _hasTunedHigherRealm = true;
             if (keys.IsKeyDown(Keys.Up))
                 RDrive[SelectedDim] = MathF.Min(RDrive[SelectedDim] + rate * DT, GameConstants.FrequencyMax);
             if (keys.IsKeyDown(Keys.Down))
@@ -407,7 +484,11 @@ public partial class Ship
         }
         else if (keys.IsKeyDown(Keys.Up) || keys.IsKeyDown(Keys.Down))
         {
-            Speak("Spatial dimension tuning locked in manual mode. Toggle with J for full access.");
+            // Up/Down pressed but tuning isn't active right now — guide the player to what works.
+            if (LockedTarget != null)
+                Speak("Your craft is tuning for you while it flies. Take manual control to tune by hand.");
+            else
+                Speak("Press 4 or 5 to choose a higher realm, then Up and Down to tune it. Press J for full manual tuning.");
         }
 
         #endregion
@@ -436,8 +517,9 @@ public partial class Ship
             _lastRotationSoundTime = SimulationTime;
         }
 
-        // Manual navigation
-        if (!TuningMode)
+        // Manual navigation. Skipped while an autopilot lock is active so it doesn't reset the drives
+        // every frame and stall the autopilot's glide (manual input above releases the lock first).
+        if (!TuningMode && LockedTarget == null)
         {
             float[] desiredVel = new float[3];
             float thrust = MaxVelocity * GameConstants.SpeedFactors[SpeedMode];
@@ -460,6 +542,9 @@ public partial class Ship
                 else
                     RDrive[i] = FTarget[i];
             }
+
+            // Realms 4 and 5 are not auto-tuned here — they are the player's to tend by ear (keys 4 and 5
+            // plus Up/Down). Leaving their drive frequencies untouched lets that by-ear tuning take effect.
         }
 
         #endregion
@@ -489,7 +574,11 @@ public partial class Ship
         // (e.g. the starmap's first-letter jump).
         if (IsKeyPressed(Keys.Up)) ActiveMenu.MoveUp();
         if (IsKeyPressed(Keys.Down)) ActiveMenu.MoveDown();
-        if (IsKeyPressed(Keys.Enter)) ActiveMenu.Select();
+        if (IsKeyPressed(Keys.Enter))
+        {
+            ActiveMenu.Select();
+            if (ActiveMenu == null) return;   // Select may close the menu (e.g. locking a destination)
+        }
         ActiveMenu.HandleExtraKeys(IsKeyPressed);
     }
 

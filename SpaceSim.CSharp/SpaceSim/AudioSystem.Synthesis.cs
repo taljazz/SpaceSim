@@ -10,10 +10,26 @@ public partial class AudioSystem
 
     /// <summary>
     /// Called by NAudio on the audio thread. Fills the interleaved stereo buffer [L,R,L,R,...].
+    ///
+    /// <para>
+    /// Every continuous voice is generated from a per-sample PHASE ACCUMULATOR (advanced by
+    /// 2*PI*freq/SampleRate) rather than evaluated as sin(2*PI*freq*t) against absolute time. That is
+    /// what keeps the drive click-free while the player tunes: a frequency change only bends the slope
+    /// of the phase ramp, it never steps the phase value. Gains that multiply a continuous tone are
+    /// smoothed per buffer for the same reason (a stepped amplitude clicks too).
+    /// </para>
     /// </summary>
     public int Read(float[] buffer, int offset, int count)
     {
         int frames = count / Channels;
+
+        // During an output-device swap, emit silence so a late callback from the old device (or the first
+        // from the new one) can't read half-torn-down state.
+        if (_deviceSwitching)
+        {
+            Array.Clear(buffer, offset, count);
+            return count;
+        }
 
         // --- Drain pending sound effects into active playback list ---
         // This is the only lock in the audio callback, held for microseconds (just a list swap).
@@ -35,17 +51,25 @@ public partial class AudioSystem
         float resonanceWidth = GameConstants.ResonanceWidthBase;
         bool isCharging = false;
         float chargeProgress = 0f;
-        bool hasHarmonicPairs = false;
-
-        // Tuning-by-ear beat cue (selected realm) — computed once per buffer, emitted per sample below.
-        bool beatActive = false;
-        float beatCloseness = 0f, beatCarrierInc = 0f, beatAmInc = 0f, beatPanL = 0f, beatPanR = 0f, beatLockBlend = 0f;
 
         Ship? ship = _ship; // volatile read
 
         // The engine (drive synthesis + harmonics) only runs while the sim is active; at the menus
         // EngineEnabled is false and just the queued sound effects (menu ticks, sound demos) play.
         bool engineOn = ship != null && EngineEnabled;
+
+        // --- Per-buffer gain smoothing (amplitude steps click too, so glide them) ---
+        // _masterGain tracks MasterVolume always (it also scales menu sounds). _driveGain ramps to zero
+        // while the engine is off, so resuming from a menu fades the drive back in click-free (the phase
+        // accumulators are never reset, so they stay continuous across the silence).
+        _masterGain += (MasterVolume - _masterGain) * GameConstants.GainSmoothingPerBuffer;
+        float driveTarget = engineOn ? DriveVolume : 0f;
+        _driveGain += (driveTarget - _driveGain) * GameConstants.GainSmoothingPerBuffer;
+
+        // Tune-by-ear cue (selected realm): closeness + a countable pulse + a signed direction, present only
+        // while actively tuning. Targets computed once per buffer here; smoothed and emitted below.
+        float cueAmpTarget = 0f;
+        float cuePanLTarget = _cuePanLSmoothed, cuePanRTarget = _cuePanRSmoothed;
 
         if (engineOn)
         {
@@ -55,131 +79,196 @@ public partial class AudioSystem
             {
                 _snapRDrive[i] = s.RDrive[i];
                 _snapFTarget[i] = s.FTarget[i];
+                _snapCueTarget[i] = s.CueTargetFreqs[i];
             }
             resonanceWidth = s.ResonanceWidth;
             isCharging = s.IsChargingRift;
             chargeProgress = s.RiftChargeProgress;
-            DetectHarmonicPairs(_harmonicPairsBuffer, _snapRDrive);
-            hasHarmonicPairs = _harmonicPairsBuffer.Count > 0;
 
-            // Beat cue: a reference tone at the selected realm's target pitch, tremolo'd at the
-            // detuning rate so it pulses fast when far, slows as you approach, and goes steady at lock.
-            int beatDim = Math.Clamp(s.SelectedDim, 0, NDimensions - 1);
-            float beatTargetF = _snapFTarget[beatDim];
-            float beatDelta = MathF.Abs(_snapRDrive[beatDim] - beatTargetF);
-            if (beatTargetF > 1f && beatDelta < GameConstants.BeatCueRange)
+            DetectHarmonicPairs(_harmonicPairsBuffer, _snapRDrive);
+
+            // Precompute per-dimension increments (constant within a buffer). The inner sample loop then
+            // only advances accumulators, so a frequency change between buffers is click-free.
+            for (int dim = 0; dim < NDimensions; dim++)
             {
-                beatActive = true;
-                beatCloseness = 1f - beatDelta / GameConstants.BeatCueRange;
-                beatLockBlend = Math.Clamp(1f - beatDelta / GameConstants.BeatLockZone, 0f, 1f);
-                beatCarrierInc = TwoPi * (beatTargetF * 0.5f) / SampleRate;
-                beatAmInc = TwoPi * beatDelta / SampleRate;
-                (beatPanL, beatPanR) = DimensionPan[beatDim];
+                float baseFreq = _snapRDrive[dim] * 0.5f;
+                _fundInc[dim] = TwoPiD * baseFreq / SampleRate;
+                _overtoneInc[dim, 0] = TwoPiD * (baseFreq * PhiPow[0]) / SampleRate;
+                _overtoneInc[dim, 1] = TwoPiD * (baseFreq * PhiPow[1]) / SampleRate;
+                _overtoneInc[dim, 2] = TwoPiD * (baseFreq * PhiPow[2]) / SampleRate;
+                _subInc[dim] = TwoPiD * (baseFreq / PHI) / SampleRate;
+
+                // Vibrato depth/rate follow a SMOOTHED resonance so a resonance change can't step the
+                // vibrato (the symptom the player reported as crackle "when the resonance changes").
+                float delta = MathF.Abs(_snapRDrive[dim] - _snapFTarget[dim]);
+                float resLevel = ResonancePhysics.Resonance(delta, resonanceWidth);
+                _resSmoothed[dim] += (resLevel - _resSmoothed[dim]) * GameConstants.GainSmoothingPerBuffer;
+                var (vibDepth, vibRate) = VibratoShape.DepthRate(_resSmoothed[dim]);
+                _vibDepth[dim] = vibDepth;
+                _vibInc1[dim] = TwoPiD * vibRate / SampleRate;
+                _vibInc2[dim] = TwoPiD * (vibRate * PHI) / SampleRate;
+            }
+
+            // Intermodulation: ramp each pair's gain toward 1 (detected) / 0 (not) and advance its
+            // stable-slot accumulators, so pairs appearing/disappearing or moving never pop or click.
+            Array.Clear(_intermodDetected);
+            foreach (var (dimA, dimB, _) in _harmonicPairsBuffer)
+                _intermodDetected[PairIndex(dimA, dimB)] = true;
+            for (int p = 0; p < PairCount; p++)
+            {
+                float fa = _snapRDrive[PairA[p]] * 0.5f;
+                float fb = _snapRDrive[PairB[p]] * 0.5f;
+                _intermodSumInc[p] = TwoPiD * (fa + fb) / SampleRate;
+                float diff = MathF.Abs(fa - fb);
+                _intermodDiffInc[p] = TwoPiD * diff / SampleRate;
+                // Below ~2 Hz the difference tone is near-DC; ramp its term out rather than emit a frozen offset.
+                _intermodDiffActive[p] = diff >= 2f && fa >= 1f && fb >= 1f;
+                float target = _intermodDetected[p] ? 1f : 0f;
+                _intermodGain[p] += (target - _intermodGain[p]) * GameConstants.GainSmoothingPerBuffer;
+            }
+
+            // The cue is present while tuning a realm by ear (recently tuned, or full tuning mode) — but not on
+            // a planet, where crystal collection has its own beeps. It tracks the realm's CUE TARGET
+            // (_snapCueTarget): a nearby claimable temple/pyramid note when one is in range, otherwise the
+            // still centre BaseFTarget — never the breathing/jittered FTarget, so a perfectly-held tuning reads
+            // as a steady lock instead of breathing in and out of it or flipping the direction cue every breath.
+            bool activelyTuning = !s.LandedMode &&
+                (s.TuningMode || (s.SimulationTime - s.LastTuneTime) < GameConstants.CueActiveWindow);
+            if (activelyTuning)
+            {
+                int selDim = Math.Clamp(s.SelectedDim, 0, NDimensions - 1);
+                float center = _snapCueTarget[selDim];
+                var cue = CueShape.Compute(_snapRDrive[selDim] - center);
+                _cueCarrierInc = TwoPiD * (center * 0.5f) / SampleRate; // carrier FIXED at the target pitch (a landmark)
+                _cueAmInc = TwoPiD * cue.PulseRate / SampleRate;
+                _cueLockBlend = cue.LockBlend;
+                cueAmpTarget = GameConstants.BeatCueVolume * (GameConstants.CueFloor + (1f - GameConstants.CueFloor) * cue.Closeness);
+                float panPos = Math.Clamp(GameConstants.DirPan * cue.Direction, -1f, 1f); // flat = left, sharp = right
+                cuePanLTarget = 1f - MathF.Max(0f, panPos);
+                cuePanRTarget = 1f + MathF.Min(0f, panPos);
             }
         }
 
-        double audioTimeStart = _audioTime;
+        // Rift-charge rising tone increment (per buffer).
+        double chargeInc = 0;
+        float chargeAmp = 0f;
+        if (engineOn && isCharging)
+        {
+            float chargeFreq = 200f + 600f * chargeProgress;
+            chargeInc = TwoPiD * chargeFreq / SampleRate;
+            chargeAmp = 0.08f * chargeProgress;
+        }
+
+        // Smooth the cue's amplitude and pan once per buffer so closeness, direction, and realm changes
+        // glide instead of stepping a continuous carrier — and so the cue fades out gently when tuning
+        // stops (cueAmpTarget is 0 then, while the persisted increments keep the carrier oscillating).
+        _cueAmpSmoothed += (cueAmpTarget - _cueAmpSmoothed) * GameConstants.GainSmoothingPerBuffer;
+        _cuePanLSmoothed += (cuePanLTarget - _cuePanLSmoothed) * GameConstants.GainSmoothingPerBuffer;
+        _cuePanRSmoothed += (cuePanRTarget - _cuePanRSmoothed) * GameConstants.GainSmoothingPerBuffer;
 
         for (int frame = 0; frame < frames; frame++)
         {
-            float t = (float)((audioTimeStart + frame) / SampleRate);
             float left = 0f;
             float right = 0f;
 
-            // --- 1. Schumann resonance carrier ---
-            float schumann = GameConstants.SchumannVolume * MathF.Sin(TwoPi * GameConstants.SchumannFreq * t);
+            // --- 1. Schumann resonance carrier (always on, fixed frequency, its own accumulator) ---
+            _schumannPhase += SchumannInc;
+            if (_schumannPhase >= TwoPiD) _schumannPhase -= TwoPiD;
+            float schumann = GameConstants.SchumannVolume * MathF.Sin((float)_schumannPhase);
             left += schumann;
             right += schumann;
 
-            // --- 2. Per-dimension drive synthesis ---
+            // --- 2. Per-dimension drive synthesis (phase-continuous) ---
             if (engineOn)
             {
                 for (int dim = 0; dim < NDimensions; dim++)
                 {
-                    float baseFreq = _snapRDrive[dim] / 2f;
-                    if (baseFreq < 1f) continue;
+                    // Vibrato: an additive phase OFFSET (continuous), shared by this dimension's voices.
+                    _vibPhase1[dim] += _vibInc1[dim];
+                    if (_vibPhase1[dim] >= TwoPiD) _vibPhase1[dim] -= TwoPiD;
+                    _vibPhase2[dim] += _vibInc2[dim];
+                    if (_vibPhase2[dim] >= TwoPiD) _vibPhase2[dim] -= TwoPiD;
+                    float vibratoPhase = _vibDepth[dim] *
+                        (MathF.Sin((float)_vibPhase1[dim]) + 0.3f * MathF.Sin((float)_vibPhase2[dim]));
 
-                    float delta = MathF.Abs(_snapRDrive[dim] - _snapFTarget[dim]);
-                    float resLevel = ResonancePhysics.Resonance(delta, resonanceWidth);
+                    // Pure sine fundamental.
+                    _fundPhase[dim] += _fundInc[dim];
+                    if (_fundPhase[dim] >= TwoPiD) _fundPhase[dim] -= TwoPiD;
+                    float signal = _driveGain * MathF.Sin((float)_fundPhase[dim] + vibratoPhase);
 
-                    float vibratoPhase = GetVibratoPhase(t, resLevel);
-
-                    // Pure sine fundamental
-                    float signal = DriveVolume * MathF.Sin(TwoPi * baseFreq * t + vibratoPhase);
-
-                    // Golden ratio overtones (PHI^k, k=1,2,3)
-                    for (int k = 1; k <= 3; k++)
+                    // Golden-ratio overtones (PHI^k, k=1..3).
+                    for (int k = 0; k < 3; k++)
                     {
-                        float amp = DriveVolume * 0.25f / k;
-                        float overtoneFreq = baseFreq * MathF.Pow(PHI, k);
-                        signal += amp * MathF.Sin(TwoPi * overtoneFreq * t + vibratoPhase);
+                        _overtonePhase[dim, k] += _overtoneInc[dim, k];
+                        if (_overtonePhase[dim, k] >= TwoPiD) _overtonePhase[dim, k] -= TwoPiD;
+                        float amp = _driveGain * 0.25f / (k + 1);
+                        signal += amp * MathF.Sin((float)_overtonePhase[dim, k] + vibratoPhase);
                     }
 
-                    // Subharmonic at baseFreq / PHI
-                    float subFreq = baseFreq / PHI;
-                    signal += DriveVolume * 0.15f * MathF.Sin(TwoPi * subFreq * t + vibratoPhase * 0.5f);
+                    // Subharmonic at baseFreq / PHI (half-depth vibrato, as before).
+                    _subPhase[dim] += _subInc[dim];
+                    if (_subPhase[dim] >= TwoPiD) _subPhase[dim] -= TwoPiD;
+                    signal += _driveGain * 0.15f * MathF.Sin((float)_subPhase[dim] + vibratoPhase * 0.5f);
 
-                    // Higher dimension modulation for dims 3 and 4
+                    // Higher-dimension tremolo for dims 3 and 4 (its own LFO accumulator).
                     if (dim >= 3)
                     {
-                        float modRate = dim == 3 ? 2f : 3f;
-                        float mod = 1f + 0.3f * MathF.Sin(TwoPi * modRate * t);
-                        signal *= mod;
+                        int m = dim - 3;
+                        _modPhase[m] += ModInc[m];
+                        if (_modPhase[m] >= TwoPiD) _modPhase[m] -= TwoPiD;
+                        signal *= 1f + 0.3f * MathF.Sin((float)_modPhase[m]);
                     }
 
-                    // Pan to stereo
+                    // Pan to stereo.
                     var (panL, panR) = DimensionPan[dim];
                     left += signal * panL;
                     right += signal * panR;
                 }
 
-                // --- 3. Intermodulation tones for harmonic pairs ---
-                if (hasHarmonicPairs)
+                // --- 3. Intermodulation tones for harmonic pairs (ramped, stable slots) ---
+                for (int p = 0; p < PairCount; p++)
                 {
-                    foreach (var (dimA, dimB, _) in _harmonicPairsBuffer)
+                    if (_intermodGain[p] < 0.0001f) continue;
+
+                    _intermodSumPhase[p] += _intermodSumInc[p];
+                    if (_intermodSumPhase[p] >= TwoPiD) _intermodSumPhase[p] -= TwoPiD;
+                    float val = 0.5f * MathF.Sin((float)_intermodSumPhase[p]);
+
+                    if (_intermodDiffActive[p])
                     {
-                        float freqA = _snapRDrive[dimA] / 2f;
-                        float freqB = _snapRDrive[dimB] / 2f;
-                        if (freqA < 1f || freqB < 1f) continue;
-
-                        float sumFreq = freqA + freqB;
-                        float diffFreq = MathF.Abs(freqA - freqB);
-
-                        float intermod = GameConstants.IntermodDepth
-                            * (0.5f * MathF.Sin(TwoPi * sumFreq * t)
-                             + 0.7f * MathF.Sin(TwoPi * diffFreq * t));
-
-                        // Spread intermod across both channels
-                        left += intermod * 0.5f;
-                        right += intermod * 0.5f;
+                        _intermodDiffPhase[p] += _intermodDiffInc[p];
+                        if (_intermodDiffPhase[p] >= TwoPiD) _intermodDiffPhase[p] -= TwoPiD;
+                        val += 0.7f * MathF.Sin((float)_intermodDiffPhase[p]);
                     }
+
+                    float intermod = GameConstants.IntermodDepth * _intermodGain[p] * val;
+                    left += intermod * 0.5f;
+                    right += intermod * 0.5f;
                 }
 
                 // --- 4. Rift charge rising tone ---
                 if (isCharging)
                 {
-                    float chargeFreq = 200f + 600f * chargeProgress;
-                    float chargeAmp = 0.08f * chargeProgress;
-                    float chargeTone = chargeAmp * MathF.Sin(TwoPi * chargeFreq * t);
+                    _chargePhase += chargeInc;
+                    if (_chargePhase >= TwoPiD) _chargePhase -= TwoPiD;
+                    float chargeTone = chargeAmp * MathF.Sin((float)_chargePhase);
                     left += chargeTone;
                     right += chargeTone;
                 }
 
-                // --- 4b. Tuning-by-ear beat cue for the selected realm ---
-                if (beatActive)
+                // --- 4b. Tune-by-ear cue: fixed-pitch carrier (landmark), pan = direction, pulse + loudness = closeness ---
+                if (_cueAmpSmoothed > 0.0001f)
                 {
-                    _beatCarrierPhase += beatCarrierInc;
-                    if (_beatCarrierPhase >= TwoPi) _beatCarrierPhase -= TwoPi;
-                    _beatAmPhase += beatAmInc;
-                    if (_beatAmPhase >= TwoPi) _beatAmPhase -= TwoPi;
+                    _beatCarrierPhase += _cueCarrierInc;
+                    if (_beatCarrierPhase >= TwoPiD) _beatCarrierPhase -= TwoPiD;
+                    _beatAmPhase += _cueAmInc;
+                    if (_beatAmPhase >= TwoPiD) _beatAmPhase -= TwoPiD;
 
-                    // Tremolo pulsing at the detuning rate; near lock it smoothly fills up to a full,
-                    // steady tone — a deterministic "locked" payoff instead of whatever phase the beat froze at.
                     float tremolo = 0.5f + 0.5f * MathF.Cos((float)_beatAmPhase);
-                    float beatEnv = tremolo + (1f - tremolo) * beatLockBlend;
-                    float beatTone = GameConstants.BeatCueVolume * beatCloseness * beatEnv * MathF.Sin((float)_beatCarrierPhase);
-                    left += beatTone * beatPanL;
-                    right += beatTone * beatPanR;
+                    float cueEnv = tremolo + (1f - tremolo) * _cueLockBlend;
+                    float cueTone = _cueAmpSmoothed * cueEnv * MathF.Sin((float)_beatCarrierPhase);
+                    left += cueTone * _cuePanLSmoothed;
+                    right += cueTone * _cuePanRSmoothed;
                 }
             }
 
@@ -213,15 +302,17 @@ public partial class AudioSystem
             }
 
             // --- 6. Apply master volume and clip ---
-            left *= MasterVolume;
-            right *= MasterVolume;
+            left *= _masterGain;
+            right *= _masterGain;
 
-            // Track clipping
+            // Track when the mix would have hard-clipped (soft-clip now engaged), for diagnostics.
             if (left > 1f || left < -1f || right > 1f || right < -1f)
                 _clippingCount++;
 
-            left = Math.Clamp(left, -1f, 1f);
-            right = Math.Clamp(right, -1f, 1f);
+            // Soft-clip instead of hard-clamping: stacked voices at high master volume saturate
+            // gracefully (tanh) and stay warm, instead of crackling into hard-clip distortion.
+            left = MathF.Tanh(left);
+            right = MathF.Tanh(right);
 
             // Write interleaved stereo
             int idx = offset + frame * Channels;
@@ -244,24 +335,6 @@ public partial class AudioSystem
         }
 
         return count;
-    }
-
-    #endregion
-
-    #region Vibrato helper
-
-    /// <summary>
-    /// Compute vibrato phase offset from two LFOs modulated by golden ratio.
-    /// </summary>
-    private static float GetVibratoPhase(float t, float resLevel)
-    {
-        // Higher resonance => deeper, faster vibrato. depth/rate lerp linearly with resLevel.
-        float depth = 0.25f + (1.1f - 0.25f) * resLevel;
-        float rate = 3.4f + (4.3f - 3.4f) * resLevel;
-        // Primary LFO plus a quieter PHI-detuned LFO for a richer, organic warble.
-        float lfo1 = MathF.Sin(TwoPi * rate * t);
-        float lfo2 = 0.3f * MathF.Sin(TwoPi * rate * PHI * t);
-        return depth * (lfo1 + lfo2);
     }
 
     #endregion

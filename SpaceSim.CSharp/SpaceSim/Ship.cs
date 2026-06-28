@@ -40,14 +40,45 @@ public partial class Ship
     public float[] Velocity = Vec5.Zero();
     public float Heading;
 
+    /// <summary>
+    /// Speed through the three SPATIAL realms only (dims 0-2), excluding tuning drift in the higher realms.
+    /// The tutorial's fly step keys off this so that ONLY the player's own WASD thrust counts as "flying"
+    /// (a realm detuned by the tutorial moves the ship through dims 4-5, which is not propulsion the player
+    /// chose). This is deliberately distinct from — and must not replace — the canonical full-5D ship speed
+    /// (<see cref="Vec5.Norm"/> of <see cref="Velocity"/>) used by the status report, HUD, dwell/stillness
+    /// test, and breathing, all of which intentionally account for all five realms.
+    /// </summary>
+    public float SpatialSpeed =>
+        MathF.Sqrt(Velocity[0] * Velocity[0] + Velocity[1] * Velocity[1] + Velocity[2] * Velocity[2]);
+
     // Drive & target frequencies
     public float[] RDrive = new float[N];
     public float[] BaseFTarget = new float[N];
     public float[] FTarget = new float[N];
 
+    /// <summary>Per-realm frequency the by-ear cue and the fine tuning rate steer toward right now: a nearby
+    /// claimable objective's note (temple key / pyramid band) when one is in range, else the realm's still
+    /// centre BaseFTarget. Computed each frame in Update; the audio thread snapshots it.</summary>
+    public readonly float[] CueTargetFreqs = new float[N];
+
     // Tuning
-    public int SelectedDim;
+    public int SelectedDim = 3;     // realm 4 — the first of the two hand-tunable higher realms
     public bool TuningMode;
+
+    // First-rest tuning nudge (in-memory, per session): teach the by-ear verb once, the first time the
+    // pilot comes to rest after flying — unless they have already tuned a higher realm themselves.
+    private bool _tuningHintGiven;
+    private bool _hasTunedHigherRealm;
+    private bool _hasFlownThisSession;
+
+    /// <summary>Sim-time of the last by-ear tuning action (realm select or Up/Down). The audio thread reads
+    /// this so the tune-by-ear cue is present while tuning and fades out shortly after — keeping the flight
+    /// soundscape calm when you are not tuning.</summary>
+    public float LastTuneTime = -999f;
+
+    /// <summary>True while the interactive tutorial is running, so retargeting the cue/tuning-rate onto
+    /// objective notes is suppressed (the tutorial's tuning steps are centre-based and would otherwise fight it).</summary>
+    public bool TutorialActive;
 
     // Proximity & resonance
     public bool NearObject;
@@ -132,7 +163,7 @@ public partial class Ship
     public CelestialBody? NearestBody;
     public float ShipHeading;
     public float Pitch;
-    public int SpeedMode = 2;
+    public int SpeedMode;  // 0 = Approach: a gentle first speed for new pilots (not persisted)
 
     // Rift charge & guidance
     public float RiftChargeTimer;
@@ -205,10 +236,10 @@ public partial class Ship
 
     // Temple keys
     public HashSet<int> TempleKeys = new();
-    private float _lastTempleCheck;
     public Temple? NearTemple;
     private bool _templeNearbyAnnounced;
     private bool _amentiSealedAnnounced;
+    private float _templeDwell;   // seconds a realm has been held on the nearby temple's note (claim dwell)
 
     // Ley lines
     public bool OnLeyLine;
@@ -222,6 +253,7 @@ public partial class Ship
     // Pyramid
     public Pyramid? NearPyramid;
     private bool _pyramidAnnounced;
+    private bool _pyramidEngagedAnnounced;   // latch for the "pyramid resonance engaged" tuning confirmation
 
     // Consciousness value
     public float ConsciousnessValue = 0.3f;
@@ -231,6 +263,12 @@ public partial class Ship
     public float DwellTimer;
     public bool InRegeneration;
     private float _lastDwellSwell;
+
+    // Throttle for the per-second diagnostic state log.
+    private float _lastDiagLog;
+
+    // Throttle for the "perfect resonance" click so near-perfect tuning can't spam it every frame.
+    private float _lastPerfectClick;
 
     // Astral projection
     public bool AstralMode;
@@ -326,13 +364,18 @@ public partial class Ship
         _openAl = openAl;
         _tolk = tolk;
 
-        // Initialize frequencies
+        // Initialize frequencies. The three spatial realms start detuned (you fly to tune them); the two
+        // higher realms start locked to their targets, so a new pilot's first encounter with by-ear tuning
+        // is gentle tending as they breathe, not a from-scratch hunt across the whole frequency band.
         for (int i = 0; i < N; i++)
         {
-            RDrive[i] = MathHelpers.RandomRange(GameConstants.FrequencyMin, GameConstants.FrequencyMax);
             BaseFTarget[i] = MathHelpers.RandomRange(GameConstants.FrequencyMin, GameConstants.FrequencyMax);
             FTarget[i] = BaseFTarget[i];
+            RDrive[i] = i >= 3
+                ? BaseFTarget[i]
+                : MathHelpers.RandomRange(GameConstants.FrequencyMin, GameConstants.FrequencyMax);
         }
+        Array.Copy(BaseFTarget, CueTargetFreqs, N);   // cue starts at each realm's centre until an objective is near
 
         // Build upgrade list
         _upgrades = new UpgradeDef[]
@@ -359,19 +402,49 @@ public partial class Ship
     /// <summary>The most recent in-game announcement, so the player can replay it (Tab key).</summary>
     private string _lastAnnouncement = "";
 
+    /// <summary>Channels of recorded messages the player can cycle and browse with the buffer keys.</summary>
+    private readonly SpeechBuffers _speechBuffers = new();
+
     /// <summary>
     /// Announces a message through the screen reader, but only if the same message hasn't been
     /// spoken within the cooldown window — this is what keeps per-frame alerts from spamming.
     /// The actual speaking is done by whoever is listening on the event bus.
     /// </summary>
-    public void Speak(string msg)
+    public void Speak(string msg) => Speak(msg, SpeechChannel.General);
+
+    /// <summary>
+    /// Announces a message on a given <see cref="SpeechChannel"/>, honoring the per-message cooldown.
+    /// The message is always recorded in its buffer for later browsing, but is only spoken aloud now if
+    /// the player's active buffer is All or matches this channel (see <see cref="SpeechBuffers"/>).
+    /// </summary>
+    public void Speak(string msg, SpeechChannel channel)
     {
         if (_lastSpoken.TryGetValue(msg, out float last) &&
             SimulationTime - last < GameConstants.SpeechCooldown)
             return;
         _lastSpoken[msg] = SimulationTime;
         _lastAnnouncement = msg;
-        GameEvents.RaiseSpeak(this, msg);
+        if (_speechBuffers.Record(channel, msg))
+            GameEvents.RaiseSpeak(this, msg);
+    }
+
+    // Channel-tagged shorthands so call sites read naturally and group their messages into buffers.
+    // (Tuning is deliberately NOT a channel — tuning feedback is essential, so it is always spoken via Speak.)
+    private void SpeakNav(string msg) => Speak(msg, SpeechChannel.Navigation);
+    private void SpeakAtlantean(string msg) => Speak(msg, SpeechChannel.Atlantean);
+    private void SpeakSystem(string msg) => Speak(msg, SpeechChannel.System);
+
+    /// <summary>
+    /// Speak an interactive-tutorial line. Non-interrupting by default, so consecutive tutorial lines queue
+    /// and play in sequence (properly spaced) instead of cutting each other off; pass interrupt:true for an
+    /// on-demand repeat (Shift+T) that should cut through other speech. Always spoken (essential) and
+    /// recorded so it can be browsed/repeated.
+    /// </summary>
+    public void SpeakTutorial(string msg, bool interrupt = false)
+    {
+        _lastAnnouncement = msg;
+        _speechBuffers.Record(SpeechChannel.System, msg);
+        GameEvents.RaiseSpeak(this, msg, interrupt);
     }
 
     /// <summary>Replays the most recent announcement, bypassing the cooldown so it always speaks.</summary>
@@ -380,6 +453,27 @@ public partial class Ship
         if (!string.IsNullOrEmpty(_lastAnnouncement))
             GameEvents.RaiseSpeak(this, _lastAnnouncement);
     }
+
+    /// <summary>
+    /// Cycles the active speech buffer ('[' and ']'). The announcement bypasses the buffer filter so the
+    /// player always hears which buffer they have moved to.
+    /// </summary>
+    public void CycleSpeechBuffer(int dir)
+        => GameEvents.RaiseSpeak(this, $"Buffer: {_speechBuffers.CycleView(dir)}.");
+
+    /// <summary>
+    /// Browses the active buffer's recorded history (',' and '.'), re-reading older or newer messages.
+    /// Speaks directly so the chosen message is heard regardless of the live filter.
+    /// </summary>
+    public void BrowseSpeechBuffer(int dir)
+    {
+        string? msg = _speechBuffers.Browse(dir);
+        GameEvents.RaiseSpeak(this, msg ?? (dir < 0 ? "Start of buffer." : "End of buffer."));
+    }
+
+    /// <summary>Reorders the buffers (Ctrl + '[' / ']'), moving the focused buffer earlier or later in the list.</summary>
+    public void MoveSpeechBuffer(int dir)
+        => GameEvents.RaiseSpeak(this, _speechBuffers.MoveActiveView(dir));
 
     #endregion
 
@@ -411,6 +505,43 @@ public partial class Ship
     {
         TuaoiMode = mode;
         _cachedTuaoiInfo = GameConstants.TuaoiModes[mode];
+    }
+
+    /// <summary>
+    /// Reset the transient flight state the interactive tutorial depends on, so it always begins from a
+    /// clean, known state regardless of any prior play session. Stale velocity, a lock, landed mode, an
+    /// astral projection, etc. would otherwise auto-complete or hard-break the early steps. Also suppresses
+    /// the first-rest tuning nudge, which the tutorial's own tuning steps make redundant.
+    /// </summary>
+    public void PrepareForTutorial()
+    {
+        Array.Clear(Velocity);
+        // Rest the three spatial realms at their still centre so the ship is provably motionless on frame 0,
+        // before any input runs (the manual-nav handler also rests them each idle frame, but this makes the
+        // clean start frame-order-independent). Use BaseFTarget — the fixed centre — not FTarget, which carries
+        // transient env-pull/breath drift. The higher realms are left for Begin() to detune for the tuning steps.
+        for (int i = 0; i < 3; i++) RDrive[i] = BaseFTarget[i];
+        LandedMode = false;
+        LandedPlanet = null;
+        LandedPlanetBody = null;
+        LockedTarget = null;
+        LockedBody = null;
+        LockedRift = null;
+        LockedIsRift = false;
+        IsOrbiting = false;
+        AstralMode = false;
+        AstralBodyPos = null;
+        IdleMode = false;
+        ActiveMenu = null;
+        TuningMode = false;
+        SelectedDim = 3;
+        RiftChargeTimer = 0f;
+        InRegeneration = false;
+        DwellTimer = 0f;
+        _hasTunedHigherRealm = true;   // the tutorial teaches tuning; don't also fire the first-rest nudge
+        _lastInputTime = SimulationTime;
+        StopLockSound();
+        SilenceAllWorldSounds();
     }
 
     /// <summary>
@@ -477,7 +608,7 @@ public partial class Ship
         GoldenHarmonyActive = true;
         MaxVelocity *= PHI;
         ResonanceWidth *= PHI;
-        Speak("Golden Harmony activated. The universe sings in perfect proportion.");
+        SpeakAtlantean("Golden Harmony activated. The universe sings in perfect proportion.");
     }
 
     #endregion
@@ -533,6 +664,8 @@ public partial class Ship
         /// <summary>True for the synthetic "Unlock target" row that clears the current lock.</summary>
         public bool IsUnlockAction;
         public Rift? ItemRift;
+        /// <summary>The live body behind this row (star/planet/nebula), so a lock can track it as it moves.</summary>
+        public CelestialBody? ItemBody;
     }
 
     /// <summary>One row in the rift-selection menu: a label, the rift's position, and the rift itself.</summary>

@@ -12,7 +12,7 @@ public sealed class MainMenuScreen : MenuScreen
 {
     #region Items
 
-    private static readonly string[] _items = { "Start Sim", "Learn Sounds", "Help", "Quit Sim" };
+    private static readonly string[] _items = { "Start Sim", "Begin Tutorial", "Learn Sounds", "Help", "Quit Sim" };
 
     // When true, the next Escape confirms quitting and any other key cancels — guards against an
     // accidental exit from a stray Escape.
@@ -52,9 +52,10 @@ public sealed class MainMenuScreen : MenuScreen
             return SelectedIndex switch
             {
                 0 => ScreenTransition.StartSim,
-                1 => ScreenTransition.OpenLearnSounds,
-                2 => ScreenTransition.OpenHelp,
-                3 => ScreenTransition.Quit,
+                1 => ScreenTransition.StartTutorial,
+                2 => ScreenTransition.OpenLearnSounds,
+                3 => ScreenTransition.OpenHelp,
+                4 => ScreenTransition.Quit,
                 _ => ScreenTransition.None,
             };
         }

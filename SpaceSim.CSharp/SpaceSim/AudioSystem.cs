@@ -27,6 +27,16 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     // --- NAudio plumbing ---
     private WaveOutEvent? _waveOut;
 
+    /// <summary>Chosen output device (NAudio MME device number; -1 = system default).</summary>
+    private int _deviceNumber = -1;
+
+    /// <summary>True while the output device is being swapped; Read() emits silence so a late/early callback
+    /// can't glitch on half-torn-down state. Volatile: set by the game thread, read by the audio thread.</summary>
+    private volatile bool _deviceSwitching;
+
+    /// <summary>The currently selected output device number (-1 = system default).</summary>
+    public int CurrentDeviceNumber => _deviceNumber;
+
     /// <summary>The interleaved 32-bit-float stereo format this provider emits (set in the constructor).</summary>
     public WaveFormat WaveFormat { get; }
 
@@ -58,12 +68,77 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     // --- Pre-allocated buffers for Read() to avoid per-callback GC pressure ---
     private readonly float[] _snapRDrive = new float[NDimensions];
     private readonly float[] _snapFTarget = new float[NDimensions];
+    private readonly float[] _snapCueTarget = new float[NDimensions]; // the realm's cue target (objective note or centre)
     private readonly List<(int DimA, int DimB, HarmonicType HType)> _harmonicPairsBuffer = new();
 
     // --- Continuous phases for the tuning-by-ear beat cue (audio thread only) ---
     // Accumulated per sample so the carrier and tremolo stay click-free even as the player tunes.
     private double _beatCarrierPhase;
     private double _beatAmPhase;
+
+    #region Phase accumulators & gain smoothing (audio-thread-only, click-free synthesis)
+
+    // Every continuous drive voice is advanced by a per-sample PHASE ACCUMULATOR instead of being
+    // evaluated as sin(2*PI*f*t) against absolute time. With an accumulator a frequency change only
+    // alters the per-sample increment (the phase ramp's slope), never the phase value — so tuning,
+    // breathing, and resonance changes can no longer step the waveform and click. Double precision
+    // keeps the phase from drifting over long sessions. ALL of this state is touched ONLY on the audio
+    // thread; the game thread communicates only through the volatile target fields (DriveVolume, etc.).
+
+    private const double TwoPiD = Math.PI * 2.0;
+    private static readonly float[] PhiPow = { PHI, PHI * PHI, PHI * PHI * PHI };
+    private static readonly double SchumannInc = TwoPiD * GameConstants.SchumannFreq / SampleRate;
+    private static readonly double[] ModInc = { TwoPiD * 2.0 / SampleRate, TwoPiD * 3.0 / SampleRate }; // dim 3, dim 4 tremolo
+
+    // Per-dimension carrier/vibrato phase accumulators.
+    private readonly double[] _fundPhase = new double[NDimensions];
+    private readonly double[,] _overtonePhase = new double[NDimensions, 3];
+    private readonly double[] _subPhase = new double[NDimensions];
+    private readonly double[] _vibPhase1 = new double[NDimensions];
+    private readonly double[] _vibPhase2 = new double[NDimensions];
+    private readonly double[] _modPhase = new double[2];
+    private double _schumannPhase;
+    private double _chargePhase;
+
+    // Per-buffer increments / shaping (constant within a buffer; recomputed each Read).
+    private readonly double[] _fundInc = new double[NDimensions];
+    private readonly double[,] _overtoneInc = new double[NDimensions, 3];
+    private readonly double[] _subInc = new double[NDimensions];
+    private readonly double[] _vibInc1 = new double[NDimensions];
+    private readonly double[] _vibInc2 = new double[NDimensions];
+    private readonly float[] _vibDepth = new float[NDimensions];
+    private readonly float[] _resSmoothed = new float[NDimensions];
+
+    // Intermodulation: one stable slot per dimension pair (C(5,2)=10), keyed by PairIndex so a
+    // persisting pair keeps its phase across buffers; gain ramps in/out so detect/lose never pops.
+    private const int PairCount = 10;
+    private static readonly int[] PairA = { 0, 0, 0, 0, 1, 1, 1, 2, 2, 3 };
+    private static readonly int[] PairB = { 1, 2, 3, 4, 2, 3, 4, 3, 4, 4 };
+    private readonly double[] _intermodSumPhase = new double[PairCount];
+    private readonly double[] _intermodDiffPhase = new double[PairCount];
+    private readonly double[] _intermodSumInc = new double[PairCount];
+    private readonly double[] _intermodDiffInc = new double[PairCount];
+    private readonly bool[] _intermodDiffActive = new bool[PairCount];
+    private readonly bool[] _intermodDetected = new bool[PairCount];
+    private readonly float[] _intermodGain = new float[PairCount];
+
+    /// <summary>Stable slot index (0..9) for the unordered dimension pair (a,b), a&lt;b — independent of detection order.</summary>
+    private static int PairIndex(int a, int b) => a * (9 - a) / 2 + (b - a - 1);
+
+    // Smoothed output gains: a stepped gain multiplying a continuous tone clicks too, so glide them.
+    private float _driveGain;
+    private float _masterGain;
+
+    // Smoothed tune-by-ear cue amplitude/pan, plus its current increments. The increments persist across
+    // the fade-out so the cue's carrier keeps oscillating as it fades (rather than freezing into a click).
+    private float _cueAmpSmoothed;
+    private float _cuePanLSmoothed = 1f;
+    private float _cuePanRSmoothed = 1f;
+    private double _cueCarrierInc;
+    private double _cueAmInc;
+    private float _cueLockBlend;
+
+    #endregion
 
     // --- Logging stats (throttled to once per second) ---
     private double _lastLogTimeSec;
@@ -75,8 +150,9 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     #region Volume settings
 
     // --- Volume settings ---
-    /// <summary>Final output gain applied to the whole mix just before clipping.</summary>
-    public float MasterVolume = 0.2f;
+    /// <summary>Final output gain applied to the whole mix just before clipping. Volatile: the game thread
+    /// writes it (volume keys); the audio thread reads it once per buffer into a smoothed gain.</summary>
+    public volatile float MasterVolume = 0.2f;
 
     /// <summary>Level for short UI beeps.</summary>
     public float BeepVolume = 0.3f;
@@ -84,8 +160,9 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// <summary>Level for one-shot sound effects (chimes, whooshes, ambient loops).</summary>
     public float EffectVolume = 0.2f;
 
-    /// <summary>Level for the continuously synthesised resonance-drive tone.</summary>
-    public float DriveVolume = 0.05f;
+    /// <summary>Level for the continuously synthesised resonance-drive tone. Volatile: written by the game
+    /// thread, read once per buffer by the audio thread into a smoothed gain.</summary>
+    public volatile float DriveVolume = 0.05f;
 
     #endregion
 
@@ -99,6 +176,12 @@ public partial class AudioSystem : ISampleProvider, IDisposable
 
     /// <summary>Higher 880 Hz beep used for rift-related cues.</summary>
     public float[] RiftBeepWaveform = Array.Empty<float>();
+
+    /// <summary>440 Hz ping followed by silence; looped as a periodic homing beacon when locked on a target.</summary>
+    public float[] HomingBeacon = Array.Empty<float>();
+
+    /// <summary>880 Hz ping followed by silence; the rift-flavoured homing beacon.</summary>
+    public float[] RiftHomingBeacon = Array.Empty<float>();
 
     /// <summary>Brief click for menu navigation.</summary>
     public float[] ClickWaveform = Array.Empty<float>();
@@ -282,6 +365,7 @@ public partial class AudioSystem : ISampleProvider, IDisposable
                 // 60ms is a good balance for WaveOut; raise it again if any system crackles/underruns.
                 DesiredLatency = 60,
                 NumberOfBuffers = 3,
+                DeviceNumber = _deviceNumber,   // -1 = system default; F3 lets the player pick another
             };
             _waveOut.Init(this);
             _waveOut.Play();
@@ -306,6 +390,56 @@ public partial class AudioSystem : ISampleProvider, IDisposable
         _waveOut.Dispose();
         _waveOut = null;
         DebugLogger.Log("Audio", "Audio output stopped");
+    }
+
+    /// <summary>
+    /// Switch the output to a different sound device (NAudio MME device number; -1 = system default) by
+    /// stopping and recreating the WaveOut on that device. Safe to call while playing — a brief gap is
+    /// expected as the device reopens. No-op if it is already the active device.
+    /// </summary>
+    public void SetOutputDevice(int deviceNumber)
+    {
+        if (_waveOut != null && deviceNumber == _deviceNumber) return;
+        _deviceNumber = deviceNumber;
+        bool wasRunning = _waveOut != null;
+        _deviceSwitching = true;   // Read() returns silence during the swap so a late callback can't glitch
+        try
+        {
+            Stop();
+            if (wasRunning) Start();
+        }
+        finally
+        {
+            _deviceSwitching = false;
+        }
+        DebugLogger.Log("Audio", $"Output device set to {deviceNumber}.");
+    }
+
+    /// <summary>Enumerate the available output devices: system default first, then each NAudio device.</summary>
+    public static List<(int Number, string Name)> GetOutputDevices()
+    {
+        var list = new List<(int, string)> { (-1, "System default") };
+        try
+        {
+            for (int n = 0; n < WaveOut.DeviceCount; n++)
+                list.Add((n, WaveOut.GetCapabilities(n).ProductName));
+        }
+        catch (Exception ex) { DebugLogger.LogError("Audio", "Enumerating output devices failed", ex); }
+        return list;
+    }
+
+    /// <summary>Find the device number whose product name matches <paramref name="name"/> (-1 if none / default).</summary>
+    public static int FindDeviceByName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return -1;
+        try
+        {
+            for (int n = 0; n < WaveOut.DeviceCount; n++)
+                if (string.Equals(WaveOut.GetCapabilities(n).ProductName, name, StringComparison.OrdinalIgnoreCase))
+                    return n;
+        }
+        catch (Exception ex) { DebugLogger.LogError("Audio", "Matching output device by name failed", ex); }
+        return -1;
     }
 
     /// <summary>

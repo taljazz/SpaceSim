@@ -52,7 +52,7 @@ public partial class Ship
         string patternMsg = "";
         if (CurrentPattern != null)
             patternMsg = $" Sacred {GameUtils.SpacePascalCase(CurrentPattern.Value.ToString())} pattern detected!";
-        Speak($"Anchored on {Biome} biome planet. {Capitalize(exoDesc)}. {CrystalCount} Atlantean crystals detected.{patternMsg}");
+        SpeakAtlantean($"Anchored on {Biome} biome planet. {Capitalize(exoDesc)}. {CrystalCount} Atlantean crystals detected.{patternMsg}");
         DebugLogger.Log("Ship", $"GenerateCrystals: {CrystalCount} crystals, biome={Biome}, pattern={CurrentPattern?.ToString() ?? "none"}, mult={crystalMult:F1}");
 
         float scaleFactor = GameConstants.ScaleFactor;
@@ -89,7 +89,7 @@ public partial class Ship
         }
 
         string freqStr = string.Join(", ", CrystalFreqs.Select(f => $"{f.Freqs[0]:F2}"));
-        Speak(ByEarMode
+        SpeakAtlantean(ByEarMode
             ? "Crystals sing in the primary realm. Tune by ear to find their notes."
             : $"Crystals sing at: {freqStr}, in the primary realm.");
         _approachingLockAnnounced = false;
@@ -136,7 +136,7 @@ public partial class Ship
         int nearest = MathHelpers.ArgMin(dists);
         if (dists[nearest] >= float.MaxValue)
         {
-            Speak("No more crystals to scan on this planet.");
+            SpeakAtlantean("No more crystals to scan on this planet.");
             return;
         }
 
@@ -170,9 +170,12 @@ public partial class Ship
         string specialMsg = "";
         if (crystal.Special && crystal.AtlanteanType != null)
             specialMsg = $" Rare {FormatName(crystal.AtlanteanType)} crystal!";
-        Speak(ByEarMode
-            ? $"Nearest crystal {dists[nearest]:F1} units {dir}. Tune realm {SelectedDim + 1} by ear to match it.{specialMsg}"
-            : $"Nearest crystal {dists[nearest]:F1} units {dir}. Its note in realm {SelectedDim + 1}: {freq:F2}.{specialMsg}");
+        // Lead with the tally so the player always knows how many crystals this planet holds and how many remain.
+        int remainingCrystals = CrystalCount - LockedCrystals.Count;
+        string countMsg = $"{remainingCrystals} of {CrystalCount} crystals remain on this planet. ";
+        SpeakAtlantean(ByEarMode
+            ? $"{countMsg}Nearest crystal {dists[nearest]:F1} units {dir}. Tune realm {SelectedDim + 1} by ear to match it.{specialMsg}"
+            : $"{countMsg}Nearest crystal {dists[nearest]:F1} units {dir}. Its note in realm {SelectedDim + 1}: {freq:F2}.{specialMsg}");
 
         float angle = MathF.Atan2(dy, dx);
         float pan = MathF.Cos(angle);
@@ -189,7 +192,7 @@ public partial class Ship
     {
         if (CrystalPositions.Count == 0)
         {
-            Speak("No crystals on this planet.");
+            SpeakAtlantean("No crystals on this planet.");
             return;
         }
 
@@ -200,7 +203,7 @@ public partial class Ship
         int nearest = MathHelpers.ArgMin(dists);
         if (dists[nearest] > 1f || dists[nearest] >= float.MaxValue)
         {
-            Speak("No collectable crystal nearby.");
+            SpeakAtlantean("No collectable crystal nearby.");
             return;
         }
 
@@ -271,7 +274,7 @@ public partial class Ship
                 }
             }
 
-            Speak(msg);
+            SpeakAtlantean(msg);
 
             if (CrystalsCollected >= GameConstants.AscensionCrystalThreshold)
                 Ascend();
@@ -279,7 +282,7 @@ public partial class Ship
         }
         else
         {
-            Speak("Resonance too low to collect. Tune to crystal frequencies.");
+            SpeakAtlantean("Resonance too low to collect. Tune to crystal frequencies.");
         }
     }
 

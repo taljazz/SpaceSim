@@ -1,11 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <RollForward>Major</RollForward>
     <PublishReadyToRun>false</PublishReadyToRun>
     <TieredCompilation>false</TieredCompilation>
     <Nullable>enable</Nullable>
+    <!-- Hybrid MonoGame + WinForms app: DPI awareness lives in app.manifest for the game window (correct
+         here), so silence the WinForms-only analyzer that wants it moved to the ApplicationHighDpiMode property. -->
+    <NoWarn>WFO0003</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>

@@ -31,9 +31,16 @@ public partial class Ship
         if (IsInMenuMode) return;
 
         // Atlantean structure proximity
-        if (temples != null && temples.Count > 0) CheckTempleProximity(temples);
+        if (temples != null && temples.Count > 0) CheckTempleProximity(temples, dt);
         if (leyLines != null && leyLines.Count > 0) CheckLeyLineProximity(leyLines);
         if (pyramids != null && pyramids.Count > 0) CheckPyramidProximity(pyramids);
+
+        // Steer the by-ear cue and the fine tuning rate onto the nearest claimable objective's note (a temple
+        // key, or a pyramid's resonance band centre) so "tune until the beat steadies" lands the player on it;
+        // when nothing is in range each realm falls back to its own still centre.
+        float objectiveNote = CurrentObjectiveNote();
+        for (int i = 0; i < N; i++)
+            CueTargetFreqs[i] = float.IsNaN(objectiveNote) ? BaseFTarget[i] : objectiveNote;
 
         // Idle mode
         if (SimulationTime - _lastInputTime > GameConstants.IdleTimeThreshold && !IdleMode)
@@ -103,14 +110,32 @@ public partial class Ship
             }
         }
         // Final target = the dimension's base target plus everything pulling on it, clamped to the legal band.
+        // The two higher realms also breathe — their targets wander gently so tuning them by ear is a living
+        // thing to tend (BreathScale decides how strongly, given speed and whether you are resting).
+        float breathScale = BreathScale();
         for (int i = 0; i < N; i++)
         {
-            FTarget[i] = BaseFTarget[i] + _envInfluence[i];
+            // Cap each realm's environmental pull so being near bodies nudges the target gently rather
+            // than slamming it across the band — keeps resonance, the Merkaba, and dwelling holdable.
+            float pull = MathF.Min(_envInfluence[i], GameConstants.EnvInfluenceMax);
+            float breath = 0f;
+            if (i >= 3 && breathScale > 0f)
+            {
+                float period = i == 3 ? GameConstants.BreathPeriodRealm4 : GameConstants.BreathPeriodRealm5;
+                breath = GameConstants.BreathAmplitude * breathScale * MathF.Sin(MathF.Tau * SimulationTime / period);
+            }
+            FTarget[i] = BaseFTarget[i] + pull + breath;
             FTarget[i] = Math.Clamp(FTarget[i], GameConstants.FrequencyMin, GameConstants.FrequencyMax);
         }
 
-        // Autopilot to locked target
-        if (LockedTarget != null)
+        // A locked moving body (planets and stars drift along their orbits) — keep the lock on its live
+        // position so the autopilot actually reaches it and any orbit stays centred, instead of chasing
+        // a stale snapshot of where it was at lock time.
+        if (LockedBody != null && LockedTarget != null)
+            Array.Copy(LockedBody.Position, LockedTarget, N);
+
+        // Autopilot to locked target (suspended while orbiting — UpdateOrbit owns the ship then)
+        if (LockedTarget != null && !IsOrbiting)
         {
             Vec5.SubtractInto(LockedTarget, Position, _dirVecBuffer);
             float norm = Vec5.Norm(_dirVecBuffer);
@@ -123,15 +148,29 @@ public partial class Ship
                 Array.Clear(Velocity);
                 if (LockedIsRift && !_approachedRiftAnnounced)
                 {
-                    Speak("Approached Harmonic Chamber. Ready for entry.");
+                    DebugLogger.Log("Autopilot", $"Approached chamber at dist {norm:F2}");
+                    SpeakNav("Approached Harmonic Chamber. Ready for entry.");
                     _approachedRiftAnnounced = true;
                 }
                 else if (!LockedIsRift)
                 {
-                    LockedTarget = null;
-                    LockedIsRift = false;
-                    StopLockSound();
-                    Speak("Target reached.");
+                    DebugLogger.Log("Autopilot", $"Target reached at dist {norm:F2}");
+                    if (LockedBody != null)
+                    {
+                        // A moving body would drift out from under us if we just stopped — settle into an
+                        // orbit so we stay with it (and can then tune up and anchor). Press O to break free.
+                        EnterOrbit();
+                        SpeakNav("Arrived. Entering orbit; press O to break free.");
+                    }
+                    else
+                    {
+                        LockedTarget = null;
+                        LockedIsRift = false;
+                        StopLockSound();
+                        // Temples and pyramids have no body to orbit; on arrival tell the player the one step
+                        // left — tune a realm onto this place's note (the proximity scan then names it).
+                        SpeakNav("Arrived. Tune a higher realm here, letting the beat steady, to attune to this place.");
+                    }
                 }
             }
             else
@@ -144,7 +183,11 @@ public partial class Ship
                     // drive frequency) that produces it — this is the inverse of the resonance->velocity rule.
                     float dirI = _dirVecBuffer[i];
                     float desiredVelI = (dirI / norm) * MaxVelocity * slowdownFactor;
-                    float targetRes = MathF.Abs(desiredVelI) > 0.01f ? MathF.Min(0.999f, MathF.Abs(desiredVelI) / MaxVelocity) : 0;
+                    // Cap the aimed-for resonance well below perfect so the drive sits at a decisive,
+                    // clearly-signed frequency offset. At ~0.999 the offset is so tiny it jitters in sign
+                    // (the ship stalls instead of heading to far targets) and hovers on the perfect-click
+                    // threshold (a sound flood). 0.9 still gives ~90% of top speed, but steady and quiet.
+                    float targetRes = MathF.Abs(desiredVelI) > 0.01f ? MathF.Min(0.9f, MathF.Abs(desiredVelI) / MaxVelocity) : 0;
                     float targetDrive = ResonancePhysics.DriveForTargetResonance(
                         FTarget[i], targetRes, ResonanceWidth, MathF.Sign(desiredVelI));
 
@@ -168,7 +211,7 @@ public partial class Ship
         // when a lock starts and restarts it after a clear-all (e.g. returning from the menu).
         if (LockedTarget != null)
         {
-            float[] lockWave = LockedIsRift ? _audio.RiftBeepWaveform : _audio.BeepWaveform;
+            float[] lockWave = LockedIsRift ? _audio.RiftHomingBeacon : _audio.HomingBeacon;
             UpdateWorldLoop(ref LockSound, lockWave, LockedTarget, _audio.BeepVolume);
         }
         else
@@ -219,8 +262,12 @@ public partial class Ship
 
             // Play a satisfying click the instant a dimension crosses into "perfect" resonance.
             if (ResonanceLevels[i] > GameConstants.PerfectResonanceThreshold &&
-                _prevResonanceLevels[i] <= GameConstants.PerfectResonanceThreshold)
+                _prevResonanceLevels[i] <= GameConstants.PerfectResonanceThreshold &&
+                SimulationTime - _lastPerfectClick > 0.3f)
+            {
                 GameEvents.RaisePlaySound(this, _audio.ClickWaveform, volume: _audio.EffectVolume);
+                _lastPerfectClick = SimulationTime;
+            }
 
             // Hold a dimension in tune and "power" builds over time; lose tune and it resets.
             if (ResonanceLevels[i] > GameConstants.PowerBuildThreshold)
@@ -231,6 +278,18 @@ public partial class Ship
             // Sustained power adds a golden-ratio boost on top of the base resonance-driven speed.
             float boost = 1f + (ResonancePower[i] / GameConstants.PowerBuildTime) * PHI;
             Velocity[i] = MaxVelocity * ResonanceLevels[i] * MathF.Sign(df) * boost;
+
+            // Higher realms held near their still centre must NOT drift the ship. Their target breathes, so
+            // resonance (and thus velocity) is never exactly zero even when the player has locked a realm —
+            // which otherwise keeps the ship "moving" forever and makes the dwelling/regeneration bath
+            // unreachable. Gate dims 4 & 5 to zero within the still band (ramping in beyond it), but only in
+            // free flight: under an autopilot lock the navigator legitimately steers through these dims.
+            if (i >= 3 && LockedTarget == null)
+            {
+                float fromCentre = MathF.Abs(RDrive[i] - BaseFTarget[i]);
+                float gate = Math.Clamp((fromCentre - GameConstants.HigherRealmStillBand) / GameConstants.HigherRealmStillBand, 0f, 1f);
+                Velocity[i] *= gate;
+            }
         }
 
         // Ley line speed boost
@@ -262,8 +321,20 @@ public partial class Ship
                 if (RDrive[i] >= GameConstants.PyramidResonanceRange.Min && RDrive[i] <= GameConstants.PyramidResonanceRange.Max)
                 { freqMatch = true; break; }
             if (freqMatch)
+            {
                 ResonanceIntegrity = MathF.Min(1f, ResonanceIntegrity + GameConstants.PyramidHealingMult * 0.01f * dt);
+                // A pyramid has no key, so without this a by-ear pilot can't tell engagement from failure.
+                // Speak + click once when a realm first enters the band; re-arm when it leaves.
+                if (!_pyramidEngagedAnnounced)
+                {
+                    SpeakAtlantean("Pyramid resonance engaged. The healing chamber awakens and quickens you.");
+                    GameEvents.RaisePlaySound(this, _audio.ClickWaveform, volume: _audio.EffectVolume);
+                    _pyramidEngagedAnnounced = true;
+                }
+            }
+            else _pyramidEngagedAnnounced = false;
         }
+        else _pyramidEngagedAnnounced = false;
 
         // Harmonic detection
         if (SimulationTime - _lastHarmonicCheck > GameConstants.HarmonicDetectionInterval)
@@ -283,7 +354,7 @@ public partial class Ship
                     if (MathF.Abs(RDrive[i] - freq) < GameConstants.SolfeggioTolerance)
                     {
                         if (!ActiveSolfeggio.ContainsKey(freq))
-                            Speak($"The {info.Name} tone awakens. {Capitalize(info.Desc)}.");
+                            SpeakAtlantean($"The {info.Name} tone awakens. {Capitalize(info.Desc)}.");
                         ActiveSolfeggio[freq] = (info.Effect, SimulationTime + 2f);
                     }
                 }
@@ -314,38 +385,49 @@ public partial class Ship
         // Merkaba activation
         // When every single dimension is above the threshold at once, the light-vehicle field
         // engages (and collapses again the moment any dimension drops out).
-        bool allAbove = Vec5.All(ResonanceLevels, r => r > GameConstants.MerkabaActivationThreshold);
-        if (allAbove && !MerkabaActive)
+        // Activate only when every realm is above the high threshold; once active, hold the field until a
+        // realm drops below the lower collapse threshold (hysteresis), so it doesn't flicker off the
+        // moment a tuning wavers or a body nudges your targets.
+        bool allActivate = Vec5.All(ResonanceLevels, r => r > GameConstants.MerkabaActivationThreshold);
+        bool allSustain = Vec5.All(ResonanceLevels, r => r > GameConstants.MerkabaCollapseThreshold);
+        if (allActivate && !MerkabaActive)
         {
             MerkabaActive = true;
-            DebugLogger.Log("Ship", "Merkaba ACTIVATED - all dimensions > 0.9");
+            DebugLogger.Log("Ship", "Merkaba ACTIVATED - all realms above activation threshold");
             GameEvents.RaiseMerkabaActivated(this);
             if (!_merkabaAnnounced)
             {
-                Speak("Merkaba activated. Light vehicle field engaged. All realms in harmonic alignment.");
+                SpeakAtlantean("Merkaba activated. Light vehicle field engaged. All realms in harmonic alignment.");
                 _merkabaAnnounced = true;
             }
         }
-        else if (!allAbove && MerkabaActive)
+        else if (!allSustain && MerkabaActive)
         {
             MerkabaActive = false;
             DebugLogger.Log("Ship", "Merkaba DEACTIVATED");
             GameEvents.RaiseMerkabaDeactivated(this);
             _merkabaAnnounced = false;
-            Speak("Merkaba field collapsed. Realign frequencies.");
+            SpeakAtlantean("Merkaba field collapsed. Realign frequencies.");
         }
 
-        // Temple resonance (110 Hz)
+        // Temple resonance (110 Hz). The pyramid band (117-121) overlaps this band, so when a realm is engaging
+        // a nearby pyramid it's announced as a pyramid (above) — don't also fire the generic temple-resonance
+        // line for the same realm.
         bool templeResActive = false;
         for (int i = 0; i < N; i++)
-            if (RDrive[i] >= GameConstants.TempleResonanceRange.Min && RDrive[i] <= GameConstants.TempleResonanceRange.Max)
-            { templeResActive = true; break; }
+        {
+            if (RDrive[i] < GameConstants.TempleResonanceRange.Min || RDrive[i] > GameConstants.TempleResonanceRange.Max)
+                continue;
+            bool isPyramidEngagement = NearPyramid != null &&
+                RDrive[i] >= GameConstants.PyramidResonanceRange.Min && RDrive[i] <= GameConstants.PyramidResonanceRange.Max;
+            if (!isPyramidEngagement) { templeResActive = true; break; }
+        }
         if (templeResActive && !InTempleResonance)
         {
             InTempleResonance = true;
             if (!_templeAnnounced)
             {
-                Speak("Temple resonance. The ancient healing tone fills your light vehicle.");
+                SpeakAtlantean("Temple resonance. The ancient healing tone fills your light vehicle.");
                 _templeAnnounced = true;
             }
         }
@@ -367,6 +449,7 @@ public partial class Ship
         UpdateAstralMode(dt);
         UpdateIntentionNavigation(dt);
         UpdateDwelling(dt);
+        MaybeGiveTuningNudge();
 
         if (PatternBonusTimer > 0) PatternBonusTimer -= dt;
 
@@ -410,6 +493,21 @@ public partial class Ship
         }
         Array.Copy(ResonanceLevels, _prevResonanceLevels, N);
 
+        // Throttled diagnostic snapshot (~1/sec): resonance, drives, targets, Merkaba, lock, position —
+        // so the debug log shows what the sim is actually doing for issues like drift or autopilot stalls.
+        if (SimulationTime - _lastDiagLog > 1f)
+        {
+            _lastDiagLog = SimulationTime;
+            string lockInfo = LockedTarget != null
+                ? $"{Vec5.Distance(Position, LockedTarget):F1}{(LockedIsRift ? " rift" : " obj")}"
+                : "none";
+            DebugLogger.Log("State",
+                $"avgRes={Vec5.Mean(ResonanceLevels):F2} res={Vec5.Format(ResonanceLevels)} " +
+                $"rdrive={Vec5.Format(RDrive)} ftarget={Vec5.Format(FTarget)} merkaba={MerkabaActive} " +
+                $"consc={ConsciousnessValue:F2}/{ConsciousnessStage} dwell={InRegeneration} speed={Vec5.Norm(Velocity):F1} " +
+                $"lock={lockInfo} pos={Vec5.Format(Position)}");
+        }
+
         // Easter egg
         bool allEasterEgg = true;
         for (int i = 0; i < N; i++)
@@ -440,7 +538,7 @@ public partial class Ship
             var proj = ProjectRelative(riftPos);
             float angle = MathF.Atan2(proj.Y, proj.X) * 180f / MathF.PI;
             string dirStr = angle < 0 ? "left" : "right";
-            Speak($"{riftType} Harmonic Chamber detected at {MathF.Abs(angle):F1} degrees {dirStr}.");
+            SpeakNav($"{riftType} Harmonic Chamber detected at {MathF.Abs(angle):F1} degrees {dirStr}.");
         }
 
         // Perfect fifth rift
@@ -529,10 +627,12 @@ public partial class Ship
         // Each axis wraps into [-100, 100] so the universe is a seamless torus (fly off one edge and
         // reappear on the opposite side). The double-modulo keeps it correct for negative coordinates too.
         for (int i = 0; i < N; i++)
-        {
             Position[i] += Velocity[i] * dt;
-            Position[i] = ((Position[i] + 100f) % 200f + 200f) % 200f - 100f;
-        }
+        // Wrap into the torus — the same fold applied to placed objects via Vec5.WrapInto.
+        Vec5.WrapInto(Position, GameConstants.UniverseHalfExtent);
+
+        // Orbit overrides the integrated position to hold the ship on its circle around the locked target.
+        UpdateOrbit(dt);
 
         // Rift charge sequence
         if (RiftChargeTimer > 0)
@@ -625,12 +725,12 @@ public partial class Ship
         if (nearAny && !NearObject)
         {
             NearObject = true;
-            Speak("Approaching celestial object. Resonance influenced.");
+            SpeakNav("Approaching celestial object. Resonance influenced.");
         }
         else if (!nearAny && NearObject)
         {
             NearObject = false;
-            Speak("Leaving object vicinity. Base targets restored.");
+            SpeakNav("Leaving object vicinity. Base targets restored.");
         }
 
         // Proximity beep toward the single nearest object (directional cue).
@@ -753,6 +853,39 @@ public partial class Ship
         {
             SaveGame();
             _lastAutosaveTime = SimulationTime;
+        }
+    }
+
+    #endregion
+
+    #region Breathing & tuning nudge
+
+    /// <summary>
+    /// How strongly the two higher realms breathe this frame, 0..1 (Model B). Breathing is full when you
+    /// are still and free to fly, fades as you speed up and as you sink into the regeneration bath, and is
+    /// silenced while the ship flies itself (locked / orbiting), while landed, while projecting astrally, or
+    /// while idle — so tending lives only in your own free, attentive flight.
+    /// </summary>
+    private float BreathScale()
+    {
+        bool suppressed = LandedMode || LockedTarget != null || AstralMode || IdleMode;
+        return TuningDynamics.BreathScale(suppressed, Vec5.Norm(Velocity), MaxVelocity, InRegeneration, DwellTimer);
+    }
+
+    /// <summary>
+    /// Teaches the by-ear tuning verb once per session: the first time the pilot comes to rest after having
+    /// flown, unless they have already discovered higher-realm tuning on their own. A gentle, single hint.
+    /// </summary>
+    private void MaybeGiveTuningNudge()
+    {
+        if (_tuningHintGiven || _hasTunedHigherRealm || !_hasFlownThisSession
+            || LandedMode || LockedTarget != null || IdleMode || AstralMode) return;
+
+        // Fire once the pilot — having flown — next comes nearly to rest, the natural moment to learn tuning.
+        if (Vec5.Norm(Velocity) < MaxVelocity * GameConstants.DwellStillFactor)
+        {
+            Speak("Two higher realms are yours to tune. Press 4, then Up and Down, and listen for the beat to steady into one clear tone.");
+            _tuningHintGiven = true;
         }
     }
 

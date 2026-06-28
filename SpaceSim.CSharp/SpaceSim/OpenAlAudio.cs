@@ -63,15 +63,18 @@ public sealed class OpenAlAudio : IDisposable
 
     #region Initialization
 
+    /// <summary>Open the system-default OpenAL device with HRTF (see <see cref="Initialize"/>).</summary>
+    public OpenAlAudio() => Initialize(null);
+
     /// <summary>
-    /// Open the default OpenAL device, create an HRTF-enabled context, and make it current. Any
-    /// failure leaves <see cref="IsAvailable"/> false (and is logged) rather than throwing.
+    /// Open an OpenAL device (null = system default), create an HRTF-enabled context, and make it current.
+    /// Any failure leaves <see cref="IsAvailable"/> false (and is logged) rather than throwing.
     /// </summary>
-    public OpenAlAudio()
+    private void Initialize(string? deviceName)
     {
         try
         {
-            _device = ALC.OpenDevice(null);
+            _device = ALC.OpenDevice(deviceName);
             if (_device == ALDevice.Null)
             {
                 DebugLogger.Log("Audio", "OpenAL: no audio device available — spatial audio disabled (NAudio fallback).");
@@ -99,7 +102,7 @@ public sealed class OpenAlAudio : IDisposable
 
             HrtfEnabled = QueryHrtfEnabled(hrtfSupported);
             IsAvailable = true;
-            DebugLogger.Log("Audio", $"OpenAL initialized. HRTF supported={hrtfSupported}, enabled={HrtfEnabled}.");
+            DebugLogger.Log("Audio", $"OpenAL initialized on '{deviceName ?? "default"}'. HRTF supported={hrtfSupported}, enabled={HrtfEnabled}.");
         }
         catch (Exception ex)
         {
@@ -107,6 +110,62 @@ public sealed class OpenAlAudio : IDisposable
             IsAvailable = false;
             Cleanup();
         }
+    }
+
+    /// <summary>
+    /// Re-open the spatial engine on the device whose name best matches <paramref name="matchName"/> (the
+    /// NAudio device chosen with F3), falling back to the system default if there's no match. Best-effort:
+    /// OpenAL and NAudio name devices differently, so a clean match isn't guaranteed — if it fails, spatial
+    /// audio simply stays on the default. The caller must silence live world sounds first (their old OpenAL
+    /// sources die with the context; the ship recreates them next frame).
+    /// </summary>
+    public void TryReopen(string? matchName)
+    {
+        if (_disposed) return;
+        try
+        {
+            Cleanup();
+            IsAvailable = false;
+            HrtfEnabled = false;
+
+            string? chosen = null;
+            if (!string.IsNullOrEmpty(matchName))
+            {
+                foreach (string dev in EnumerateDevices())
+                {
+                    if (dev.IndexOf(matchName, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        matchName.IndexOf(dev, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        chosen = dev;
+                        break;
+                    }
+                }
+            }
+
+            Initialize(chosen);
+            DebugLogger.Log("Audio", $"OpenAL reopen (match '{matchName}' -> '{chosen ?? "default"}'). Available={IsAvailable}.");
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.LogError("Audio", "OpenAL reopen failed — spatial audio off.", ex);
+            IsAvailable = false;
+        }
+    }
+
+    /// <summary>List the OpenAL output device names, or an empty list if enumeration is unsupported.</summary>
+    private static List<string> EnumerateDevices()
+    {
+        var result = new List<string>();
+        try
+        {
+            foreach (string name in ALC.GetStringList(GetEnumerationStringList.DeviceSpecifier))
+                result.Add(name);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.LogError("Audio", "OpenAL device enumeration unavailable.", ex);
+        }
+        return result;
     }
 
     /// <summary>Ask OpenAL Soft whether HRTF actually engaged (the request can be silently denied).</summary>

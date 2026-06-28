@@ -110,7 +110,11 @@ public partial class Ship
         if (LockedTarget != null && !LockedIsRift)
             StarmapItems.Add(new StarmapItem { Label = "Unlock target", IsUnlockAction = true });
 
+        // Stars, planets, nebulae, and rifts are listed nearest-first; the Atlantean objectives (temples
+        // and pyramids) go in their own list so they always sit at the TOP, not buried under hundreds of
+        // closer stars — they are the points of the game and must be easy to find and lock onto.
         var items = new List<(float Dist, StarmapItem Item)>();
+        var objectives = new List<(float Dist, StarmapItem Item)>();
 
         for (int i = 0; i < stars.Count; i++)
         {
@@ -122,7 +126,7 @@ public partial class Ship
                 var sType = stars[i].StellarClass ?? StellarType.MainSequence;
                 string sDesc = GameConstants.StellarTypes[sType].Desc;
                 string label = $"Star {i + 1} ({sDesc}) at dist {dist:F1}, angle {angle:F1} degrees (cannot anchor)";
-                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(stars[i].Position), Kind = StarmapItemKind.Star }));
+                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(stars[i].Position), Kind = StarmapItemKind.Star, ItemBody = stars[i] }));
             }
         }
 
@@ -136,7 +140,7 @@ public partial class Ship
                 var eType = planets[i].ExoplanetClass ?? ExoplanetType.SuperEarth;
                 string eDesc = GameConstants.ExoplanetTypes[eType].Desc;
                 string label = $"Planet {i + 1} ({eDesc}) at dist {dist:F1}, angle {angle:F1} degrees";
-                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(planets[i].Position), Kind = StarmapItemKind.Planet }));
+                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(planets[i].Position), Kind = StarmapItemKind.Planet, ItemBody = planets[i] }));
             }
         }
 
@@ -150,7 +154,7 @@ public partial class Ship
                 var nType = nebulae[i].NebulaClass ?? NebulaType.Emission;
                 string nDesc = GameConstants.NebulaTypes[nType].Desc;
                 string label = $"Nebula {i + 1} ({nDesc}) at dist {dist:F1}, angle {angle:F1} degrees (cannot anchor)";
-                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(nebulae[i].Position), Kind = StarmapItemKind.Nebula }));
+                items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(nebulae[i].Position), Kind = StarmapItemKind.Nebula, ItemBody = nebulae[i] }));
             }
         }
 
@@ -185,7 +189,7 @@ public partial class Ship
                 label = ByEarMode
                     ? $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note by ear for the key"
                     : $"Temple of {temple.KeyName} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note, {temple.Frequency:F0}, for the key";
-            items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(temple.Position), Kind = StarmapItemKind.Temple }));
+            objectives.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(temple.Position), Kind = StarmapItemKind.Temple }));
         }
 
         foreach (var pyramid in Pyramids)
@@ -196,11 +200,15 @@ public partial class Ship
             string label = ByEarMode
                 ? $"{pyramid.Name} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note by ear to activate"
                 : $"{pyramid.Name} at dist {dist:F1}, angle {angle:F1} degrees, attune a realm to its note, {pyramid.Frequency:F0}, to activate";
-            items.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(pyramid.Position), Kind = StarmapItemKind.Pyramid }));
+            objectives.Add((dist, new StarmapItem { Label = label, Position = Vec5.Clone(pyramid.Position), Kind = StarmapItemKind.Pyramid }));
         }
 
-        // Present nearest objects first so the most relevant targets are at the top of the list.
+        // Objectives first (each list nearest-first), then everything else — so temples and pyramids sit
+        // at the top of the scanner, right after any unlock row, instead of buried below the nearer bodies.
+        objectives.Sort((a, b) => a.Dist.CompareTo(b.Dist));
         items.Sort((a, b) => a.Dist.CompareTo(b.Dist));
+        foreach (var (_, item) in objectives)
+            StarmapItems.Add(item);
         foreach (var (_, item) in items)
             StarmapItems.Add(item);
 
@@ -225,25 +233,32 @@ public partial class Ship
         if (sel.IsUnlockAction)
         {
             LockedTarget = null;
+            LockedBody = null;
             LockedIsRift = false;
+            IsOrbiting = false;
             _approachedRiftAnnounced = false;
             StopLockSound();
+            DebugLogger.Log("Lock", "UNLOCKED by player");
             Speak("Target unlocked.");
             return;
         }
         if (sel.Position == null) return;
 
         LockedTarget = sel.Position;
+        LockedBody = sel.ItemBody;          // live body behind the lock (null for temples/pyramids/rifts)
         LockedIsRift = sel.Kind == StarmapItemKind.Rift;
         LockedRift = LockedIsRift ? sel.ItemRift : null;
+        IsOrbiting = false;                  // a fresh lock starts in fly-to mode, not orbiting
         _approachedRiftAnnounced = false;
         // Start the homing beacon now so the lock is confirmed audibly even while the menu is still
         // open (Ship.Update, which then keeps it positioned, is skipped during in-sim menus).
-        UpdateWorldLoop(ref LockSound, LockedIsRift ? _audio.RiftBeepWaveform : _audio.BeepWaveform,
+        UpdateWorldLoop(ref LockSound, LockedIsRift ? _audio.RiftHomingBeacon : _audio.HomingBeacon,
                         LockedTarget, _audio.BeepVolume);
 
+        DebugLogger.Log("Lock", $"LOCKED {sel.Kind} at {Vec5.Format(LockedTarget)} dist={Vec5.Distance(Position, LockedTarget):F1} isRift={LockedIsRift}");
         string name = sel.Label.Contains(" at") ? sel.Label[..sel.Label.IndexOf(" at")] : sel.Label;
         Speak($"Locked on to {name}.");
+        ActiveMenu = null;   // close the scanner on a lock so the autopilot can immediately steer you there
     }
 
     /// <summary>
@@ -303,7 +318,7 @@ public partial class Ship
         LockedIsRift = true;
         _approachedRiftAnnounced = false;
         // Start the homing beacon now (see LockOnStarmapItem) so the lock beeps even inside the menu.
-        UpdateWorldLoop(ref LockSound, _audio.RiftBeepWaveform, LockedTarget, _audio.BeepVolume);
+        UpdateWorldLoop(ref LockSound, _audio.RiftHomingBeacon, LockedTarget, _audio.BeepVolume);
 
         string name = sel.Label.Contains(" at") ? sel.Label[..sel.Label.IndexOf(" at")] : sel.Label;
         Speak($"Locked on to {name} for beeping and navigation.");

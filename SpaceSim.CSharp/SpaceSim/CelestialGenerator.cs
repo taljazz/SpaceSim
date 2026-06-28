@@ -269,6 +269,10 @@ public static class CelestialGenerator
             pos[3] = pos[0] * GameConstants.PHI;
             pos[4] = pos[1] * GameConstants.PHI;
 
+            // The sacred spiral places temples far past the universe edge; wrap them into the torus so the
+            // (wrapping) ship can actually reach them — otherwise the autopilot chases an unreachable point.
+            Vec5.WrapInto(pos, GameConstants.UniverseHalfExtent);
+
             var temple = new Temple
             {
                 Position = pos,
@@ -399,6 +403,10 @@ public static class CelestialGenerator
         var pyramids = new List<Pyramid>(GameConstants.PyramidCount);
         for (int i = 0; i < GameConstants.PyramidCount; i++)
         {
+            // Wrap into the torus so the pyramid sits in the reachable volume; some PHI-scaled coordinates
+            // (e.g. phi^2 * 50 ≈ 131) land outside [-100, 100], which the wrapping ship could never reach.
+            Vec5.WrapInto(pyramidPositions[i], GameConstants.UniverseHalfExtent);
+
             var pyramid = new Pyramid
             {
                 Position = pyramidPositions[i],

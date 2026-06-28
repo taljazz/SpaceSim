@@ -10,6 +10,10 @@ namespace SpaceSim;
 public class SpeakEventArgs : EventArgs
 {
     public string Message { get; init; } = "";
+
+    /// <summary>When true (default) the line cuts off and replaces any current/queued speech; false appends
+    /// it so consecutive lines play in sequence (used by the tutorial so its messages don't clobber each other).</summary>
+    public bool Interrupt { get; init; } = true;
 }
 
 /// <summary>Payload to play a one-shot or looping sound effect, with pan/volume/pitch.</summary>
@@ -130,6 +134,9 @@ public static class GameEvents
 
     public static void RaiseSpeak(object? sender, string message)
         => OnSpeak?.Invoke(sender, new SpeakEventArgs { Message = message });
+
+    public static void RaiseSpeak(object? sender, string message, bool interrupt)
+        => OnSpeak?.Invoke(sender, new SpeakEventArgs { Message = message, Interrupt = interrupt });
 
     public static void RaisePlaySound(object? sender, float[] waveform,
         float pan = 0f, float volume = 1f, bool loop = false, float pitch = 1f)

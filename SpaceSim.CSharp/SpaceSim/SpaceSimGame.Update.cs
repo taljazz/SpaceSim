@@ -19,13 +19,19 @@ public partial class SpaceSimGame
     /// </summary>
     protected override void Update(GameTime gameTime)
     {
-        float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        // Clamp dt so a blocking modal dialog (F1 help, F3 device chooser) can't inject a multi-second frame
+        // on resume — which would jolt physics, cooldowns, and the tutorial's timers in one jump.
+        float dt = MathF.Min((float)gameTime.ElapsedGameTime.TotalSeconds, 0.1f);
 
         var keys = Keyboard.GetState();
 
         // F1 toggles the help screen from anywhere (it remembers where to return to).
         if (IsKeyPressed(keys, Keys.F1))
             ApplyTransition(_screen == GameScreen.Help ? ScreenTransition.CloseHelp : ScreenTransition.OpenHelp);
+
+        // F3 opens the audio output device chooser from anywhere (a modal dialog; audio keeps playing).
+        if (IsKeyPressed(keys, Keys.F3))
+            OpenAudioDeviceDialog();
 
         // Route the frame to the active top-level screen.
         switch (_screen)
@@ -100,6 +106,13 @@ public partial class SpaceSimGame
             _ship.Pyramids = _pyramids;
             DebugLogger.Log("Init", "Universe regeneration completed");
         }
+
+        // Drive the interactive tutorial (if active) so it can watch the player's actions and advance.
+        // Ticked here (not inside Ship.Update) so it still runs while a menu like the scanner is open.
+        // TutorialActive suppresses the objective-note cue/rate retarget so it can't fight the tutorial's
+        // centre-based tuning steps; it clears once the tutorial finishes so normal claiming resumes.
+        _ship.TutorialActive = _tutorial != null && !_tutorial.Finished;
+        _tutorial?.Update(_ship, keys, _prevKeyState, dt);
 
         // Audio click effect (periodic resonance feedback)
         UpdateClickEffect();

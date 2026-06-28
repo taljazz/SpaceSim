@@ -17,6 +17,10 @@ public class GameSettings
     public float EffectVolume { get; set; } = 0.2f;
     public float DriveVolume { get; set; } = 0.05f;
 
+    /// <summary>Name of the chosen audio output device (empty = system default). Stored by name so it
+    /// survives device-index changes between sessions; matched back to a device on load.</summary>
+    public string OutputDeviceName { get; set; } = "";
+
     #endregion
 
     #region Accessibility / HUD

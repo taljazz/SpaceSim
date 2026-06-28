@@ -171,4 +171,38 @@ public class Vec5Tests
     }
 
     #endregion
+
+    #region WrapInto (universe torus)
+
+    [Fact]
+    public void WrapInto_FoldsOutOfBoundsCoordinatesIntoRange()
+    {
+        // The kind of temple/pyramid coordinates that were unreachable before the fix.
+        float[] v = Vec5.Create(130.9f, -261.8f, 78.8f, 0f, -161.8f);
+        Vec5.WrapInto(v, 100f);
+        Assert.All(v, c => Assert.InRange(c, -100f, 100f));
+    }
+
+    [Fact]
+    public void WrapInto_LeavesInBoundsPointsUnchanged()
+    {
+        float[] v = Vec5.Create(10f, -20f, 0f, 99f, -99f);
+        Vec5.WrapInto(v, 100f);
+        Assert.Equal(10f, v[0], precision: 3);
+        Assert.Equal(-20f, v[1], precision: 3);
+        Assert.Equal(0f, v[2], precision: 3);
+        Assert.Equal(99f, v[3], precision: 3);
+        Assert.Equal(-99f, v[4], precision: 3);
+    }
+
+    [Fact]
+    public void WrapInto_MapsAPointToItsToroidalEquivalent()
+    {
+        // On a [-100, 100] torus (period 200), -261.8 folds to -61.8.
+        float[] v = Vec5.Create(-261.8f, 0f, 0f, 0f, 0f);
+        Vec5.WrapInto(v, 100f);
+        Assert.Equal(-61.8f, v[0], precision: 3);
+    }
+
+    #endregion
 }

@@ -38,6 +38,9 @@ public static class GameConstants
 
     public const float MaxVelocityBase = 10f;
     public const float ResonanceWidthBase = 10f;
+
+    /// <summary>Half-size of the wrapping universe cube; every position lives in [-this, this] on each axis.</summary>
+    public const float UniverseHalfExtent = 100f;
     public const float FrequencyMin = 110f;
     public const float FrequencyMax = 963f;
     public const float PHI = 1.6180339887f; // Golden ratio
@@ -71,13 +74,33 @@ public static class GameConstants
     // at perfect resonance.
 
     /// <summary>Detuning (Hz) within which the beat-frequency tuning cue emerges (it stays silent beyond this).</summary>
-    public const float BeatCueRange = 25f;
+    public const float BeatCueRange = 40f;
 
-    /// <summary>Amplitude of the tuning cue — subtle; further scaled by closeness and the tremolo envelope.</summary>
-    public const float BeatCueVolume = 0.07f;
+    /// <summary>Amplitude of the tuning cue — further scaled by the CueFloor/closeness curve and the tremolo envelope.</summary>
+    public const float BeatCueVolume = 0.18f;
 
     /// <summary>Detuning (Hz) within which the tremolo smoothly fills up to a full, steady "locked" tone.</summary>
-    public const float BeatLockZone = 3f;
+    public const float BeatLockZone = 2.5f;
+
+    /// <summary>Per-buffer one-pole coefficient for smoothing output gains and resonance on the audio thread,
+    /// so volume/resonance changes glide instead of stepping (a stepped gain on a continuous tone clicks).</summary>
+    public const float GainSmoothingPerBuffer = 0.35f;
+
+    // --- Tune-by-ear cue shaping (closeness + direction). All playtest dials. ---
+    /// <summary>Detuning (Hz) over which the coarse "hot/cold" closeness fades from full to cold — a useful operating range, not the whole band.</summary>
+    public const float CueCoarseRange = 200f;
+    /// <summary>Floor on cue loudness so it stays audible even when far (loudness scales between this and 1 by closeness).</summary>
+    public const float CueFloor = 0.5f;
+    /// <summary>Tremolo pulse rate (Hz) at the lock — slow, "almost there".</summary>
+    public const float TremoloMin = 0.3f;
+    /// <summary>Tremolo pulse rate (Hz) at/beyond the fine band — brisk but still countable (kept under the ~12 Hz flutter-fusion limit).</summary>
+    public const float TremoloMax = 9f;
+    /// <summary>Detuning (Hz) within which the direction cue reads "centred" (no up/down lean), avoiding dither at the lock.</summary>
+    public const float CueDeadband = 3f;
+    /// <summary>Stereo lean for the direction cue: flat (drive below target) pans left, sharp pans right.</summary>
+    public const float DirPan = 0.7f;
+    /// <summary>Seconds after the last tuning action that the by-ear cue stays present, then it fades — so the flight soundscape is calm when not tuning.</summary>
+    public const float CueActiveWindow = 2.5f;
 
     // --- Doppler (positional world voices) ---
     // Approaching a world sound shifts its pitch up, receding shifts it down (a simple radial-speed
@@ -94,6 +117,32 @@ public static class GameConstants
 
     #endregion
 
+    #region Higher-realm breathing (tune-by-ear)
+
+    // The two higher realms breathe — their target tones wander gently so tuning them by ear is a living
+    // thing to tend, not set-and-forget. Breathing swells as you slow to listen and fades as you sink into
+    // the regeneration bath (Model B); it is silenced while the ship flies itself, while landed, and while idle.
+
+    /// <summary>Peak wander (Hz) of a higher realm's target tone at full breathing.</summary>
+    public const float BreathAmplitude = 6f;
+    /// <summary>Breathing period (seconds) for realm 4.</summary>
+    public const float BreathPeriodRealm4 = 13f;
+    /// <summary>Breathing period (seconds) for realm 5 — offset from realm 4 so the two never move in lockstep.</summary>
+    public const float BreathPeriodRealm5 = 17f;
+    /// <summary>Seconds for breathing to fade to stillness once the regeneration bath has formed.</summary>
+    public const float BreathDwellSettle = 18f;
+    /// <summary>Fraction of the ship's max velocity below which you count as "settling" — breathing swells toward full as you slow past this.</summary>
+    public const float BreathStillSpeed = 0.3f;
+    /// <summary>Faint breathing that remains even at full cruise, so the universe never goes fully dead while you travel.</summary>
+    public const float BreathCruiseFloor = 0.15f;
+
+    /// <summary>Detuning (Hz) within which a higher realm counts as "at its centre": held there it neither drifts the
+    /// ship (the velocity gate zeroes it) nor needs further tuning. Shared by the velocity gate and the tutorial's
+    /// tune step so "locked" means the same thing to the physics and to the lesson.</summary>
+    public const float HigherRealmStillBand = 5f;
+
+    #endregion
+
     #region Celestial body generation
 
     public const int NStars = 200;
@@ -102,6 +151,10 @@ public static class GameConstants
     public const float OrbitRadius = 5f;
     public const float PlanetRadius = 10f;
     public const float InteractionDistance = 15f;
+    /// <summary>Maximum Hz a nearby body may pull a realm's target tone. Held small (under half the
+    /// resonance width) so a tuned realm stays above the Merkaba threshold near bodies — the universe
+    /// nudges your tuning, it doesn't break your locks.</summary>
+    public const float EnvInfluenceMax = 3f;
 
     #endregion
 
@@ -182,10 +235,19 @@ public static class GameConstants
     public const float RotationSpeed = 3f;
     public const float TuningRate = 100f;
     public const float TuningRatePlanet = 20f;
+    /// <summary>Detuning (Hz) at/above which default-mode higher-realm tuning runs at the full <see cref="TuningRate"/>; below it the rate eases toward <see cref="TuningFineMin"/>.</summary>
+    public const float TuningCoarseDelta = 30f;
+    /// <summary>The slow fine tuning rate (Hz/sec) right at the lock, so you settle gently onto the still center.</summary>
+    public const float TuningFineMin = 4f;
     public const float ScannerRange = 50f;
     public const float SlowdownDist = 20f;
     public const float AutoSnapThreshold = 0.5f;
     public const float ApproachingLockThreshold = 10f;
+
+    // Orbit mechanic: lock an object and circle it (O key) instead of flying to it and stopping — the only
+    // way to stay with a planet, which is always drifting along its own orbit around its star.
+    public const float OrbitMinRadius = 5f;        // closest the ship will orbit (units)
+    public const float OrbitAngularSpeed = 0.35f;  // radians/second — a full circle in ~18 seconds
 
     #endregion
 
@@ -365,6 +427,12 @@ public static class GameConstants
 
     #region Temple Resonance
 
+    /// <summary>Resonance a single realm must reach at a temple's note to claim its key — shared by the claim
+    /// check (CheckTempleProximity) and the spoken T readout so they never disagree.</summary>
+    public const float TempleKeyClaimResonance = 0.7f;
+    /// <summary>Seconds a realm must hold on a temple's note before the key is granted — long enough that a
+    /// deliberate by-ear settle claims it, short enough not to feel laggy, and enough to prevent fly-by claims.</summary>
+    public const float TempleClaimDwell = 0.4f;
     public const float TempleResonanceFreq = 110f;
     public static readonly (float Min, float Max) TempleResonanceRange = (95f, 120f);
     public const int TempleCount = 7;
@@ -375,7 +443,12 @@ public static class GameConstants
 
     #region Merkaba Activation
 
-    public const float MerkabaActivationThreshold = 0.9f;
+    /// <summary>Every realm must reach this resonance to engage the Merkaba. Set just below a clean lock
+    /// so it is genuinely achievable once you have all five realms well tuned (not flawless).</summary>
+    public const float MerkabaActivationThreshold = 0.85f;
+    /// <summary>Once active, the Merkaba only collapses if a realm drops below this (hysteresis), so the
+    /// field doesn't flicker off the instant a tuning wavers — it has a stable band to live in.</summary>
+    public const float MerkabaCollapseThreshold = 0.7f;
     public const float MerkabaShieldStrength = 0.5f;
     public const float MerkabaVelocityBoost = 1.3f;
     public const float MerkabaDetectionRange = 2f;
@@ -550,7 +623,7 @@ public static class GameConstants
     /// <summary>Consciousness gained per second while dwelling — the contemplative path to ascension.</summary>
     public const float DwellConsciousnessRate = 0.003f;
     /// <summary>Interval (seconds) between soft golden-chord swells that deepen the bath while dwelling.</summary>
-    public const float DwellSwellInterval = 6f;
+    public const float DwellSwellInterval = 8f;
 
     #endregion
 

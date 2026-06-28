@@ -16,6 +16,16 @@ public partial class AudioSystem
         // --- General UI sounds ---
         BeepWaveform = GenerateTone(440f, 0.1f, 0.2f);
         RiftBeepWaveform = GenerateTone(880f, 0.1f, 0.2f);
+
+        // Homing beacons: a brief ping followed by silence so looping them gives a periodic
+        // "ping ... ping" homing cue while autopiloting to a lock, not a continuous muddy drone.
+        float[] ping440 = GenerateTone(440f, 0.1f, 0.18f);
+        HomingBeacon = new float[(int)(SampleRate * 0.7f)];
+        Array.Copy(ping440, HomingBeacon, ping440.Length);
+        float[] ping880 = GenerateTone(880f, 0.1f, 0.18f);
+        RiftHomingBeacon = new float[(int)(SampleRate * 0.7f)];
+        Array.Copy(ping880, RiftHomingBeacon, ping880.Length);
+
         ClickWaveform = GenerateTone(100f * PHI, 0.05f, 0.15f);
         RotationWhooshWaveform = GenerateTone(200f * PHI, 0.2f, 0.1f);
 

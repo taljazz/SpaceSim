@@ -210,6 +210,7 @@ public enum ScreenTransition
 {
     None,
     StartSim,
+    StartTutorial,
     OpenLearnSounds,
     OpenHelp,
     CloseHelp,

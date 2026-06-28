@@ -329,7 +329,7 @@ public partial class Ship
         if (IsKeyPressed(Keys.P) && !shiftPressed && !LandedMode)
             CreatePortalAnchor();
         if (IsKeyPressed(Keys.P) && shiftPressed && !LandedMode)
-            UsePortalAnchor();
+            OpenPortalMenu();
 
         // Astral projection
         if (IsKeyPressed(Keys.B) && !LandedMode)

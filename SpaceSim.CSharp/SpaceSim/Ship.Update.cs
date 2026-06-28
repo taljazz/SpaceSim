@@ -308,6 +308,10 @@ public partial class Ship
         if (PatternBonusTimer > 0f)
             Vec5.ScaleInPlace(Velocity, GameConstants.PatternBonusVelocityMult);
 
+        // Velocity-affecting harmonics (octave boost / tritone jitter) — applied here, after the velocity
+        // recompute, so they actually take effect (they were inert when applied in the periodic harmonic pass).
+        ApplyHarmonicVelocity();
+
         // Halls of Amenti blessing: a permanent power aura earned by reaching the master temple — the
         // tangible reward for completing the temple-key arc (persists across save/load).
         if (AmentiBlessingActive)

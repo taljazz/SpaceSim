@@ -11,14 +11,16 @@ public class GameSoundEffect
     /// <summary>Current playback cursor into <see cref="Waveform"/>, advanced by the audio mixer.</summary>
     public int Position;
 
-    /// <summary>Stereo pan, -1 (left) to +1 (right).</summary>
-    public float Pan;
+    /// <summary>Stereo pan, -1 (left) to +1 (right). Volatile: mutated from the game thread (e.g. a moving
+    /// world loop) while the audio thread reads it on the NAudio fallback mixing path.</summary>
+    public volatile float Pan;
 
-    /// <summary>Whether playback restarts from the beginning when it reaches the end.</summary>
-    public bool Loop;
+    /// <summary>Whether playback restarts from the beginning when it reaches the end. Volatile so a game-thread
+    /// stop (Loop = false) is seen by the audio thread instead of a "stopped" loop audibly continuing.</summary>
+    public volatile bool Loop;
 
-    /// <summary>Playback gain multiplier.</summary>
-    public float Volume;
+    /// <summary>Playback gain multiplier. Volatile: cross-thread (game writes, audio reads) on the fallback path.</summary>
+    public volatile float Volume;
 
     /// <summary>
     /// Builds a playable effect from a waveform, optionally resampling it for a pitch shift up front

@@ -75,7 +75,7 @@ public partial class Ship
             HudItems.Add($"Integrity: {ResonanceIntegrity * 100f:F0} percent");
             HudItems.Add($"Atlantean Crystals: {CrystalsCollected}");
             HudItems.Add($"Status: {(LandedMode ? "Anchored" : "In Flight")}");
-            HudItems.Add($"Power: {ResonancePower.Average() * 100f:F0} percent");
+            HudItems.Add($"Power: {MathF.Min(100f, ResonancePower.Average() / GameConstants.PowerBuildTime * 100f):F0} percent");
             HudItems.Add($"Tuaoi face: {TuaoiMode}");
             HudItems.Add($"Merkaba: {(MerkabaActive ? "Active" : "Inactive")}");
             HudItems.Add($"Temple Resonance: {(InTempleResonance ? "Active" : "Inactive")}");
@@ -292,6 +292,44 @@ public partial class Ship
     {
         if (RiftItems.Count == 0) return;
         Speak(RiftItems[RiftSelectionIndex].Label);
+    }
+
+    /// <summary>Build the portal-anchor pick-list (Shift+P): each dropped anchor with its name and distance,
+    /// nearest first; a placeholder row when none exist.</summary>
+    public void UpdatePortalItems()
+    {
+        PortalItems.Clear();
+        if (PortalAnchors.Count == 0)
+        {
+            PortalItems.Add(new PortalMenuItem { Label = "No portal anchors set. Press P to drop one." });
+            return;
+        }
+        var rows = new List<(float Dist, PortalMenuItem Item)>();
+        for (int i = 0; i < PortalAnchors.Count; i++)
+        {
+            float dist = Vec5.Distance(Position, PortalAnchors[i].Position);
+            rows.Add((dist, new PortalMenuItem { Label = $"{PortalAnchors[i].Name}, distance {dist:F0}", AnchorIndex = i }));
+        }
+        rows.Sort((a, b) => a.Dist.CompareTo(b.Dist));
+        foreach (var (_, item) in rows) PortalItems.Add(item);
+    }
+
+    /// <summary>Announce the highlighted portal-anchor row.</summary>
+    internal void SpeakPortalItem()
+    {
+        if (PortalItems.Count == 0) return;
+        Speak(PortalItems[PortalSelectionIndex].Label);
+    }
+
+    /// <summary>Teleport to the highlighted anchor (Enter in the portal menu), applying the cooldown/resonance
+    /// gate; closes the menu only on a successful jump (mirrors how locking closes the scanner).</summary>
+    internal void TeleportToSelectedAnchor()
+    {
+        if (PortalItems.Count == 0) return;
+        var sel = PortalItems[PortalSelectionIndex];
+        if (sel.AnchorIndex < 0 || sel.AnchorIndex >= PortalAnchors.Count) return;  // placeholder row
+        if (TeleportToAnchor(PortalAnchors[sel.AnchorIndex]))
+            ActiveMenu = null;
     }
 
     /// <summary>

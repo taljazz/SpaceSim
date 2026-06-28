@@ -47,29 +47,42 @@ public partial class Ship
     /// (<see cref="GameConstants.PortalCooldown"/>) and a minimum average resonance
     /// (<see cref="GameConstants.PortalTravelResonance"/>); the reason is spoken if travel is denied.
     /// </summary>
-    public void UsePortalAnchor()
+    public void OpenPortalMenu()
     {
         if (PortalAnchors.Count == 0)
         {
-            SpeakAtlantean("No portal anchors set. Create one with P key.");
+            SpeakAtlantean("No portal anchors set. Create one with the P key.");
             return;
         }
+        // Open a pick-list so EVERY anchor is reachable. (Previously this teleported only ever to the first
+        // anchor, stranding the rest.) The menu's Enter calls TeleportToSelectedAnchor.
+        OpenMenu(new PortalMenuMode(this));
+    }
+
+    /// <summary>
+    /// Teleport to a specific anchor, gated by the portal cooldown (<see cref="GameConstants.PortalCooldown"/>)
+    /// and a minimum average resonance (<see cref="GameConstants.PortalTravelResonance"/>). Speaks the reason
+    /// and returns false if travel is denied; regenerates the universe around the arrival point on success.
+    /// </summary>
+    public bool TeleportToAnchor(PortalAnchor anchor)
+    {
         if (SimulationTime - _lastPortalUse < GameConstants.PortalCooldown)
         {
             int remaining = (int)(GameConstants.PortalCooldown - (SimulationTime - _lastPortalUse));
             SpeakAtlantean($"Portal cooldown active. {remaining} seconds remaining.");
-            return;
+            return false;
         }
         if (Vec5.Mean(ResonanceLevels) < GameConstants.PortalTravelResonance)
         {
             SpeakAtlantean("Insufficient resonance for portal travel. Tune frequencies higher.");
-            return;
+            return false;
         }
 
-        var anchor = PortalAnchors[0];
         Array.Copy(anchor.Position, Position, N);
         _lastPortalUse = SimulationTime;
+        NeedsUniverseRegeneration = true;   // a teleport is a large jump — rebuild the world around the arrival
         SpeakAtlantean($"Portal activated. Teleported to {anchor.Name}.");
+        return true;
     }
 
     #endregion
@@ -301,8 +314,11 @@ public partial class Ship
                     ConsciousnessStage = ConsciousnessLevel.Ascended;
                 }
             }
-            else if (!_amentiSealedAnnounced)
+            else if (!_amentiSealedAnnounced && TempleKeys.Count > 0)
             {
+                // Only speak the locked-door line once the player is actually on the path (has a key). The ship
+                // spawns on the origin, where Amenti sits, so without this guard the very first line a new pilot
+                // hears is the endgame's "remain sealed" message, which reads as a failure state.
                 int missing = GameConstants.MinorTempleCount - TempleKeys.Count;
                 SpeakAtlantean($"The Halls of Amenti remain sealed. {missing} more temple keys needed, or consciousness level insufficient.");
                 _amentiSealedAnnounced = true;
@@ -495,16 +511,29 @@ public partial class Ship
         }
 
         var oldStage = ConsciousnessStage;
-        foreach (var (levelName, levelInfo) in GameConstants.ConsciousnessLevels)
-        {
-            if (ConsciousnessValue >= levelInfo.Threshold)
-                ConsciousnessStage = levelName;
-        }
+        // Pick the highest tier whose threshold we meet by walking the EXPLICIT low-to-high order array, not
+        // the dictionary (whose enumeration order is not guaranteed by contract and would silently mis-rank).
+        ConsciousnessLevel newStage = GameConstants.ConsciousnessLevelOrder[0];
+        foreach (var level in GameConstants.ConsciousnessLevelOrder)
+            if (ConsciousnessValue >= GameConstants.ConsciousnessLevels[level].Threshold)
+                newStage = level;
+        ConsciousnessStage = newStage;
 
         if (ConsciousnessStage != oldStage && !_consciousnessAnnounced)
         {
-            var info = GameConstants.ConsciousnessLevels[ConsciousnessStage];
-            SpeakAtlantean($"Consciousness level: {ConsciousnessStage}. {info.Desc}. The universe opens wider to your senses.");
+            int oldRank = Array.IndexOf(GameConstants.ConsciousnessLevelOrder, oldStage);
+            int newRank = Array.IndexOf(GameConstants.ConsciousnessLevelOrder, ConsciousnessStage);
+            if (newRank >= oldRank)
+            {
+                var info = GameConstants.ConsciousnessLevels[ConsciousnessStage];
+                SpeakAtlantean($"Consciousness rises to {ConsciousnessStage}. {info.Desc}. The universe opens wider to your senses.");
+            }
+            else
+            {
+                // A demotion must NOT use the rising wording: the player's tuning width and hearing range just
+                // shrank, and for a blind-first game this spoken line is their only signal of the change.
+                SpeakAtlantean($"Consciousness recedes to {ConsciousnessStage}. The universe narrows; raise your resonance to reawaken.");
+            }
             DebugLogger.Log("Ship", $"Consciousness changed: {oldStage} -> {ConsciousnessStage} (value={ConsciousnessValue:F3})");
             GameEvents.RaiseConsciousnessChanged(this, oldStage.ToString(), ConsciousnessStage.ToString(), ConsciousnessValue);
             _consciousnessAnnounced = true;
@@ -679,12 +708,11 @@ public partial class Ship
         {
             if (SimulationTime > expiry) { _harmonicsToRemove.Add(key); continue; }
 
+            // The velocity-affecting harmonics (Octave boost, Tritone jitter) are applied per-frame in
+            // ApplyHarmonicVelocity, NOT here: this pass runs only periodically, so the per-frame velocity
+            // recompute used to overwrite them and they did nothing.
             switch (hType)
             {
-                case HarmonicType.Octave:
-                    foreach (int d in dims)
-                        Velocity[d] *= 1.1f;
-                    break;
                 case HarmonicType.PerfectFifth:
                     DissonanceTimer = MathF.Max(0, DissonanceTimer - 0.1f);
                     break;
@@ -695,13 +723,27 @@ public partial class Ship
                     foreach (int d in dims)
                         ResonancePower[d] += 0.05f;
                     break;
-                case HarmonicType.Tritone:
-                    foreach (int d in dims)
-                        Velocity[d] += MathHelpers.RandomRange(-0.2f, 0.2f);
-                    break;
             }
         }
         foreach (string k in _harmonicsToRemove) ActiveHarmonics.Remove(k);
+    }
+
+    /// <summary>
+    /// Apply the velocity-affecting harmonics — octave (a steady boost) and tritone (chaotic jitter) — EVERY
+    /// frame, after the velocity recompute, for each still-active harmonic. This is the per-frame home for
+    /// these bonuses; doing it in the periodic <see cref="ApplyHarmonicBonuses"/> let them be overwritten.
+    /// Non-compounding: velocity is rebuilt from scratch each frame, so the multiplier is a constant boost.
+    /// </summary>
+    public void ApplyHarmonicVelocity()
+    {
+        foreach (var (_, (hType, dims, expiry)) in ActiveHarmonics)
+        {
+            if (SimulationTime > expiry) continue;
+            if (hType == HarmonicType.Octave)
+                foreach (int d in dims) Velocity[d] *= 1.1f;
+            else if (hType == HarmonicType.Tritone)
+                foreach (int d in dims) Velocity[d] += MathHelpers.RandomRange(-0.2f, 0.2f);
+        }
     }
 
     #endregion

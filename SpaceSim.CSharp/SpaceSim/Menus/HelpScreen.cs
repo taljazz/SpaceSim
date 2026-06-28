@@ -96,28 +96,65 @@ public sealed class HelpScreen : MenuScreen
             "more. While flying, U instead reads your status panel aloud."),
 
         new("The Atlantean Path", "The Tuaoi crystal",
-            "The heart of your craft is the Tuaoi crystal, a great six-sided stone. Press G to turn it to its next " +
-            "face. Each face shapes the craft differently: one for healing, one for navigation, one for power, one " +
-            "for reaching the higher realms, and more."),
+            "The heart of your craft is the Tuaoi crystal, a great six-sided firestone, the legendary stone of " +
+            "Atlantis. Press G to turn it to its next face. Only one face is active at a time, so you choose the one " +
+            "that suits what you are doing now; there is a short pause between turns, each turn is announced, and the " +
+            "current face is shown on your status panel. There are six faces. Healing mends your craft steadily, " +
+            "anywhere, and is good whenever you are worn. Navigation, where the crystal begins, makes your craft " +
+            "steer itself to a locked destination half again as fast, and is the face to wear while travelling. " +
+            "Communication doubles how far you can sense, so temples, pyramids, and worlds reach your ears from " +
+            "twice the distance; wear it when you are searching or finding your way. Power quickens your flight for " +
+            "crossing open space. Regeneration deepens your healing while you rest in a temple's or a pyramid's " +
+            "resonance. And Transcendence widens the two higher realms, making the tones you tune by ear far easier " +
+            "to catch and hold; wear it whenever the higher tuning is delicate, such as settling onto a temple's or " +
+            "a pyramid's note. In short: Communication to find a thing, Navigation to fly to it, Transcendence to " +
+            "tune onto it, Healing or Regeneration to mend, and Power for speed."),
 
-        new("The Atlantean Path", "Consciousness and rest",
-            "As you spend time in harmony, your consciousness slowly rises through levels of awakening, and the " +
-            "higher you rise, the more of the universe you can hear as distant voices open up around you. To rest, " +
-            "come nearly to a stop with your realms in tune, including the two higher realms you tend by ear, which " +
-            "is what truly opens the door. When you do, you settle into a regeneration bath that heals your craft " +
-            "and deepens your consciousness while you simply rest in the tones. And as you rest, the breathing of " +
-            "the tones settles with you, until they grow still; the longer you stay, the deeper the quiet. It is the " +
-            "gentlest, and one of the most powerful, things you can do."),
+        new("The Atlantean Path", "Temples and the twelve keys",
+            "Twelve temples are scattered across the universe, one for each sign of the old zodiac, and each holds a " +
+            "single key. Open the scanner with M to find them; they are listed first, before the stars and worlds, " +
+            "since they are your goals. Lock onto one and your craft flies you there. A temple gives its key to " +
+            "whoever can sound its note: when you are near, tune any one realm to the temple's tone and hold it " +
+            "steady a moment, and the key is yours. Press T near a temple to hear its note, or, in by-ear mode, how " +
+            "close you already are. Each temple sounds a different tone from across the sacred range, so each asks a " +
+            "different note of you, and wearing the Transcendence face of the Tuaoi crystal makes that note far " +
+            "easier to catch. Gathering all twelve keys is the first half of the way of the One, the path to the " +
+            "Halls of Amenti."),
 
-        new("The Atlantean Path", "Your journey",
-            "Twelve temples are scattered across the universe, each holding a key. Fly to a temple, tune a realm to " +
-            "its note — press T near a temple to hear that note, or how close you already are — and you receive its " +
-            "key. Gather all twelve keys and raise your consciousness high enough, and " +
-            "the Halls of Amenti at the very center of the universe will open to you; reaching them is the heart of " +
-            "the game. Pyramids are resonance chambers: tune to a pyramid's note nearby and it will greatly heal and " +
-            "quicken you. Two paths lie open: the way of accumulation, gathering crystals until your craft renews " +
-            "into a whole new universe, and the way of the One, raising your consciousness and gathering the keys " +
-            "toward Amenti. Both are yours to walk."),
+        new("The Atlantean Path", "Pyramids",
+            "Three great pyramids stand in the universe, and unlike the temples they hold no key. They are resonance " +
+            "chambers, and every one answers to the same tone: one hundred and eighteen hertz. Fly near a pyramid, " +
+            "tune a realm to that tone, and the chamber awakens and greets you. While its resonance holds you, your " +
+            "craft is healed, and, more preciously, your awakening rises faster than anywhere else in the universe. " +
+            "So when you wish to raise your consciousness toward Amenti, seek a pyramid, sound its tone, and rest " +
+            "there in the resonance. Wear the Communication face to find one from afar, and Transcendence to settle " +
+            "gently onto its tone."),
+
+        new("The Atlantean Path", "Awakening, your consciousness",
+            "As you spend time in harmony, your awakening, your consciousness, slowly rises through six levels: " +
+            "dormant, awakening, aware, attuned, enlightened, and at last ascended. The higher you rise, the more of " +
+            "the universe opens to your senses, as distant voices reach you from further away. Awakening grows " +
+            "whenever all five of your realms are in resonance together, which in truth means whenever you are still " +
+            "and deeply in tune; it slips back if you let everything fall out of harmony. Two places quicken it " +
+            "most: the resonance of a pyramid, and the regeneration bath of rest. The game tells you each time you " +
+            "cross into a new level. To open the Halls of Amenti, you must reach the level called enlightened."),
+
+        new("The Atlantean Path", "Rest and the regeneration bath",
+            "To rest, come nearly to a stop with all your realms in tune, including the two higher realms you tend " +
+            "by ear, which is what truly opens the door. When you do, you settle into a regeneration bath: it heals " +
+            "your craft and deepens your awakening while you simply rest in the tones. As you rest, the breathing of " +
+            "the tones settles with you until they grow still, and the longer you stay, the deeper the quiet. It is " +
+            "the gentlest, and one of the most powerful, things you can do."),
+
+        new("The Atlantean Path", "The Halls of Amenti",
+            "At the very center of the universe stand the Halls of Amenti, the master temple and the heart of the " +
+            "whole journey. They open only to one who carries all twelve temple keys and whose awakening has reached " +
+            "enlightened or beyond. When both are true, lock the Halls of Amenti in your scanner and fly to the " +
+            "center; there is no note to match, for the keys and your awakening are the password, and the doors open " +
+            "as you arrive. Should you come too early, the Halls will tell you what is still wanting. To pass within " +
+            "is to receive the ascension blessing and to complete the way of the One. There is also another way, the " +
+            "way of accumulation: gathering crystals until your craft renews into a whole new universe. Both are " +
+            "yours to walk."),
 
         new("The Atlantean Path", "Special abilities",
             "Press P to drop a portal anchor that marks your spot, and Shift plus P to travel back to it later. " +

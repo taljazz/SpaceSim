@@ -9,6 +9,12 @@ namespace SpaceSim.Models;
 /// </summary>
 public class SaveGameState
 {
+    /// <summary>Current save-format version, bumped when the schema changes incompatibly.</summary>
+    public const int CurrentVersion = 1;
+
+    /// <summary>Schema version this save was written with; lets a future build migrate or reject old saves.</summary>
+    public int Version { get; set; } = CurrentVersion;
+
     // Core ship state
     /// <summary>The ship's 5D position.</summary>
     public float[] Position { get; set; } = Vec5.Zero();

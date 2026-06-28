@@ -75,13 +75,19 @@ public partial class Ship
         catch (Exception ex)
         {
             DebugLogger.LogError("Save", "Async save write failed", ex);
+            // The optimistic "Game saved." was already spoken; a failed disk write would otherwise be silent.
+            // Raise speech directly (thread-safe Tolk queue) rather than via Ship.Speak, since this runs on a
+            // background thread and must not touch the game-thread speech cooldown/buffers.
+            GameEvents.RaiseSpeak(null, "Warning: saving to disk failed.");
         }
     }
 
     /// <summary>Build a frozen snapshot of everything worth persisting; arrays/dicts/lists are cloned.</summary>
     private SaveGameState BuildSaveState() => new SaveGameState
     {
-        Position = Vec5.Clone(Position),
+        // If projecting astrally, persist the BODY's position (not the roaming form), so a mid-astral autosave
+        // doesn't silently relocate the player to wherever the projection happened to be on next load.
+        Position = (AstralMode && AstralBodyPos != null) ? Vec5.Clone(AstralBodyPos) : Vec5.Clone(Position),
         Velocity = Vec5.Clone(Velocity),
         RDrive = (float[])RDrive.Clone(),
         BaseFTarget = (float[])BaseFTarget.Clone(),
@@ -117,64 +123,113 @@ public partial class Ship
     /// </summary>
     public void LoadGame()
     {
+        SaveGameState? state;
         try
         {
-            if (!File.Exists("savegame.json"))
+            if (!File.Exists(SaveFile))
             {
                 SpeakSystem("No save file found.");
                 return;
             }
-            string json = File.ReadAllText("savegame.json");
-            var state = JsonSerializer.Deserialize<SaveGameState>(json);
-            if (state == null) { SpeakSystem("Save file corrupted."); return; }
-
-            // Copy saved values back onto the live ship; Array.Copy fills the existing N-length buffers.
-            Array.Copy(state.Position, Position, N);
-            Array.Copy(state.Velocity, Velocity, N);
-            Array.Copy(state.RDrive, RDrive, N);
-            Array.Copy(state.BaseFTarget, BaseFTarget, N);
-            ResonanceIntegrity = state.ResonanceIntegrity;
-            CrystalsCollected = state.CrystalsCollected;
-            ResonanceWidth = state.ResonanceWidth;
-            MaxVelocity = state.MaxVelocity;
-            CrystalBonus = state.CrystalBonus;
-            GoldenHarmonyActive = state.GoldenHarmonyActive;
-            FrequencyPresets = state.FrequencyPresets ?? new();
-            SetTuaoiMode(state.TuaoiMode);
-            TuaoiModeIndex = state.TuaoiModeIndex;
-            ConsciousnessValue = state.ConsciousnessValue;
-            ConsciousnessStage = state.ConsciousnessStage;
-            TempleKeys = new HashSet<int>(state.TempleKeys);
-            VisitedAmenti = state.VisitedAmenti;
-            AmentiBlessingActive = state.AmentiBlessingActive;
-            PortalAnchors = state.PortalAnchors.Select(a => new PortalAnchor
-            {
-                Position = Vec5.Clone(a.Position),
-                Name = a.Name
-            }).ToList();
-            VerboseMode = state.VerboseMode;
-            AutosaveEnabled = state.AutosaveEnabled;
-            AmbientSoundsEnabled = state.AmbientSoundsEnabled;
-            NebulaDissonanceEnabled = state.NebulaDissonanceEnabled;
-
-            // Start fresh: stop and clear any rifts, lock, and world sounds from the previous session
-            // so they don't carry stale audio into the loaded universe (mirrors Ascend).
-            SilenceAllWorldSounds();
-            Rifts.Clear();
-            LockedTarget = null;
-            LockedRift = null;
-            LockedIsRift = false;
-
-            // Rebuild celestial bodies around the restored position on the next update.
-            NeedsUniverseRegeneration = true;
-            SpeakSystem("Game loaded.");
-            DebugLogger.Log("Save", $"Game loaded: pos={Vec5.Format(Position)}, crystals={CrystalsCollected}, consciousness={ConsciousnessStage}");
+            string json = File.ReadAllText(SaveFile);
+            state = JsonSerializer.Deserialize<SaveGameState>(json);
+        }
+        catch (FileNotFoundException)
+        {
+            SpeakSystem("No save file found.");
+            return;
         }
         catch (Exception ex)
         {
-            SpeakSystem("No save file found.");
-            DebugLogger.LogError("Save", "LoadGame failed", ex);
+            // Unreadable / unparseable / unknown-enum file is CORRUPTION, not a missing save. Say so —
+            // speech is the player's only feedback channel, and "no save file" here would be a lie.
+            SpeakSystem("Save file corrupted.");
+            DebugLogger.LogError("Save", "LoadGame read/parse failed", ex);
+            return;
         }
+
+        // Validate the WHOLE snapshot before touching the live ship, so a corrupt save can never leave a
+        // half-loaded craft or feed a NaN/out-of-range frequency into the real-time synth.
+        if (state == null || !IsValidSaveState(state))
+        {
+            SpeakSystem("Save file corrupted.");
+            DebugLogger.Log("Save", "LoadGame: save data failed validation");
+            return;
+        }
+
+        // Validated — commit onto the live ship. Array.Copy fills the existing N-length buffers in place.
+        Array.Copy(state.Position, Position, N);
+        Array.Copy(state.Velocity, Velocity, N);
+        Array.Copy(state.RDrive, RDrive, N);
+        Array.Copy(state.BaseFTarget, BaseFTarget, N);
+        ResonanceIntegrity = state.ResonanceIntegrity;
+        CrystalsCollected = state.CrystalsCollected;
+        ResonanceWidth = state.ResonanceWidth;
+        MaxVelocity = state.MaxVelocity;
+        CrystalBonus = state.CrystalBonus;
+        GoldenHarmonyActive = state.GoldenHarmonyActive;
+        // Keep only well-formed presets (length N) so a later Shift+1-9 recall can't crash on a malformed slot.
+        FrequencyPresets = state.FrequencyPresets?
+            .Where(kv => kv.Value != null && kv.Value.Length == N)
+            .ToDictionary(kv => kv.Key, kv => (float[])kv.Value.Clone()) ?? new();
+        SetTuaoiMode(state.TuaoiMode);
+        // Derive the cycle index from the (enum-validated) mode rather than trusting the saved index, so a
+        // corrupt/out-of-range index can't crash the next G press (TuaoiModeOrder[index]).
+        int tmIdx = Array.IndexOf(GameConstants.TuaoiModeOrder, state.TuaoiMode);
+        TuaoiModeIndex = tmIdx >= 0 ? tmIdx : 0;
+        ConsciousnessValue = state.ConsciousnessValue;
+        ConsciousnessStage = state.ConsciousnessStage;
+        TempleKeys = new HashSet<int>(state.TempleKeys);
+        VisitedAmenti = state.VisitedAmenti;
+        AmentiBlessingActive = state.AmentiBlessingActive;
+        PortalAnchors = state.PortalAnchors
+            .Where(a => a?.Position != null && a.Position.Length == N)
+            .Select(a => new PortalAnchor { Position = Vec5.Clone(a.Position), Name = a.Name ?? "Anchor" })
+            .ToList();
+        VerboseMode = state.VerboseMode;
+        AutosaveEnabled = state.AutosaveEnabled;
+        AmbientSoundsEnabled = state.AmbientSoundsEnabled;
+        NebulaDissonanceEnabled = state.NebulaDissonanceEnabled;
+
+        // Start fresh: stop and clear any rifts, lock, and world sounds from the previous session
+        // so they don't carry stale audio into the loaded universe (mirrors Ascend).
+        SilenceAllWorldSounds();
+        Rifts.Clear();
+        LockedTarget = null;
+        LockedRift = null;
+        LockedIsRift = false;
+
+        // Rebuild celestial bodies around the restored position on the next update.
+        NeedsUniverseRegeneration = true;
+        SpeakSystem("Game loaded.");
+        DebugLogger.Log("Save", $"Game loaded: pos={Vec5.Format(Position)}, crystals={CrystalsCollected}, consciousness={ConsciousnessStage}");
+    }
+
+    /// <summary>
+    /// Validate a deserialized save BEFORE any of it is copied onto the live ship: arrays must be the right
+    /// length and finite, and the drive frequencies must be in range. Guarantees a corrupt or hand-edited
+    /// save is rejected cleanly instead of half-loading or poisoning the audio synthesis with a NaN.
+    /// </summary>
+    private static bool IsValidSaveState(SaveGameState s)
+    {
+        if (!IsFiniteVec(s.Position) || !IsFiniteVec(s.Velocity) || !IsFiniteVec(s.RDrive) || !IsFiniteVec(s.BaseFTarget))
+            return false;
+        if (s.TempleKeys == null || s.PortalAnchors == null) return false;
+        for (int i = 0; i < N; i++)
+        {
+            if (s.RDrive[i] < GameConstants.FrequencyMin || s.RDrive[i] > GameConstants.FrequencyMax) return false;
+            if (s.BaseFTarget[i] < GameConstants.FrequencyMin || s.BaseFTarget[i] > GameConstants.FrequencyMax) return false;
+        }
+        return float.IsFinite(s.ResonanceIntegrity) && float.IsFinite(s.ResonanceWidth)
+            && float.IsFinite(s.MaxVelocity) && float.IsFinite(s.ConsciousnessValue);
+    }
+
+    /// <summary>True if <paramref name="a"/> is non-null, exactly N elements, and every element is finite.</summary>
+    private static bool IsFiniteVec(float[] a)
+    {
+        if (a == null || a.Length != N) return false;
+        foreach (float v in a) if (!float.IsFinite(v)) return false;
+        return true;
     }
 
     #endregion

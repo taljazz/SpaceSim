@@ -25,6 +25,7 @@ public partial class Ship
         LockedCrystals.Clear();
         Biome = Random.Shared.NextDouble() < 0.5 ? PlanetBiome.Harmonic : PlanetBiome.Dissonant;
         PatternProgress.Clear();
+        Array.Clear(CursorPos);   // centre the exploration cursor on each new planet's layout (it isn't reset elsewhere)
 
         // Rarer planet types skew their crystal yield via CrystalMult (e.g. rogue planets give more).
         float crystalMult = 1f;

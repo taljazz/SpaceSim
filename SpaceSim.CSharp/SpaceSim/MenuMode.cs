@@ -168,3 +168,20 @@ public sealed class RiftMenuMode : MenuMode
     public override void SpeakCurrent() => Ship.SpeakRiftItem();
     public override void Select() => Ship.LockOnRiftItem();
 }
+
+/// <summary>The portal-anchor pick-list (Shift+P). Enter teleports to the selected anchor; P closes it.
+/// Lets the player reach ANY of their anchors (the old one-key teleport only ever used the first).</summary>
+public sealed class PortalMenuMode : MenuMode
+{
+    public PortalMenuMode(Ship ship) : base(ship) { }
+
+    public override int Count => Ship.PortalItems.Count;
+    public override IReadOnlyList<string> ItemLabels => Ship.PortalItems.Select(p => p.Label).ToList();
+    public override int SelectedIndex { get => Ship.PortalSelectionIndex; set => Ship.PortalSelectionIndex = value; }
+    public override Keys ExitKey => Keys.P;
+    public override string ExitMessage => "Exiting portal anchors.";
+
+    public override void Populate() => Ship.UpdatePortalItems();
+    public override void SpeakCurrent() => Ship.SpeakPortalItem();
+    public override void Select() => Ship.TeleportToSelectedAnchor();
+}

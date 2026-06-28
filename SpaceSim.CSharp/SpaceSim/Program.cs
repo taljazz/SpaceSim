@@ -20,7 +20,25 @@ internal static class Program
     {
         try { SetDllDirectory(AppContext.BaseDirectory); } catch { /* non-fatal: native search stays default */ }
 
-        using var game = new SpaceSimGame();
-        game.Run();
+        try
+        {
+            using var game = new SpaceSimGame();
+            game.Run();
+        }
+        catch (Exception ex)
+        {
+            // A blind-first app must never die silently. Log the failure, then surface a screen-reader-readable
+            // dialog so the player at least hears WHY it would not start (e.g. no audio device).
+            try { DebugLogger.LogError("Fatal", "Unhandled startup/run exception", ex); } catch { /* ignore */ }
+            try
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "SpaceSim could not start:\n\n" + ex.Message,
+                    "SpaceSim - startup error",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Error);
+            }
+            catch { /* last-resort dialog failed; the log still has it */ }
+        }
     }
 }

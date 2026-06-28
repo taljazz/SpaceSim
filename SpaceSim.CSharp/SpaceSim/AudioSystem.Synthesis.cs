@@ -276,6 +276,9 @@ public partial class AudioSystem
             for (int s = _activePlayback.Count - 1; s >= 0; s--)
             {
                 var sfx = _activePlayback[s];
+                // A zero-length buffer would loop forever on an empty read / throw IndexOutOfRange below,
+                // tearing down the audio callback and silencing everything — drop it defensively.
+                if (sfx.Waveform.Length == 0) { _activePlayback.RemoveAt(s); continue; }
                 if (sfx.Position >= sfx.Waveform.Length)
                 {
                     if (sfx.Loop)
@@ -314,10 +317,12 @@ public partial class AudioSystem
             left = MathF.Tanh(left);
             right = MathF.Tanh(right);
 
-            // Write interleaved stereo
+            // Write interleaved stereo. Guard against any non-finite sample: a stray NaN/Infinity (e.g. from a
+            // corrupt loaded frequency) would otherwise propagate through WaveOut and silence the entire game
+            // with no feedback to a blind player.
             int idx = offset + frame * Channels;
-            buffer[idx] = left;
-            buffer[idx + 1] = right;
+            buffer[idx] = float.IsFinite(left) ? left : 0f;
+            buffer[idx + 1] = float.IsFinite(right) ? right : 0f;
         }
 
         _audioTime += frames;

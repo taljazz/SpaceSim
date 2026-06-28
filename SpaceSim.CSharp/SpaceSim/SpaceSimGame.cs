@@ -448,6 +448,7 @@ public partial class SpaceSimGame : Game
                 _ship.SilenceAllWorldSounds();  // stop positioned world loops (ambients, rift hums, lock)
                 _audio.ClearAllEffects();       // drop any lingering one-shots / loops
                 _ship.ActiveMenu = null;        // close any open in-sim menu so re-entry isn't frozen inside it
+                _ship.ResetHeldInput();         // drop held-key latches (e.g. Space) so they don't persist on resume
                 _tutorial = null;               // leaving the sim ends any active tutorial
                 break;
             case GameScreen.LearnSounds:

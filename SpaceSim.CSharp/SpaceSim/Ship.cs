@@ -157,6 +157,10 @@ public partial class Ship
     public List<RiftMenuItem> RiftItems = new();
     public Rift? LockedRift;
 
+    // Portal anchor selection (Shift+P opens a pick-list of your dropped anchors)
+    public int PortalSelectionIndex;
+    public List<PortalMenuItem> PortalItems = new();
+
     // Misc state
     private float[] _lastCursorPos = new float[2];
     private float _lastCursorSpeakTime;
@@ -383,7 +387,7 @@ public partial class Ship
             new() { Name = "Resonance Width", Cost = GameConstants.UpgradeCosts[0], Effect = UpgradeWidth, Desc = "Increases tuning tolerance by golden increment." },
             new() { Name = "Integrity Repair", Cost = GameConstants.UpgradeCosts[1], Effect = UpgradeIntegrity, Desc = "Restores ship harmony." },
             new() { Name = "Max Velocity", Cost = GameConstants.UpgradeCosts[2], Effect = UpgradeVelocity, Desc = "Boosts top speed with divine proportion." },
-            new() { Name = "Auto-Tune Helper", Cost = GameConstants.UpgradeCosts[3], Effect = AutoTune, Desc = "Subtly aligns frequencies automatically." },
+            new() { Name = "Auto-Tune Helper", Cost = GameConstants.UpgradeCosts[3], Effect = AutoTune, Desc = "Nudges your drives once toward their targets." },
             new() { Name = "Crystal Growth", Cost = GameConstants.UpgradeCosts[4], Effect = UpgradeCrystalCount, Desc = "Increases crystals per planet." },
             new() { Name = "Golden Harmony Mode", Cost = GameConstants.UpgradeCosts[5], Effect = ActivateGoldenHarmony, Desc = "Permanent PHI multiplier to all stats for ascension prep." },
         };
@@ -401,6 +405,10 @@ public partial class Ship
 
     /// <summary>The most recent in-game announcement, so the player can replay it (Tab key).</summary>
     private string _lastAnnouncement = "";
+
+    /// <summary>The most recent tutorial line. Tab-repeat prefers this while the tutorial is running, so the
+    /// player's repeat key replays the instruction rather than a transient gameplay line that overwrote it.</summary>
+    private string _lastTutorialLine = "";
 
     /// <summary>Channels of recorded messages the player can cycle and browse with the buffer keys.</summary>
     private readonly SpeechBuffers _speechBuffers = new();
@@ -443,15 +451,29 @@ public partial class Ship
     public void SpeakTutorial(string msg, bool interrupt = false)
     {
         _lastAnnouncement = msg;
+        _lastTutorialLine = msg;
         _speechBuffers.Record(SpeechChannel.System, msg);
         GameEvents.RaiseSpeak(this, msg, interrupt);
     }
 
-    /// <summary>Replays the most recent announcement, bypassing the cooldown so it always speaks.</summary>
+    /// <summary>Replays the most recent announcement (Tab), bypassing the cooldown so it always speaks. While
+    /// the tutorial is running, prefers the last tutorial line so the repeat key gives the instruction back,
+    /// not whatever transient line happened to come after it.</summary>
     public void RepeatLastAnnouncement()
     {
-        if (!string.IsNullOrEmpty(_lastAnnouncement))
-            GameEvents.RaiseSpeak(this, _lastAnnouncement);
+        string line = TutorialActive && !string.IsNullOrEmpty(_lastTutorialLine) ? _lastTutorialLine : _lastAnnouncement;
+        if (!string.IsNullOrEmpty(line))
+            GameEvents.RaiseSpeak(this, line);
+    }
+
+    /// <summary>Clear transient held-key latches when the sim is left, so a key still held across the
+    /// transition (e.g. Space mid water-blessing ritual) can't keep its timer running on resume.</summary>
+    public void ResetHeldInput()
+    {
+        _spacebarPressed = false;
+        _spacebarHoldTimer = 0f;
+        RotatingLeft = false;
+        RotatingRight = false;
     }
 
     /// <summary>
@@ -676,6 +698,14 @@ public partial class Ship
         /// <summary>True for the synthetic "Unlock rift" row that clears the current lock.</summary>
         public bool IsUnlockAction;
         public Rift? Rift;
+    }
+
+    /// <summary>One row in the portal-anchor pick-list (Shift+P): a label and the index of the anchor it
+    /// teleports to (-1 for the placeholder "no anchors" row).</summary>
+    public class PortalMenuItem
+    {
+        public string Label = "";
+        public int AnchorIndex = -1;
     }
 
     /// <summary>A detected harmonic relationship: its interval type, the two dimensions involved, and their frequency ratio.</summary>

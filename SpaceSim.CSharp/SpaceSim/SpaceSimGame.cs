@@ -447,6 +447,9 @@ public partial class SpaceSimGame : Game
                 _audio.ClearAllEffects();       // drop any lingering one-shots / loops
                 _ship.ActiveMenu = null;        // close any open in-sim menu so re-entry isn't frozen inside it
                 _ship.ResetHeldInput();         // drop held-key latches (e.g. Space) so they don't persist on resume
+                // Flush any pending preference change now: the debounce clock (SimulationTime) freezes at the
+                // menu, so a just-changed setting could otherwise sit unsaved until exit (and be lost on a crash).
+                if (_settings != null && _settingsDirty) { SettingsStore.Save(_settings); _settingsDirty = false; }
                 _tutorial = null;               // leaving the sim ends any active tutorial
                 break;
             case GameScreen.LearnSounds:

@@ -158,27 +158,35 @@ public sealed class TolkSpeechService : IDisposable
             _ready.Set(); // unblock the constructor regardless of how loading went
         }
 
-        foreach (var cmd in _queue.GetConsumingEnumerable())
+        // Drain the queue until CompleteAdding + the producer stops. Wrapped so that if Dispose() disposes the
+        // queue mid-drain (a slow utterance overran the join timeout at shutdown), the enumerator's throw is
+        // swallowed and the worker exits cleanly instead of escaping on the background thread.
+        try
         {
-            try
+            foreach (var cmd in _queue.GetConsumingEnumerable())
             {
-                if (!_isActive)
+                try
                 {
-                    if (cmd.Kind == CommandKind.Speak)
-                        Console.WriteLine(cmd.Text);
-                    continue;
-                }
+                    if (!_isActive)
+                    {
+                        if (cmd.Kind == CommandKind.Speak)
+                            Console.WriteLine(cmd.Text);
+                        continue;
+                    }
 
-                if (cmd.Kind == CommandKind.Speak)
-                    TolkNative.Tolk_Output(cmd.Text, cmd.Interrupt);
-                else
-                    TolkNative.Tolk_Silence();
-            }
-            catch
-            {
-                // A single failed utterance must never kill the worker.
+                    if (cmd.Kind == CommandKind.Speak)
+                        TolkNative.Tolk_Output(cmd.Text, cmd.Interrupt);
+                    else
+                        TolkNative.Tolk_Silence();
+                }
+                catch
+                {
+                    // A single failed utterance must never kill the worker.
+                }
             }
         }
+        catch (ObjectDisposedException) { /* queue disposed mid-drain during shutdown — exit cleanly */ }
+        catch (InvalidOperationException) { /* adding-completed/dispose race during shutdown — exit cleanly */ }
 
         if (_isActive)
         {

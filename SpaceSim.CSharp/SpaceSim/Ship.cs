@@ -51,7 +51,10 @@ public partial class Ship
     public float SpatialSpeed =>
         MathF.Sqrt(Velocity[0] * Velocity[0] + Velocity[1] * Velocity[1] + Velocity[2] * Velocity[2]);
 
-    // Drive & target frequencies
+    // Drive & target frequencies.
+    // INVARIANT: the audio thread (AudioSystem.Read) reads these element-wise without a lock, so they must be
+    // MUTATED IN PLACE (Array.Copy into them) and NEVER reassigned for the live ship — a reassignment would let
+    // the audio thread observe a torn or null reference and crash. Save/load and preset recall copy into them.
     public float[] RDrive = new float[N];
     public float[] BaseFTarget = new float[N];
     public float[] FTarget = new float[N];

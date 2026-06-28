@@ -329,10 +329,12 @@ public static class CelestialGenerator
             leyLines.Add(leyLine);
         }
 
-        // Star lines: connect opposite temples (6 lines forming a star pattern)
-        for (int i = 0; i < 6; i++)
+        // Star lines: connect each minor temple to its antipode (half as many lines), forming a star pattern.
+        // Derived from MinorTempleCount so this stays correct if the temple count ever changes (was hardcoded 6).
+        int half = GameConstants.MinorTempleCount / 2;
+        for (int i = 0; i < half; i++)
         {
-            int oppositeI = i + 6;
+            int oppositeI = i + half;
 
             var leyLine = new LeyLine
             {

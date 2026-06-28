@@ -784,6 +784,9 @@ public partial class Ship
         DebugLogger.Log("Ship", $"Entering rift: type={rift.RiftKind}, pos={Vec5.Format(rift.Position)}");
         for (int i = 0; i < N; i++)
             Position[i] += MathHelpers.RandomRange(-20f, 20f) * PHI;
+        // Keep the warped position inside the torus immediately: when EnterRift fires from Update it runs
+        // AFTER the per-frame wrap, so without this the ship sits briefly out of bounds for one frame.
+        Vec5.WrapInto(Position, GameConstants.UniverseHalfExtent);
 
         // Build the warp announcement as one utterance (interrupt-by-default would drop the first line).
         string warpMsg = $"Entering {rift.RiftKind} Harmonic Chamber. Golden warp activated.";

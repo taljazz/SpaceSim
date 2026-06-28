@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace SpaceSim;
@@ -24,18 +25,25 @@ public partial class AudioSystem : ISampleProvider, IDisposable
 
     #region NAudio plumbing
 
-    // --- NAudio plumbing ---
-    private WaveOutEvent? _waveOut;
+    // --- NAudio plumbing (WASAPI shared-mode output) ---
+    private WasapiOut? _waveOut;
+    private MMDevice? _currentDevice;   // the resolved endpoint behind _waveOut; disposed with it
 
-    /// <summary>Chosen output device (NAudio MME device number; -1 = system default).</summary>
-    private int _deviceNumber = -1;
+    /// <summary>WASAPI endpoint ID of the chosen output device (null/empty = system default). Stable across
+    /// sessions and unique per endpoint, unlike the old WinMM product name (truncated to 31 chars and often
+    /// duplicated across identical devices, which made them indistinguishable to restore).</summary>
+    private string? _deviceId;
+
+    /// <summary>Shared-mode WASAPI buffer latency in ms: low enough to keep tuning/menu feedback snappy, high
+    /// enough to avoid underruns. Raise if a device crackles.</summary>
+    private const int OutputLatencyMs = 100;
 
     /// <summary>True while the output device is being swapped; Read() emits silence so a late/early callback
     /// can't glitch on half-torn-down state. Volatile: set by the game thread, read by the audio thread.</summary>
     private volatile bool _deviceSwitching;
 
-    /// <summary>The currently selected output device number (-1 = system default).</summary>
-    public int CurrentDeviceNumber => _deviceNumber;
+    /// <summary>The currently selected output device's WASAPI endpoint ID (null = system default).</summary>
+    public string? CurrentDeviceId => _deviceId;
 
     /// <summary>The interleaved 32-bit-float stereo format this provider emits (set in the constructor).</summary>
     public WaveFormat WaveFormat { get; }
@@ -359,23 +367,36 @@ public partial class AudioSystem : ISampleProvider, IDisposable
         DebugLogger.Log("Audio", "Starting audio output...");
         try
         {
-            _waveOut = new WaveOutEvent
+            MMDevice? device = null;
+            using (var enumerator = new MMDeviceEnumerator())
             {
-                // Lower latency = snappier audio feedback (menu ticks, beeps) right after a keypress.
-                // 60ms is a good balance for WaveOut; raise it again if any system crackles/underruns.
-                DesiredLatency = 60,
-                NumberOfBuffers = 3,
-                DeviceNumber = _deviceNumber,   // -1 = system default; F3 lets the player pick another
-            };
+                if (!string.IsNullOrEmpty(_deviceId))
+                {
+                    // Re-select exactly the chosen endpoint; if it has vanished (unplugged), fall back to default.
+                    try
+                    {
+                        device = enumerator.GetDevice(_deviceId);
+                        if (device.State != DeviceState.Active) { device.Dispose(); device = null; }
+                    }
+                    catch { device = null; }
+                }
+                device ??= enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            }
+            _currentDevice = device;
+            // Shared-mode WASAPI mixes through Windows just as WinMM did, but exposes full friendly names and
+            // stable IDs. Event-sync drives Read() on its own thread — the same pull model as before.
+            _waveOut = new WasapiOut(device, AudioClientShareMode.Shared, useEventSync: true, latency: OutputLatencyMs);
             _waveOut.Init(this);
             _waveOut.Play();
-            DebugLogger.Log("Audio", "Audio output started successfully");
+            DebugLogger.Log("Audio", $"Audio output started on '{device.FriendlyName}'");
         }
         catch (Exception ex)
         {
             DebugLogger.LogError("Audio", "Failed to start audio output", ex);
             _waveOut?.Dispose();
             _waveOut = null;
+            _currentDevice?.Dispose();
+            _currentDevice = null;
         }
     }
 
@@ -389,6 +410,8 @@ public partial class AudioSystem : ISampleProvider, IDisposable
         _waveOut.Stop();
         _waveOut.Dispose();
         _waveOut = null;
+        _currentDevice?.Dispose();
+        _currentDevice = null;
         DebugLogger.Log("Audio", "Audio output stopped");
     }
 
@@ -397,10 +420,10 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// stopping and recreating the WaveOut on that device. Safe to call while playing — a brief gap is
     /// expected as the device reopens. No-op if it is already the active device.
     /// </summary>
-    public void SetOutputDevice(int deviceNumber)
+    public void SetOutputDevice(string? deviceId)
     {
-        if (_waveOut != null && deviceNumber == _deviceNumber) return;
-        _deviceNumber = deviceNumber;
+        if (_waveOut != null && deviceId == _deviceId) return;
+        _deviceId = deviceId;
         bool wasRunning = _waveOut != null;
         _deviceSwitching = true;   // Read() returns silence during the swap so a late callback can't glitch
         try
@@ -412,34 +435,27 @@ public partial class AudioSystem : ISampleProvider, IDisposable
         {
             _deviceSwitching = false;
         }
-        DebugLogger.Log("Audio", $"Output device set to {deviceNumber}.");
+        DebugLogger.Log("Audio", $"Output device set to '{deviceId ?? "system default"}'.");
     }
 
-    /// <summary>Enumerate the available output devices: system default first, then each NAudio device.</summary>
-    public static List<(int Number, string Name)> GetOutputDevices()
+    /// <summary>
+    /// Enumerate the available output devices via WASAPI: system default first (Id null), then each active
+    /// render endpoint with its stable Id and full friendly name (no 31-character WinMM truncation).
+    /// </summary>
+    public static List<(string? Id, string Name)> GetOutputDevices()
     {
-        var list = new List<(int, string)> { (-1, "System default") };
+        var list = new List<(string?, string)> { (null, "System default") };
         try
         {
-            for (int n = 0; n < WaveOut.DeviceCount; n++)
-                list.Add((n, WaveOut.GetCapabilities(n).ProductName));
+            using var enumerator = new MMDeviceEnumerator();
+            foreach (var device in enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+            {
+                list.Add((device.ID, device.FriendlyName));
+                device.Dispose();
+            }
         }
         catch (Exception ex) { DebugLogger.LogError("Audio", "Enumerating output devices failed", ex); }
         return list;
-    }
-
-    /// <summary>Find the device number whose product name matches <paramref name="name"/> (-1 if none / default).</summary>
-    public static int FindDeviceByName(string name)
-    {
-        if (string.IsNullOrEmpty(name)) return -1;
-        try
-        {
-            for (int n = 0; n < WaveOut.DeviceCount; n++)
-                if (string.Equals(WaveOut.GetCapabilities(n).ProductName, name, StringComparison.OrdinalIgnoreCase))
-                    return n;
-        }
-        catch (Exception ex) { DebugLogger.LogError("Audio", "Matching output device by name failed", ex); }
-        return -1;
     }
 
     /// <summary>

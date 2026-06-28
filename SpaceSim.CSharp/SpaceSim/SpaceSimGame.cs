@@ -228,16 +228,13 @@ public partial class SpaceSimGame : Game
         _ship.AmbientSoundsEnabled = s.AmbientSoundsEnabled;
         _ship.NebulaDissonanceEnabled = s.NebulaDissonanceEnabled;
 
-        // Restore the chosen output device (matched by name; silently stays on default if it's gone).
-        if (!string.IsNullOrEmpty(s.OutputDeviceName))
+        // Restore the chosen output device by its stable WASAPI ID (falls back to the default device if it has
+        // vanished); the spatial engine follows by friendly name.
+        if (!string.IsNullOrEmpty(s.OutputDeviceId))
         {
-            int dev = AudioSystem.FindDeviceByName(s.OutputDeviceName);
-            if (dev >= 0)
-            {
-                _audio.SetOutputDevice(dev);
-                _openAl.TryReopen(s.OutputDeviceName);
-                _openAl.SetMasterGain(_audio.MasterVolume);
-            }
+            _audio.SetOutputDevice(s.OutputDeviceId);
+            _openAl.TryReopen(string.IsNullOrEmpty(s.OutputDeviceName) ? null : s.OutputDeviceName);
+            _openAl.SetMasterGain(_audio.MasterVolume);
         }
     }
 
@@ -302,28 +299,29 @@ public partial class SpaceSimGame : Game
         try
         {
             var devices = AudioSystem.GetOutputDevices();
-            using var form = new AudioDeviceForm(devices, _audio.CurrentDeviceNumber);
+            using var form = new AudioDeviceForm(devices, _audio.CurrentDeviceId);
             if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
             // Re-selecting the already-active device would needlessly rebuild the OpenAL context and briefly
             // silence the world loops, so treat it as a no-op.
-            if (form.SelectedDeviceNumber == _audio.CurrentDeviceNumber)
+            if (form.SelectedDeviceId == _audio.CurrentDeviceId)
             {
                 _tolk.Speak($"Already using {form.SelectedDeviceName}.", interrupt: true);
                 return;
             }
 
-            _audio.SetOutputDevice(form.SelectedDeviceNumber);
+            _audio.SetOutputDevice(form.SelectedDeviceId);
 
             // Move the spatial engine to a name-matched device too; silence live world loops first so no
             // stale OpenAL sources survive the context swap (the ship recreates them next frame).
             _ship.SilenceAllWorldSounds();
-            _openAl.TryReopen(form.SelectedDeviceNumber < 0 ? null : form.SelectedDeviceName);
+            _openAl.TryReopen(form.SelectedDeviceId == null ? null : form.SelectedDeviceName);
             _openAl.SetMasterGain(_audio.MasterVolume);   // restore listener gain now (reopen resets it to 1)
 
             if (_settings != null)
             {
-                _settings.OutputDeviceName = form.SelectedDeviceNumber < 0 ? "" : form.SelectedDeviceName;
+                _settings.OutputDeviceId = form.SelectedDeviceId ?? "";
+                _settings.OutputDeviceName = form.SelectedDeviceId == null ? "" : form.SelectedDeviceName;
                 // Persist immediately: a discrete choice needs no debounce, and the debounce clock
                 // (SimulationTime) is frozen off the Playing screen, so it might otherwise never save.
                 SettingsStore.Save(_settings);
@@ -331,7 +329,7 @@ public partial class SpaceSimGame : Game
             }
 
             _tolk.Speak($"Audio output set to {form.SelectedDeviceName}.", interrupt: true);
-            DebugLogger.Log("Audio", $"Output device chosen: {form.SelectedDeviceName} (#{form.SelectedDeviceNumber}).");
+            DebugLogger.Log("Audio", $"Output device chosen: {form.SelectedDeviceName} (id={form.SelectedDeviceId ?? "default"}).");
         }
         catch (Exception ex)
         {

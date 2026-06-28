@@ -17,8 +17,12 @@ public class GameSettings
     public float EffectVolume { get; set; } = 0.2f;
     public float DriveVolume { get; set; } = 0.05f;
 
-    /// <summary>Name of the chosen audio output device (empty = system default). Stored by name so it
-    /// survives device-index changes between sessions; matched back to a device on load.</summary>
+    /// <summary>WASAPI endpoint ID of the chosen audio output device (empty = system default). Stable and
+    /// unique per endpoint, so the exact device is reselected on load; if it has vanished, falls back to default.</summary>
+    public string OutputDeviceId { get; set; } = "";
+
+    /// <summary>Friendly name of the chosen output device (empty = system default). Kept for the spatial
+    /// (OpenAL) engine's name match and for display; the NAudio mix selects by <see cref="OutputDeviceId"/>.</summary>
     public string OutputDeviceName { get; set; } = "";
 
     #endregion

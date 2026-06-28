@@ -13,15 +13,15 @@ namespace SpaceSim.Menus;
 public sealed class AudioDeviceForm : Form
 {
     private readonly ListBox _list;
-    private readonly List<(int Number, string Name)> _devices;
+    private readonly List<(string? Id, string Name)> _devices;
 
-    /// <summary>The chosen device's NAudio number (-1 = system default). Valid only when DialogResult is OK.</summary>
-    public int SelectedDeviceNumber { get; private set; } = -1;
+    /// <summary>The chosen device's WASAPI endpoint ID (null = system default). Valid only when DialogResult is OK.</summary>
+    public string? SelectedDeviceId { get; private set; }
 
     /// <summary>The chosen device's display name. Valid only when DialogResult is OK.</summary>
     public string SelectedDeviceName { get; private set; } = "System default";
 
-    public AudioDeviceForm(List<(int Number, string Name)> devices, int currentNumber)
+    public AudioDeviceForm(List<(string? Id, string Name)> devices, string? currentId)
     {
         _devices = devices;
 
@@ -57,7 +57,7 @@ public sealed class AudioDeviceForm : Form
             TabStop = true,
         };
         foreach (var d in devices) _list.Items.Add(d.Name);
-        int idx = devices.FindIndex(d => d.Number == currentNumber);
+        int idx = devices.FindIndex(d => d.Id == currentId);
         _list.SelectedIndex = idx >= 0 ? idx : 0;
 
         var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Right, Width = 100, ForeColor = Color.Black };
@@ -85,7 +85,7 @@ public sealed class AudioDeviceForm : Form
         int i = _list.SelectedIndex;
         if (i >= 0 && i < _devices.Count)
         {
-            SelectedDeviceNumber = _devices[i].Number;
+            SelectedDeviceId = _devices[i].Id;
             SelectedDeviceName = _devices[i].Name;
         }
     }

@@ -68,6 +68,9 @@ public partial class Ship
                 float df = RDrive[i] - FTarget[i];
                 ResonanceLevels[i] = ResonancePhysics.Resonance(df, ResonanceWidth);
             }
+            // Keep the perfect-resonance edge tracker in step while landed (the function returns before the
+            // usual copy below), so takeoff doesn't register a false rising edge and fire a spurious click.
+            Array.Copy(ResonanceLevels, _prevResonanceLevels, N);
             return;
         }
 
@@ -819,10 +822,11 @@ public partial class Ship
             LandingTimer -= dt;
             if (LandingTimer <= 0)
             {
-                // Harder worlds demand higher average resonance to anchor (difficulty scales the bar).
+                // Harder worlds demand higher average resonance to anchor (difficulty scales the bar, but
+                // asymptotically so it never exceeds the reachable 1.0 ceiling — see LandingResonanceRequired).
                 float landingThreshold = GameConstants.LandingThreshold;
                 if (NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
-                    landingThreshold *= NearestBody.Difficulty;
+                    landingThreshold = GameConstants.LandingResonanceRequired(NearestBody.Difficulty);
 
                 if (avgRes > landingThreshold && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
                 {

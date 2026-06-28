@@ -184,6 +184,16 @@ public static class GameConstants
 
     public const float LandingThreshold = 0.8f;
     public const float LandingTime = 3f;
+
+    /// <summary>
+    /// Average resonance required to anchor on a planet of the given difficulty. Asymptotic in difficulty so
+    /// harder worlds always demand more, but the bar stays strictly below the 1.0 resonance ceiling and is
+    /// therefore always reachable. (The old LandingThreshold * Difficulty exceeded 1.0 for Difficulty &gt; 1.25 —
+    /// e.g. Ice Giant 1.3, Hot Jupiter 1.5, Rogue 2.0 — making roughly half the planets impossible to land on,
+    /// since resonance can never exceed 1.0.)
+    /// </summary>
+    public static float LandingResonanceRequired(float difficulty)
+        => difficulty <= 0f ? LandingThreshold : 1f - (1f - LandingThreshold) / difficulty;
     public const int CrystalCountBase = 3;
     public const int GridSize = 10;
     public const float CrystalCollectionThreshold = 0.8f;

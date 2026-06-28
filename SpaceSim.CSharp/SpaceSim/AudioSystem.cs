@@ -45,6 +45,10 @@ public partial class AudioSystem : ISampleProvider, IDisposable
     /// <summary>The currently selected output device's WASAPI endpoint ID (null = system default).</summary>
     public string? CurrentDeviceId => _deviceId;
 
+    /// <summary>True if the output device opened and is playing. False means Start() failed (e.g. no usable
+    /// audio endpoint) — the caller should tell the player, since the whole game is the sound.</summary>
+    public bool IsRunning => _waveOut != null;
+
     /// <summary>The interleaved 32-bit-float stereo format this provider emits (set in the constructor).</summary>
     public WaveFormat WaveFormat { get; }
 

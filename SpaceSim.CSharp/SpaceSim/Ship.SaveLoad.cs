@@ -77,8 +77,10 @@ public partial class Ship
             DebugLogger.LogError("Save", "Async save write failed", ex);
             // The optimistic "Game saved." was already spoken; a failed disk write would otherwise be silent.
             // Raise speech directly (thread-safe Tolk queue) rather than via Ship.Speak, since this runs on a
-            // background thread and must not touch the game-thread speech cooldown/buffers.
-            GameEvents.RaiseSpeak(null, "Warning: saving to disk failed.");
+            // background thread and must not touch the game-thread speech cooldown/buffers. Non-interrupting so a
+            // concurrent interrupting announcement (constant tuning chatter) can't drain it before it is heard —
+            // this is a must-hear "your save didn't actually persist" warning.
+            GameEvents.RaiseSpeak(null, "Warning: saving to disk failed.", interrupt: false);
         }
     }
 
@@ -179,7 +181,9 @@ public partial class Ship
         TuaoiModeIndex = tmIdx >= 0 ? tmIdx : 0;
         ConsciousnessValue = state.ConsciousnessValue;
         ConsciousnessStage = state.ConsciousnessStage;
-        TempleKeys = new HashSet<int>(state.TempleKeys);
+        // Filter key indices to the valid range so a hand-edited save can't inflate the count and trip the
+        // 12-keys Amenti gate without visiting the temples (mirrors the presets/anchors filtering above).
+        TempleKeys = new HashSet<int>(state.TempleKeys.Where(k => k >= 0 && k < GameConstants.MinorTempleCount));
         VisitedAmenti = state.VisitedAmenti;
         AmentiBlessingActive = state.AmentiBlessingActive;
         PortalAnchors = state.PortalAnchors
@@ -198,6 +202,21 @@ public partial class Ship
         LockedTarget = null;
         LockedRift = null;
         LockedIsRift = false;
+        // Reset transient flight modes so loading while landed / astral / idle / tuning doesn't strand or
+        // corrupt the restored position (loading while landed froze the ship in space; loading while astral
+        // had UpdateAstralMode tug Position back to the stale body). The loaded RDrive is left intact — we do
+        // NOT call ResetTransientState here, since that would re-tune the spatial realms over the load.
+        LandedMode = false;
+        LandedPlanet = null;
+        LandedPlanetBody = null;
+        AstralMode = false;
+        AstralBodyPos = null;
+        IdleMode = false;
+        IsOrbiting = false;
+        TuningMode = false;
+        InRegeneration = false;
+        DwellTimer = 0f;
+        RiftChargeTimer = 0f;
 
         // Rebuild celestial bodies around the restored position on the next update.
         NeedsUniverseRegeneration = true;

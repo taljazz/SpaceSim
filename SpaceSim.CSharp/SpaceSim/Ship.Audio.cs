@@ -156,6 +156,9 @@ public partial class Ship
         {
             slot.Sfx.Loop = false;
             slot.Sfx.Volume = 0;
+            // Mark it finished so the mixer drops it from _activePlayback on the next callback, instead of
+            // stepping a silent (volume 0) loop until it happens to reach its end (OpenAL-less fallback path).
+            slot.Sfx.Position = slot.Sfx.Waveform.Length;
         }
         slot = null;
     }

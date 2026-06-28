@@ -43,19 +43,24 @@ public partial class Ship
     }
 
     /// <summary>
-    /// Teleports the ship to its first portal anchor. Gated by a cooldown
-    /// (<see cref="GameConstants.PortalCooldown"/>) and a minimum average resonance
-    /// (<see cref="GameConstants.PortalTravelResonance"/>); the reason is spoken if travel is denied.
+    /// Opens the portal-anchor pick-list (Shift+P) so any dropped anchor can be selected and teleported to; the
+    /// cooldown/resonance gate is applied per-anchor in <see cref="TeleportToAnchor"/>. Blocked while astral
+    /// projecting, where a teleport would be silently undone when the projection snaps back to the body.
     /// </summary>
     public void OpenPortalMenu()
     {
+        if (AstralMode)
+        {
+            SpeakAtlantean("Cannot use portals while projecting. Return to your body first.");
+            return;
+        }
         if (PortalAnchors.Count == 0)
         {
             SpeakAtlantean("No portal anchors set. Create one with the P key.");
             return;
         }
-        // Open a pick-list so EVERY anchor is reachable. (Previously this teleported only ever to the first
-        // anchor, stranding the rest.) The menu's Enter calls TeleportToSelectedAnchor.
+        // A pick-list so EVERY anchor is reachable (this used to teleport only ever to the first, stranding the
+        // rest). The menu's Enter calls TeleportToSelectedAnchor, which applies the cooldown/resonance gate.
         OpenMenu(new PortalMenuMode(this));
     }
 
@@ -320,7 +325,9 @@ public partial class Ship
                 // spawns on the origin, where Amenti sits, so without this guard the very first line a new pilot
                 // hears is the endgame's "remain sealed" message, which reads as a failure state.
                 int missing = GameConstants.MinorTempleCount - TempleKeys.Count;
-                SpeakAtlantean($"The Halls of Amenti remain sealed. {missing} more temple keys needed, or consciousness level insufficient.");
+                SpeakAtlantean(missing > 0
+                    ? $"The Halls of Amenti remain sealed. {missing} more temple keys needed, or consciousness level insufficient."
+                    : "The Halls of Amenti remain sealed. All twelve keys are yours; raise your consciousness to enlightened to enter.");
                 _amentiSealedAnnounced = true;
             }
         }
@@ -666,8 +673,9 @@ public partial class Ship
     /// <param name="harmonics">The harmonics detected this frame (from <see cref="DetectHarmonicRelationships"/>).</param>
     public void ApplyHarmonicBonuses(Dictionary<string, HarmonicInfo> harmonics)
     {
-        if (harmonics.Count == 0) return;
-
+        // No early-out on an empty detection: the expiry loop below is the ONLY place stale entries are removed
+        // from ActiveHarmonics, and skipping it on empty frames left expired entries lingering — which then
+        // suppressed the chime/announcement when the player re-formed the same interval after a lapse.
         _newHarmonics.Clear();
 
         foreach (var (key, info) in harmonics)
@@ -739,10 +747,17 @@ public partial class Ship
         foreach (var (_, (hType, dims, expiry)) in ActiveHarmonics)
         {
             if (SimulationTime > expiry) continue;
-            if (hType == HarmonicType.Octave)
-                foreach (int d in dims) Velocity[d] *= 1.1f;
-            else if (hType == HarmonicType.Tritone)
-                foreach (int d in dims) Velocity[d] += MathHelpers.RandomRange(-0.2f, 0.2f);
+            foreach (int d in dims)
+            {
+                // Respect the higher-realm still-band gate (Ship.Update): a centred higher realm must stay
+                // motionless so the dwelling bath is reachable. The octave's multiply preserves a zeroed
+                // velocity, but the tritone's additive jitter would escape the gate — so skip gated dims.
+                if (d >= 3 && LockedTarget == null &&
+                    MathF.Abs(RDrive[d] - BaseFTarget[d]) < GameConstants.HigherRealmStillBand)
+                    continue;
+                if (hType == HarmonicType.Octave) Velocity[d] *= 1.1f;
+                else if (hType == HarmonicType.Tritone) Velocity[d] += MathHelpers.RandomRange(-0.2f, 0.2f);
+            }
         }
     }
 

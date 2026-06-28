@@ -150,6 +150,14 @@ public partial class SpaceSimGame : Game
         {
             DebugLogger.LogError("Audio", "AudioSystem.Start() failed", ex);
         }
+        // Start() swallows device-open failures internally, so check the result: in an audio-only game a dead
+        // soundscape with no spoken reason is the worst failure. Speech still works, so warn through it and
+        // point at the F3 device picker (which can recover by selecting another endpoint).
+        if (!_audio.IsRunning)
+        {
+            DebugLogger.Log("Audio", "Audio output did not start — warning the player via speech");
+            _tolk.Speak("Warning: audio output could not start. Only speech is available. Press F3 to choose a different output device.", interrupt: true);
+        }
 
         // Subscribe to game events
         GameEvents.OnSpeak += HandleSpeak;

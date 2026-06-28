@@ -188,7 +188,7 @@ public partial class Ship
             float avgRes = Vec5.Mean(ResonanceLevels);
             float landingThreshold = GameConstants.LandingThreshold;
             if (NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
-                landingThreshold *= NearestBody.Difficulty;
+                landingThreshold = GameConstants.LandingResonanceRequired(NearestBody.Difficulty);
 
             if (NearObject && avgRes > landingThreshold && NearestBody != null && NearestBody.BodyType == CelestialBodyType.Planet)
             {

@@ -423,6 +423,17 @@ public partial class Ship
     /// </summary>
     public void Speak(string msg) => Speak(msg, SpeechChannel.General);
 
+    /// <summary>Drop speech-cooldown entries older than the cooldown window, bounding the history map (templated
+    /// messages with embedded values would otherwise accumulate keys forever over a long session).</summary>
+    private void PruneSpokenHistory()
+    {
+        var stale = new List<string>();
+        foreach (var kv in _lastSpoken)
+            if (SimulationTime - kv.Value >= GameConstants.SpeechCooldown)
+                stale.Add(kv.Key);
+        foreach (var k in stale) _lastSpoken.Remove(k);
+    }
+
     /// <summary>
     /// Announces a message on a given <see cref="SpeechChannel"/>, honoring the per-message cooldown.
     /// The message is always recorded in its buffer for later browsing, but is only spoken aloud now if
@@ -433,6 +444,10 @@ public partial class Ship
         if (_lastSpoken.TryGetValue(msg, out float last) &&
             SimulationTime - last < GameConstants.SpeechCooldown)
             return;
+        // Templated lines (with embedded numbers) make a fresh key every time, so prune stale entries when the
+        // map grows — otherwise this cooldown dictionary grows unbounded over a long meditative session.
+        if (_lastSpoken.Count > 128)
+            PruneSpokenHistory();
         _lastSpoken[msg] = SimulationTime;
         _lastAnnouncement = msg;
         if (_speechBuffers.Record(channel, msg))

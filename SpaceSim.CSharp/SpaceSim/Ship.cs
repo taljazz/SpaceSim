@@ -540,11 +540,36 @@ public partial class Ship
     /// </summary>
     public void PrepareForTutorial()
     {
+        ResetTransientState();
+        _hasTunedHigherRealm = true;   // the tutorial teaches tuning; don't also fire the first-rest nudge
+        // The two higher realms are deliberately left as-is here for Begin() to detune for the hands-on steps.
+    }
+
+    /// <summary>
+    /// Enter NORMAL play from a clean, known state. Same transient reset as the tutorial, but the two higher
+    /// realms start IN tune (a fresh new game) and tutorial mode is cleared — so a prior Begin-Tutorial session
+    /// can't leak its detuned realms / tutorial state into Start Sim (which otherwise made normal play feel like
+    /// the tutorial). Progress (crystals, keys, consciousness, position) is preserved; only transient flight
+    /// state is reset.
+    /// </summary>
+    public void PrepareForPlay()
+    {
+        ResetTransientState();
+        RDrive[3] = BaseFTarget[3];    // higher realms in tune for normal play (the tutorial detunes them instead)
+        RDrive[4] = BaseFTarget[4];
+        _hasTunedHigherRealm = false;  // allow the gentle first-rest tuning nudge during normal play
+        TutorialActive = false;        // make sure no prior tutorial run leaves the cue/rate retarget suppressed
+    }
+
+    /// <summary>
+    /// Shared transient-state reset used when (re)entering the sim or the tutorial: clears velocity, rests the
+    /// three spatial realms at their still centre, and drops any lock / landing / orbit / astral / idle / menu /
+    /// full-tuning state plus the dwell and rift-charge timers. Leaves progress and the higher realms alone;
+    /// callers decide what to do with realms 4 &amp; 5. Uses BaseFTarget (fixed centre), not the breathing FTarget.
+    /// </summary>
+    private void ResetTransientState()
+    {
         Array.Clear(Velocity);
-        // Rest the three spatial realms at their still centre so the ship is provably motionless on frame 0,
-        // before any input runs (the manual-nav handler also rests them each idle frame, but this makes the
-        // clean start frame-order-independent). Use BaseFTarget — the fixed centre — not FTarget, which carries
-        // transient env-pull/breath drift. The higher realms are left for Begin() to detune for the tuning steps.
         for (int i = 0; i < 3; i++) RDrive[i] = BaseFTarget[i];
         LandedMode = false;
         LandedPlanet = null;
@@ -563,7 +588,6 @@ public partial class Ship
         RiftChargeTimer = 0f;
         InRegeneration = false;
         DwellTimer = 0f;
-        _hasTunedHigherRealm = true;   // the tutorial teaches tuning; don't also fire the first-rest nudge
         _lastInputTime = SimulationTime;
         StopLockSound();
         SilenceAllWorldSounds();

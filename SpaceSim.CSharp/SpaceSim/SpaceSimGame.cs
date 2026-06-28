@@ -349,6 +349,7 @@ public partial class SpaceSimGame : Game
             case ScreenTransition.StartSim:
                 _screen = GameScreen.Playing;
                 _tutorial = null;
+                _ship.PrepareForPlay();               // clean normal-play state so a prior tutorial can't leak in
                 _audio.EngineEnabled = true;          // resume the live resonance-drive synthesis
                 SpeakStartOrientation();
                 DebugLogger.Log("Event", "Screen -> Playing");
